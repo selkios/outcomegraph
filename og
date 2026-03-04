@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import fnmatch
 import os
 import shutil
 import subprocess
@@ -748,14 +749,16 @@ def _build_claim_payload(
     mode: str,
     changed_files: list[str],
     receipt_pointers: list[dict[str, object]],
+    text: str | None = None,
 ) -> dict[str, object]:
     now = _utc_timestamp()
+    claim_text = text or f"Synthetic claim for {capsule_id} from distill stage."
     return {
         "schema_version": 2,
         "artifact_type": "claim",
         "id": claim_id,
         "capsule_id": capsule_id,
-        "text": f"Synthetic claim for {capsule_id} from distill stage.",
+        "text": claim_text,
         "category": "behavior",
         "receipt_pointers": receipt_pointers,
         "origin": {
@@ -776,6 +779,8 @@ def _build_certificate_payload(
     profile: str,
     mode: str,
     receipt_pointers: list[dict[str, object]],
+    status: str = "success",
+    source: str = "distill-placeholder",
 ) -> dict[str, object]:
     now = _utc_timestamp()
     return {
@@ -784,7 +789,7 @@ def _build_certificate_payload(
         "id": certificate_id,
         "capsule_id": capsule_id,
         "run_id": run_id,
-        "status": "success",
+        "status": status,
         "adapter": {
             "name": "filesystem-store",
             "version": "1.0.0",
@@ -795,7 +800,7 @@ def _build_certificate_payload(
             "run_id": run_id,
             "adapter_profile": profile,
             "mode": mode,
-            "source": "distill-placeholder",
+            "source": source,
         },
         "created_at": now,
         "updated_at": now,
@@ -1834,6 +1839,166 @@ def _compute_idempotency_key(snapshot: dict[str, object], profile: str, mode: st
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _normalize_oracle_entry(raw_oracle: object) -> dict[str, object] | None:
+    if isinstance(raw_oracle, str):
+        name = raw_oracle.strip()
+        if not name:
+            return None
+        return {"name": name, "command": None, "scope": []}
+    if not isinstance(raw_oracle, dict):
+        return None
+
+    name = raw_oracle.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+
+    command = raw_oracle.get("command")
+    command_value = command.strip() if isinstance(command, str) and command.strip() else None
+
+    scope_raw = raw_oracle.get("scope")
+    scope: list[str] = []
+    if isinstance(scope_raw, str):
+        if scope_raw.strip():
+            scope = [scope_raw.strip()]
+    elif isinstance(scope_raw, list):
+        for raw_scope in scope_raw:
+            if isinstance(raw_scope, str):
+                cleaned = raw_scope.strip()
+                if cleaned:
+                    scope.append(cleaned)
+
+    return {"name": name.strip(), "command": command_value, "scope": scope}
+
+
+def _load_capsule_oracles(repo_root: str, capsule_id: str) -> list[dict[str, object]]:
+    yaml_path = os.path.join(repo_root, OG_ROOT, "capsules", f"{_safe_slug(capsule_id)}.yaml")
+    json_path = os.path.join(repo_root, OG_ROOT, "capsules", f"{_safe_slug(capsule_id)}.json")
+
+    for candidate in (json_path, yaml_path):
+        if not os.path.isfile(candidate):
+            continue
+        payload = _read_json_file(candidate)
+        if not isinstance(payload, dict):
+            continue
+        raw_oracles = payload.get("oracles")
+        if not isinstance(raw_oracles, list):
+            continue
+        normalized: list[dict[str, object]] = []
+        for raw_oracle in raw_oracles:
+            normalized_oracle = _normalize_oracle_entry(raw_oracle)
+            if normalized_oracle is not None:
+                normalized.append(normalized_oracle)
+        if normalized:
+            return normalized
+
+    return [
+        {
+            "name": f"{_safe_slug(capsule_id)}-verify",
+            "command": None,
+            "scope": [],
+        }
+    ]
+
+
+def _oracle_scopes_match(oracle: dict[str, object], changed_paths: list[str]) -> bool:
+    scope_raw = oracle.get("scope")
+    if not isinstance(scope_raw, list):
+        return True
+    scope: list[str] = [str(entry) for entry in scope_raw if isinstance(entry, str)]
+    if not scope:
+        return True
+    if not changed_paths:
+        return True
+    for changed_path in changed_paths:
+        for glob in scope:
+            if fnmatch.fnmatch(changed_path, glob):
+                return True
+    return False
+
+
+def _run_oracle_check(
+    repo_root: str,
+    capsule_id: str,
+    oracle: dict[str, object],
+    changed_paths: list[str],
+    run_id: str,
+    mode: str,
+) -> dict[str, object]:
+    oracle_name = str(oracle.get("name", "unknown-oracle"))
+    command = oracle.get("command")
+    command_text = command.strip() if isinstance(command, str) else None
+
+    start = time.perf_counter()
+    result_payload: dict[str, object] = {
+        "schema_version": 2,
+        "oracle_name": oracle_name,
+        "capsule_id": capsule_id,
+        "run_id": run_id,
+        "mode": mode,
+        "status": "skipped",
+        "checked_at": _utc_timestamp(),
+        "changed_paths": changed_paths,
+        "command": command_text or "",
+    }
+
+    if not command_text:
+        result_payload["status"] = "pass"
+        result_payload["observed_code"] = 0
+        result_payload["message"] = "No oracle command configured; marked pass."
+        payload_bytes = (json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode(
+            "utf-8"
+        )
+    else:
+        try:
+            executed = subprocess.run(
+                command_text,
+                shell=True,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            result_payload["status"] = "error"
+            result_payload["observed_code"] = 124
+            result_payload["error"] = "oracle command timed out"
+            payload_bytes = (
+                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+            ).encode("utf-8")
+        except Exception as exc:
+            result_payload["status"] = "error"
+            result_payload["observed_code"] = 1
+            result_payload["error"] = f"oracle command failed to execute: {exc}"
+            payload_bytes = (
+                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+            ).encode("utf-8")
+        else:
+            result_payload["observed_code"] = executed.returncode
+            if executed.returncode == 0:
+                result_payload["status"] = "pass"
+            else:
+                result_payload["status"] = "fail"
+            result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
+            result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
+            result_payload["message"] = "oracle command executed."
+            payload_bytes = (
+                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+            ).encode("utf-8")
+
+    result_payload["duration_ms"] = int((time.perf_counter() - start) * 1000)
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-verify.json"
+    trace_full_path = os.path.join(repo_root, trace_path)
+    os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
+    _write_text_payload(trace_full_path, payload_bytes.decode("utf-8"))
+    receipts = [
+        _build_file_pointer(trace_path, payload_bytes, "application/json"),
+        _store_put(repo_root, payload_bytes.decode("utf-8"), "application/json"),
+    ]
+    result_payload["receipt_pointers"] = receipts
+    result_payload["trace"] = trace_path
+    return result_payload
+
+
 def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
     if not changed_files:
         return []
@@ -2024,7 +2189,13 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
     }
 
 
-def _run_verify_stage(repo_root: str, changed_capsules: list[str], run_id: str, mode: str) -> dict[str, object]:
+def _run_verify_stage(
+    repo_root: str,
+    changed_capsules: list[str],
+    changed_paths: list[str],
+    run_id: str,
+    mode: str,
+) -> dict[str, object]:
     if not changed_capsules:
         return {
             "name": "verify",
@@ -2033,34 +2204,91 @@ def _run_verify_stage(repo_root: str, changed_capsules: list[str], run_id: str, 
             "mode": mode,
             "verified_capsules": [],
             "receipt_pointers": {},
+            "oracle_results": {},
         }
+
+    changed_paths = changed_paths if isinstance(changed_paths, list) else []
+    normalized_changed_paths = [str(path) for path in changed_paths]
     receipts: dict[str, list[dict[str, object]]] = {}
+    oracle_results: dict[str, list[dict[str, object]]] = {}
+    certificate_refs: list[str] = []
+    overall_failed = False
+
     for capsule in changed_capsules:
-        payload = {
-            "run_id": run_id,
-            "capsule_id": capsule,
-            "stage": "verify",
-            "mode": mode,
-            "checked_at": _utc_timestamp(),
-        }
-        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-verify.json"
-        trace_payload = (
-            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-        ).encode("utf-8")
-        trace_full_path = os.path.join(repo_root, trace_path)
-        os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
-        _write_text_payload(trace_full_path, trace_payload.decode("utf-8"))
-        receipts[capsule] = [
-            _build_file_pointer(trace_path, trace_payload, "application/json"),
-            _store_put(repo_root, payload, "application/json"),
+        capsule_oracles = _load_capsule_oracles(repo_root, capsule)
+        impacted_oracles = [
+            oracle
+            for oracle in capsule_oracles
+            if isinstance(oracle, dict) and _oracle_scopes_match(oracle, normalized_changed_paths)
         ]
+        if not impacted_oracles:
+            impacted_oracles = capsule_oracles[:1]
+
+        checks = []
+        for oracle in impacted_oracles:
+            checks.append(_run_oracle_check(repo_root, capsule, oracle, normalized_changed_paths, run_id, mode))
+
+        receipt_records: list[dict[str, object]] = []
+        for check in checks:
+            for pointer in check.get("receipt_pointers", []):
+                if isinstance(pointer, dict):
+                    receipt_records.append(pointer)
+
+        receipts[capsule] = receipt_records
+        oracle_results[capsule] = checks
+        capsule_status = "success"
+        for raw_result in checks:
+            status = str(raw_result.get("status", "skipped"))
+            if status in {"fail", "error"}:
+                capsule_status = "failed"
+                overall_failed = True
+                break
+
+        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
+        receipt_pointers = receipt_records
+        claim_text = f"Verification checkpoints for {capsule} on {len(checks)} oracle checks."
+        claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
+        os.makedirs(os.path.dirname(claim_path), exist_ok=True)
+        claim_payload = _build_claim_payload(
+            claim_id,
+            capsule,
+            run_id,
+            "verify",
+            mode,
+            normalized_changed_paths,
+            receipt_pointers,
+            text=claim_text,
+        )
+        _write_json_file(claim_path, claim_payload)
+        claim_ref = f"{OG_ROOT}/claims/{claim_id}.json"
+
+        certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
+        cert_status = "failed" if capsule_status != "success" else "success"
+        cert_payload = _build_certificate_payload(
+            certificate_id,
+            capsule,
+            run_id,
+            claim_ref,
+            "verify",
+            mode,
+            receipt_pointers,
+            status=cert_status,
+            source="oracle-loop",
+        )
+        cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
+        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+        _write_json_file(cert_path, cert_payload)
+        certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+
     return {
         "name": "verify",
-        "status": "ok",
-        "message": "Synthetic fast-verify loop completed for affected capsules.",
+        "status": "error" if overall_failed else "ok",
+        "message": "Oracle-driven verify loop completed for affected capsules.",
         "mode": mode,
         "verified_capsules": changed_capsules,
-        "oracle_count": len(changed_capsules),
+        "oracle_count": sum(len(values) for values in oracle_results.values()) if oracle_results else 0,
+        "certificate_refs": sorted(certificate_refs),
+        "oracle_results": oracle_results,
         "receipt_pointers": receipts,
     }
 
@@ -2195,7 +2423,13 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="verify", last_message="starting verify")
     verify = _time_step(
         "verify",
-        lambda: _run_verify_stage(repo_root, affected_capsules, run_id, mode=mode),
+        lambda: _run_verify_stage(
+            repo_root,
+            affected_capsules,
+            snapshot.get("changed_files", []) if isinstance(snapshot, dict) else [],
+            run_id,
+            mode=mode,
+        ),
     )
     steps.append(verify)
 
