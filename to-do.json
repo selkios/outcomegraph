@@ -615,8 +615,8 @@
       "id": "OG-OPT-001",
       "title": "Implement experimental prompt optimization workflow",
       "priority": 4,
-      "status": "todo",
-      "details": "Add offline prompt tuning command with dataset evaluation and manual promotion gate checks.",
+      "status": "done",
+      "details": "Implemented experimental prompt optimization workflow including eval dataset parsing/evaluation, threshold-based pass/fail, manual approval gating, result/prompt-pack artifact writes, and docs wiring.",
       "steps": [
         "Create eval dataset schema and execution path",
         "Compare candidate prompt performance against baseline",
@@ -629,6 +629,15 @@
       "depends_on": [
         "OG-CLI-001",
         "OG-SYNC-001"
+      ],
+      "updated_at": "2026-03-04T10:32:44Z",
+      "files": [
+        "og",
+        "README.md",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "QUICKSTART.md",
+        "to-do.json"
       ]
     },
     {

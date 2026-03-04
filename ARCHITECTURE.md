@@ -304,7 +304,19 @@ Default policy documents (`.outcomegraph/policy.yaml`) include:
 
 Explicit autonomous mode (`--mode autonomous`) is required before allowlisted writes/deploys can be executed; observe mode always treats these as blocking.
 
-## 9) Operational touchpoints
+## 9) Experimental optimization workflow
+
+Optimization is offline and controlled by `og optimize prompts`.
+
+- The optimizer reads an `eval_dataset` artifact and baseline/candidate prompt artifacts.
+- It simulates prompt execution against each case using deterministic scoring for:
+  - `contains`: every expected token must appear in the candidate output.
+  - `exact`: normalized output must equal one expected value.
+- It writes an `optimization_eval_result` artifact under `.outcomegraph/datasets/`.
+- `--approve` gates writing a `prompt_pack` artifact for activation.
+- Failed threshold checks never auto-promote; manual approval is required for promotion.
+
+## 10) Operational touchpoints
 
 - Human path: `og init`, optional `og autopilot init`, then `og sync`.
 - Agent path: use steward skill, run the same CLI contract.

@@ -175,6 +175,16 @@ Core parsing rules:
 - `--profile` and `--mode` are validated against finite enumerations.
 - Unknown options or subcommands are treated as usage errors.
 
+`og optimize prompts` accepts:
+
+- `--dataset <path>` path to an `eval_dataset` artifact (`schema_version: 2`).
+- `--candidate <path>` path to candidate prompt artifact text.
+- `--baseline <path>` path to baseline prompt artifact text.
+- `--metric {contains|exact}` scoring metric (`contains` default).
+- `--min-improvement <number>` score delta threshold, interpreted as percentage when > 1.
+- `--approve` to persist an active prompt pack.
+- `--json` for machine-readable output.
+
 Exit codes:
 
 - `0` success
@@ -250,7 +260,7 @@ All canonical ArtifactGraph payloads are schema-versioned records with `schema_v
 Every canonical artifact must include:
 
 - `schema_version: 2`
-- `artifact_type`: one of `capsule`, `ref`, `decision`, `certificate`, `materials_lock`, `claim`
+- `artifact_type`: one of `capsule`, `ref`, `decision`, `certificate`, `materials_lock`, `claim`, `prompt_pack`, `eval_dataset`, `optimization_eval_result`
 - `id` (namespace-unique)
 - `created_at` and `updated_at` (ISO-8601 UTC when applicable)
 
@@ -1040,6 +1050,60 @@ Promotion gate:
 - require eval dataset results against baseline.
 - require manual review/approval before activation.
 - no automatic production promotion.
+
+Experimental schemas:
+
+- `eval_dataset`:
+
+```json
+{
+  "schema_version": 2,
+  "artifact_type": "eval_dataset",
+  "id": "llm-routing-bugfix",
+  "name": "LLM routing bugfix dataset",
+  "cases": [
+    {
+      "id": "q-001",
+      "input": "When should I file a ticket?",
+      "expected_contains": ["create a ticket", "ticketing"],
+      "must_not_contain": ["panic"],
+      "weight": 1.0
+    }
+  ]
+}
+```
+
+- `optimization_eval_result`:
+
+```json
+{
+  "schema_version": 2,
+  "artifact_type": "optimization_eval_result",
+  "id": "opt-llm-routing-bugfix-abc123",
+  "dataset_id": "llm-routing-bugfix",
+  "metric": "contains",
+  "min_improvement": 0.02,
+  "baseline_score": 0.35,
+  "candidate_score": 0.52,
+  "score_delta": 0.17,
+  "status": "pass"
+}
+```
+
+- `prompt_pack`:
+
+```json
+{
+  "schema_version": 2,
+  "artifact_type": "prompt_pack",
+  "id": "llm-routing-bugfix-active-pack",
+  "dataset_id": "llm-routing-bugfix",
+  "status": "active",
+  "baseline_prompt": ".outcomegraph/datasets/baseline.txt",
+  "candidate_prompt": ".outcomegraph/datasets/candidate.txt",
+  "result_ref": ".outcomegraph/datasets/opt-llm-routing-bugfix-abc123.json"
+}
+```
 
 ## 19) Documentation requirements
 

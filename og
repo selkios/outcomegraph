@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import fnmatch
+import math
 import os
 import shutil
 import subprocess
@@ -103,6 +104,8 @@ MCP_CONTROL_TOOL_DEFS = (
 MCP_CONTROL_RESOURCES = ("capsules", "refs", "constitution", "certificates")
 MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
 WORK_LOCK_STALE_SECONDS = 300
+OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
+OPTIMIZATION_SUPPORTED_METRICS = ("contains", "exact")
 LOCK_STATUS_LOCKED = "locked"
 LOCK_STATUS_UNLOCKED = "unlocked"
 STATUS_SCHEMA_VERSION = 1
@@ -199,6 +202,16 @@ def parse_bool_option(raw: str) -> bool:
     if value in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"invalid boolean value '{raw}'")
+
+
+def parse_float_option(raw: str, field: str) -> float:
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be a number") from exc
+    if math.isinf(value) or math.isnan(value):
+        raise ValueError(f"{field} must be a finite number")
+    return value
 
 
 def _build_run_id(prefix: str, run_suffix: str | None = None) -> str:
@@ -3626,8 +3639,347 @@ def parse_command_flags(
     return options, []
 
 
+def _parse_optimize_prompts_flags(
+    args: list[str],
+    output_json: bool,
+) -> dict[str, object]:
+    dataset_path: str | None = None
+    candidate_prompt: str | None = None
+    baseline_prompt: str | None = None
+    metric = "contains"
+    min_improvement = OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT
+    approve = False
+    i = 0
+
+    while i < len(args):
+        arg = args[i]
+        if arg in {"-h", "--help"}:
+            emit_command_result({"message": emit_usage() + "\nUse --help with a specific command for details."}, output_json)
+            sys.exit(EXIT_SUCCESS)
+        if arg == "--json":
+            output_json = True
+            i += 1
+            continue
+        if arg == "--dataset":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --dataset", "optimize", EXIT_USAGE, output_json)
+            dataset_path = args[i + 1].strip()
+            i += 2
+            continue
+        if arg.startswith("--dataset="):
+            dataset_path = arg.split("=", 1)[1].strip()
+            i += 1
+            continue
+        if arg == "--candidate":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --candidate", "optimize", EXIT_USAGE, output_json)
+            candidate_prompt = args[i + 1].strip()
+            i += 2
+            continue
+        if arg.startswith("--candidate="):
+            candidate_prompt = arg.split("=", 1)[1].strip()
+            i += 1
+            continue
+        if arg == "--baseline":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --baseline", "optimize", EXIT_USAGE, output_json)
+            baseline_prompt = args[i + 1].strip()
+            i += 2
+            continue
+        if arg.startswith("--baseline="):
+            baseline_prompt = arg.split("=", 1)[1].strip()
+            i += 1
+            continue
+        if arg == "--metric":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --metric", "optimize", EXIT_USAGE, output_json)
+            value = args[i + 1].strip().lower()
+            if value not in OPTIMIZATION_SUPPORTED_METRICS:
+                emit_error(
+                    f"invalid --metric '{value}', expected one of: {', '.join(sorted(OPTIMIZATION_SUPPORTED_METRICS))}",
+                    "optimize",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            metric = value
+            i += 2
+            continue
+        if arg.startswith("--metric="):
+            value = arg.split("=", 1)[1].strip().lower()
+            if value not in OPTIMIZATION_SUPPORTED_METRICS:
+                emit_error(
+                    f"invalid --metric '{value}', expected one of: {', '.join(sorted(OPTIMIZATION_SUPPORTED_METRICS))}",
+                    "optimize",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            metric = value
+            i += 1
+            continue
+        if arg == "--min-improvement":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --min-improvement", "optimize", EXIT_USAGE, output_json)
+            try:
+                value = parse_float_option(args[i + 1], "min-improvement")
+            except ValueError as exc:
+                emit_error(f"invalid --min-improvement value: {exc}", "optimize", EXIT_USAGE, output_json)
+            min_improvement = value
+            i += 2
+            continue
+        if arg.startswith("--min-improvement="):
+            try:
+                value = parse_float_option(arg.split("=", 1)[1], "min-improvement")
+            except ValueError as exc:
+                emit_error(f"invalid --min-improvement value: {exc}", "optimize", EXIT_USAGE, output_json)
+            min_improvement = value
+            i += 1
+            continue
+        if arg == "--approve":
+            approve = True
+            i += 1
+            continue
+        if arg.startswith("--approve="):
+            try:
+                approve = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --approve value: {exc}", "optimize", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        emit_error(f"unknown option '{arg}' for optimize prompts", "optimize", EXIT_USAGE, output_json)
+
+    if not dataset_path:
+        emit_error("optimize prompts requires --dataset", "optimize", EXIT_USAGE, output_json)
+    if not candidate_prompt:
+        emit_error("optimize prompts requires --candidate", "optimize", EXIT_USAGE, output_json)
+    if not baseline_prompt:
+        emit_error("optimize prompts requires --baseline", "optimize", EXIT_USAGE, output_json)
+    if not isinstance(min_improvement, (int, float)) or min_improvement < 0:
+        emit_error("--min-improvement must be >= 0", "optimize", EXIT_USAGE, output_json)
+    if min_improvement > 1:
+        min_improvement = min_improvement / 100.0
+
+    return {
+        "dataset": dataset_path.strip(),
+        "candidate": candidate_prompt.strip(),
+        "baseline": baseline_prompt.strip(),
+        "metric": metric,
+        "min_improvement": min_improvement,
+        "approve": bool(approve),
+        "output_json": output_json,
+    }
+
+
 def _normalize_path_list(raw: str) -> list[str]:
     return sorted({entry.strip() for entry in raw.splitlines() if entry.strip()})
+
+
+def _normalize_dataset_path(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a path string")
+    path = value.strip().replace("\\", "/")
+    if not path:
+        raise ValueError(f"{field} must be a non-empty path")
+    return path.lstrip("./")
+
+
+def _load_text_artifact(repo_root: str, relative_path: str, label: str) -> str:
+    path = os.path.join(repo_root, relative_path)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return handle.read()
+    except OSError as exc:
+        raise ValueError(f"unable to read {label} from '{relative_path}': {exc}") from exc
+
+
+def _build_optimization_case_payload(
+    index: int,
+    case_id: str,
+    case_input: str,
+    weight: float,
+    baseline_score: float,
+    candidate_score: float,
+) -> dict[str, object]:
+    winner = "tie"
+    if candidate_score > baseline_score:
+        winner = "candidate"
+    elif baseline_score > candidate_score:
+        winner = "baseline"
+    return {
+        "index": index,
+        "id": case_id,
+        "input": case_input,
+        "weight": weight,
+        "baseline_score": baseline_score,
+        "candidate_score": candidate_score,
+        "winner": winner,
+    }
+
+
+def _normalize_evaluation_cases(raw_cases: object, dataset_id: str) -> list[dict[str, object]]:
+    if not isinstance(raw_cases, list) or not raw_cases:
+        raise ValueError(f"eval_dataset[{dataset_id}] must contain a non-empty 'cases' list")
+    cases: list[dict[str, object]] = []
+    for index, raw_case in enumerate(raw_cases, start=1):
+        if not isinstance(raw_case, dict):
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] must be an object")
+        case_input_raw = raw_case.get("input")
+        if not isinstance(case_input_raw, str) or not case_input_raw.strip():
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] is missing non-empty 'input'")
+        expected_raw = raw_case.get("expected")
+        if expected_raw is None:
+            expected_raw = raw_case.get("expected_contains")
+        if expected_raw is None:
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] missing required 'expected'")
+        if isinstance(expected_raw, str):
+            expected = [expected_raw]
+        elif isinstance(expected_raw, list):
+            expected = [str(item) for item in expected_raw if isinstance(item, str)]
+        else:
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] invalid 'expected'")
+        expected = [item.strip() for item in expected if item.strip()]
+        if not expected:
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] must include at least one expected token")
+        must_not_raw = raw_case.get("must_not_contain", [])
+        if isinstance(must_not_raw, str):
+            must_not = [must_not_raw]
+        elif isinstance(must_not_raw, list):
+            must_not = [str(item) for item in must_not_raw if str(item).strip()]
+        else:
+            must_not = []
+
+        weight_raw = raw_case.get("weight", 1.0)
+        if isinstance(weight_raw, bool) or not isinstance(weight_raw, int | float):
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] has invalid weight")
+        if weight_raw <= 0:
+            raise ValueError(f"eval_dataset[{dataset_id}] case[{index}] weight must be greater than 0")
+
+        case_id_raw = raw_case.get("id")
+        case_id = str(case_id_raw).strip() if isinstance(case_id_raw, str) and case_id_raw.strip() else f"case-{index:03d}"
+
+        cases.append(
+            {
+                "id": case_id,
+                "input": case_input_raw.strip(),
+                "expected": expected,
+                "must_not_contain": [item.strip() for item in must_not],
+                "weight": float(weight_raw),
+            }
+        )
+    return cases
+
+
+def _read_eval_dataset(repo_root: str, dataset_relative_path: str) -> dict[str, object]:
+    payload = _read_json_file(os.path.join(repo_root, dataset_relative_path))
+    if not isinstance(payload, dict):
+        raise ValueError(f"dataset '{dataset_relative_path}' is not valid JSON")
+    dataset_id = _required_str(payload.get("id"), f"eval_dataset[{dataset_relative_path}].id")
+    schema_version = payload.get("schema_version")
+    if schema_version != 2:
+        raise ValueError(f"eval_dataset[{dataset_id}] must use schema_version 2")
+    artifact_type = payload.get("artifact_type")
+    if artifact_type != "eval_dataset":
+        raise ValueError(f"eval_dataset[{dataset_id}] must have artifact_type 'eval_dataset'")
+    cases_raw = payload.get("cases")
+    cases = _normalize_evaluation_cases(cases_raw, dataset_id)
+    return {
+        "id": dataset_id,
+        "name": str(payload.get("name") or dataset_id),
+        "cases": cases,
+        "schema_version": schema_version,
+        "artifact_type": artifact_type,
+        "description": payload.get("description"),
+    }
+
+
+def _build_prompt_execution_result(prompt: str, case: dict[str, object], metric: str) -> float:
+    case_input = str(case.get("input") or "")
+    expected = [
+        " ".join(str(token).strip().lower().split()) for token in case.get("expected", []) if str(token).strip()
+    ]
+    if not expected:
+        return 0.0
+    forbidden = [
+        " ".join(str(token).strip().lower().split()) for token in case.get("must_not_contain", []) if str(token).strip()
+    ]
+    response = f"{prompt} {case_input}".strip().lower()
+    response_normalized = " ".join(response.split())
+    if metric == "exact":
+        matched = any(response_normalized == expected_value for expected_value in expected)
+    else:
+        matched = all(token in response_normalized for token in expected)
+    if forbidden and any(token in response_normalized for token in forbidden):
+        matched = False
+    return 1.0 if matched else 0.0
+
+
+def _evaluate_prompts(
+    repo_root: str,
+    dataset: dict[str, object],
+    baseline_prompt: str,
+    candidate_prompt: str,
+    options: dict[str, object],
+) -> dict[str, object]:
+    metric = str(options.get("metric") or "contains").strip().lower()
+    if metric not in OPTIMIZATION_SUPPORTED_METRICS:
+        raise ValueError(f"unsupported metric '{metric}'")
+    cases = dataset.get("cases")
+    if not isinstance(cases, list):
+        raise ValueError("dataset is missing parsed cases")
+    min_improvement = float(options.get("min_improvement") or 0.0)
+    if min_improvement < 0:
+        raise ValueError("min_improvement must be >= 0")
+    total_weight = 0.0
+    baseline_total = 0.0
+    candidate_total = 0.0
+    case_results: list[dict[str, object]] = []
+    for index, case in enumerate(cases, start=1):
+        if not isinstance(case, dict):
+            raise ValueError(f"eval_dataset[{dataset['id']}] case[{index}] must be an object")
+        weight = float(case.get("weight") or 1.0)
+        baseline_score = _build_prompt_execution_result(baseline_prompt, case, metric)
+        candidate_score = _build_prompt_execution_result(candidate_prompt, case, metric)
+        candidate_total += candidate_score * weight
+        total_weight += weight
+        baseline_total += baseline_score * weight
+        case_results.append(
+            _build_optimization_case_payload(
+                index=index,
+                case_id=str(case.get("id") or f"case-{index:03d}"),
+                case_input=str(case.get("input") or ""),
+                weight=weight,
+                baseline_score=baseline_score,
+                candidate_score=candidate_score,
+            )
+        )
+
+    if total_weight <= 0:
+        raise ValueError("dataset cases must have positive total weight")
+
+    baseline_rate = baseline_total / total_weight
+    candidate_rate = candidate_total / total_weight
+    baseline_delta = candidate_rate - baseline_rate
+    baseline = baseline_rate
+    candidate = candidate_rate
+    pass_threshold = candidate >= baseline + min_improvement
+    result: dict[str, object] = {
+        "schema_version": 2,
+        "artifact_type": "optimization_eval_result",
+        "id": f"opt-{dataset['id']}-{_short_hash(f'{dataset[\"id\"]}:{_utc_timestamp()}')}",
+        "dataset_id": dataset["id"],
+        "created_at": _utc_timestamp(),
+        "metric": metric,
+        "min_improvement": min_improvement,
+        "baseline_score": baseline,
+        "candidate_score": candidate,
+        "score_delta": baseline_delta,
+        "status": "pass" if pass_threshold else "fail",
+        "case_count": len(case_results),
+        "cases": case_results,
+    }
+    result["dataset_path"] = options.get("dataset_path")
+    result["baseline_prompt_path"] = options.get("baseline_path")
+    result["candidate_prompt_path"] = options.get("candidate_path")
+    return result
 
 
 def _collect_changed_paths(repo_root: str) -> list[str]:
@@ -4812,6 +5164,202 @@ def _run_explain_stage(
     }
 
 
+def _build_prompt_pack_payload(
+    dataset_id: str,
+    dataset_path: str,
+    baseline_prompt: str,
+    candidate_prompt: str,
+    approved_at: str,
+    result_ref: str,
+) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "artifact_type": "prompt_pack",
+        "id": f"{_safe_slug(dataset_id)}-active-pack",
+        "status": "active",
+        "dataset_id": dataset_id,
+        "dataset_ref": dataset_path,
+        "baseline_prompt": baseline_prompt,
+        "candidate_prompt": candidate_prompt,
+        "active_from": approved_at,
+        "run_id": os.path.splitext(os.path.basename(result_ref))[0],
+        "result_ref": result_ref,
+        "message": "Prompt pack is active for experimental offline evaluations.",
+    }
+
+
+def _record_optimize_prompts_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
+    event_payload = {
+        "schema_version": 2,
+        "artifact_type": "optimize_prompt_eval",
+        "id": payload["run_id"],
+        "status": payload["status"],
+        "command": "optimize",
+        "subcommand": "prompts",
+        "duration_ms": total_ms,
+        "created_at": _utc_timestamp(),
+        "dataset": payload.get("dataset_id"),
+        "options": payload.get("options"),
+        "summary": payload.get("summary"),
+        "result_path": payload.get("result_path"),
+        "promotion": payload.get("promotion"),
+        "errors": payload.get("errors", []),
+        "steps": [payload.get("result")],
+    }
+    path, _ = _append_ledger_event(repo_root, event_payload)
+    return path
+
+
+def _run_optimize_prompts_stage(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    start_at = time.perf_counter()
+    try:
+        dataset_path = _normalize_dataset_path(options.get("dataset"), "dataset")
+        candidate_path = _normalize_dataset_path(options.get("candidate"), "candidate")
+        baseline_path = _normalize_dataset_path(options.get("baseline"), "baseline")
+        metric = str(options.get("metric") or "contains").strip().lower()
+        min_improvement = float(options.get("min_improvement") or OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT)
+        approve = bool(options.get("approve"))
+
+        dataset = _read_eval_dataset(repo_root, dataset_path)
+        baseline_prompt = _load_text_artifact(repo_root, baseline_path, "baseline prompt")
+        candidate_prompt = _load_text_artifact(repo_root, candidate_path, "candidate prompt")
+        dataset_with_refs: dict[str, object] = dict(dataset)
+        dataset_with_refs["dataset_path"] = dataset_path
+        dataset_with_refs["candidate_path"] = candidate_path
+        dataset_with_refs["baseline_path"] = baseline_path
+        eval_options = {
+            "metric": metric,
+            "min_improvement": min_improvement,
+            "dataset_path": dataset_path,
+            "candidate_path": candidate_path,
+            "baseline_path": baseline_path,
+        }
+
+        evaluation = _evaluate_prompts(
+            repo_root,
+            dataset_with_refs,
+            baseline_prompt,
+            candidate_prompt,
+            eval_options,
+        )
+        result_path = f"{OG_ROOT}/datasets/{evaluation['id']}.json"
+        absolute_result_path = os.path.join(repo_root, result_path)
+        os.makedirs(os.path.dirname(absolute_result_path), exist_ok=True)
+        _write_json_file(absolute_result_path, evaluation)
+
+        summary = {
+            "dataset_id": dataset["id"],
+            "dataset_path": dataset_path,
+            "baseline_path": baseline_path,
+            "candidate_path": candidate_path,
+            "metric": metric,
+            "cases": evaluation["case_count"],
+            "baseline_score": evaluation["baseline_score"],
+            "candidate_score": evaluation["candidate_score"],
+            "score_delta": evaluation["score_delta"],
+            "passes_threshold": evaluation["status"] == "pass",
+            "require_approval": evaluation["status"] == "pass" and not approve,
+        }
+        promotion_errors: list[str] = []
+        if evaluation["status"] != "pass":
+            promotion_state = "blocked_by_threshold"
+            promotion_error = (
+                f"candidate score {evaluation['candidate_score']} did not beat baseline {evaluation['baseline_score']} "
+                f"by minimum improvement {min_improvement}"
+            )
+            promotion_errors.append(promotion_error)
+        elif not approve:
+            promotion_state = "requires_manual_approval"
+            promotion_error = "promotion gate requires --approve"
+            promotion_errors.append(promotion_error)
+        else:
+            promotion_state = "promoted"
+            promotion_error = None
+        payload = {
+            "status": "ok",
+            "command": "optimize",
+            "subcommand": "prompts",
+            "run_id": evaluation["id"],
+            "options": {
+                "dataset": dataset_path,
+                "candidate": candidate_path,
+                "baseline": baseline_path,
+                "metric": metric,
+                "min_improvement": min_improvement,
+                "approve": approve,
+            },
+            "dataset_id": dataset["id"],
+            "result_path": result_path,
+            "result": evaluation,
+            "summary": summary,
+            "errors": promotion_errors,
+            "promotion": {
+                "state": promotion_state,
+                "message": promotion_error,
+                "approved": approve,
+            },
+        }
+        payload["message"] = (
+            "Candidate is ready for manual approval."
+            if promotion_state == "requires_manual_approval"
+            else "Candidate promotion completed." if promotion_state == "promoted" else "Optimization result did not meet threshold."
+        )
+
+        if evaluation["status"] == "pass" and approve:
+            pack_path = f"{OG_ROOT}/datasets/{_safe_slug(dataset['id'])}-prompt-pack.json"
+            pack_payload = _build_prompt_pack_payload(
+                dataset_id=str(dataset["id"]),
+                dataset_path=dataset_path,
+                baseline_prompt=baseline_path,
+                candidate_prompt=candidate_path,
+                approved_at=_utc_timestamp(),
+                result_ref=result_path,
+            )
+            pack_full_path = os.path.join(repo_root, pack_path)
+            os.makedirs(os.path.dirname(pack_full_path), exist_ok=True)
+            _write_json_file(pack_full_path, pack_payload)
+            payload["promotion"]["pack_path"] = pack_path
+            payload["message"] = "Candidate prompts approved and promoted to active pack."
+            summary["pack_path"] = pack_path
+
+        payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
+        payload["summary_event"] = _record_optimize_prompts_event(repo_root, payload, payload["duration_ms"])
+        return payload
+    except ValueError as exc:
+        duration_ms = int((time.perf_counter() - start_at) * 1000)
+        return {
+            "status": "error",
+            "command": "optimize",
+            "subcommand": "prompts",
+            "options": options,
+            "message": str(exc),
+            "duration_ms": duration_ms,
+        }
+
+
+def _render_optimize_prompts(payload: dict[str, object]) -> str:
+    summary = payload.get("summary") or {}
+    promotion = payload.get("promotion") or {}
+    lines = [
+        f"Optimize prompts result: {payload.get('status', 'unknown')}",
+        f"run_id: {payload.get('run_id', 'unknown')}",
+        f"dataset: {summary.get('dataset_id', 'unknown')} ({summary.get('dataset_path', 'unknown')})",
+        f"baseline: {summary.get('baseline_path', 'unknown')}",
+        f"candidate: {summary.get('candidate_path', 'unknown')}",
+        f"metric: {summary.get('metric', 'unknown')}",
+        f"baseline score: {summary.get('baseline_score', 0)}",
+        f"candidate score: {summary.get('candidate_score', 0)}",
+        f"score delta: {summary.get('score_delta', 0)}",
+        f"cases: {summary.get('cases', 0)}",
+        f"promotion: {promotion.get('state', 'unknown')}",
+    ]
+    if promotion.get("message"):
+        lines.append(f"promotion note: {promotion.get('message')}")
+    if payload.get("result_path"):
+        lines.append(f"result file: {payload['result_path']}")
+    return "\n".join(lines) + "\n"
+
+
 def _run_verify_stage(
     repo_root: str,
     changed_capsules: list[str],
@@ -5402,8 +5950,14 @@ def run_command(args: list[str], output_json: bool) -> int:
                 EXIT_USAGE,
                 output_json,
             )
-        options, _ = parse_command_flags(rest[1:], "optimize prompts", False, False, False, output_json)
-        emit_command_result(build_payload("optimize", "prompts", **options), output_json)
+        options = _parse_optimize_prompts_flags(rest[1:], output_json)
+        repo_root = _git_root()
+        payload = _run_optimize_prompts_stage(repo_root, options)
+        if not output_json:
+            payload["message"] = _render_optimize_prompts(payload) if payload.get("status") == "ok" else payload.get(
+                "message", "optimize prompts execution failed"
+            )
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "autopilot":

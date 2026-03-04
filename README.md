@@ -41,6 +41,14 @@ Common options:
 - `--changed` (for changed-scope operations)
 - `--json` for machine-readable results and errors
 
+Optimization workflow:
+
+- `og optimize prompts` evaluates `candidate` and `baseline` prompt files against an evaluation dataset.
+- Output artifacts are stored under `.outcomegraph/datasets/`:
+  - `opt-<dataset-id>-<hash>.json` (evaluation result)
+  - `<dataset-id>-prompt-pack.json` (active pack, only when `--approve` passes threshold)
+- Promotion is intentionally manual-first for this experimental path; threshold success alone does not activate the pack unless `--approve` is used.
+
 Schema versioning:
 
 - Canonical `.outcomegraph` artifacts are v2:

@@ -32,6 +32,46 @@ og replay --changed
 
 Use `og explain` to inspect what changed, why, and evidence pointers.
 
+## 2b) Experimental prompt optimization
+
+`og optimize prompts` compares two prompt files using an evaluation dataset and writes an optimization result under `.outcomegraph/datasets/`.
+
+Example:
+
+```bash
+og optimize prompts \
+  --dataset .outcomegraph/datasets/bugfix-llm-eval.json \
+  --baseline .outcomegraph/datasets/baseline.txt \
+  --candidate .outcomegraph/datasets/candidate.txt \
+  --metric contains \
+  --min-improvement 2
+```
+
+Append `--approve` to write an active prompt pack at:
+
+```text
+.outcomegraph/datasets/<dataset-id>-prompt-pack.json
+```
+
+`--approve` is required for activation.
+
+The dataset format is:
+
+```json
+{
+  "schema_version": 2,
+  "artifact_type": "eval_dataset",
+  "id": "bugfix-llm-eval",
+  "cases": [
+    {
+      "id": "q-001",
+      "input": "What is the failure mode here?",
+      "expected_contains": "checks and retries"
+    }
+  ]
+}
+```
+
 ## 3) Autonomous flow
 
 When autopilot is enabled, Steward runs `og sync` from hooks/daemon/CI.
