@@ -4,6 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
+import datetime
 import sys
 
 
@@ -15,6 +19,10 @@ EXIT_RUNTIME = 1
 
 PROFILE_VALUES = {"analyze", "propose", "apply"}
 MODE_VALUES = {"observe", "autonomous"}
+AUTOPILOT_HOOKS = ("pre-commit", "post-commit", "post-merge", "post-checkout", "post-rewrite", "pre-push")
+AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
+AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
+AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
 
 
 def emit_usage() -> str:
@@ -70,6 +78,190 @@ def parse_bool_option(raw: str) -> bool:
     raise ValueError(f"invalid boolean value '{raw}'")
 
 
+def _run_git(repo_root: str, args: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", repo_root, *args],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _git_root() -> str:
+    result = _run_git(".", ["rev-parse", "--show-toplevel"])
+    if result.returncode != 0:
+        emit_error("not inside a git repository", None, EXIT_RUNTIME, False)
+    return result.stdout.strip()
+
+
+def _hooks_path(repo_root: str) -> str | None:
+    result = _run_git(repo_root, ["config", "--get", "core.hooksPath"])
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def _set_hooks_path(repo_root: str, hooks_path: str | None) -> None:
+    args = ["config", "core.hooksPath", hooks_path] if hooks_path else ["config", "--unset-all", "core.hooksPath"]
+    result = _run_git(repo_root, args)
+    if result.returncode != 0 and hooks_path is not None:
+        emit_error(f"failed to set core.hooksPath: {result.stderr.strip()}", "autopilot", EXIT_RUNTIME, False)
+
+
+def _resolve_path(repo_root: str, hooks_path: str) -> str:
+    if os.path.isabs(hooks_path):
+        return os.path.normpath(hooks_path)
+    return os.path.normpath(os.path.join(repo_root, hooks_path))
+
+
+def _is_managed_hook(path: str) -> bool:
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as handle:
+            header = handle.readline()
+        return "outcomegraph-autopilot-hook" in header
+    except OSError:
+        return False
+
+
+def _mark_pending(repo_root: str, hook_name: str) -> None:
+    pending_dir = os.path.join(repo_root, ".outcomegraph", "work")
+    os.makedirs(pending_dir, exist_ok=True)
+    pending_file = os.path.join(pending_dir, "pending")
+    timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with open(pending_file, "w", encoding="utf-8") as handle:
+        handle.write(f'{\"hook\":\"{hook_name}\",\"at\":\"{timestamp}\"}\\n')
+
+
+def _hook_script(repo_root: str, hook_name: str, original_hook: str | None) -> str:
+    original_invocation = ""
+    if original_hook:
+        original_invocation = (
+            f"if [ -x \"{original_hook}\" ]; then\n"
+            f"  if ! \"{original_hook}\" \"$@\"; then\n"
+            f"    echo \"og-autopilot: existing {hook_name} hook failed; continuing to avoid blocking local flow.\" >&2\n"
+            f"  fi\n"
+            f"fi\n"
+        )
+    return (
+        "#!/usr/bin/env bash\n"
+        "# outcomegraph-autopilot-hook\n"
+        "set -euo pipefail\n"
+        "\n"
+        'if [ "${OG_AUTOPILOT:-}" = "1" ]; then\n'
+        "  exit 0\n"
+        "fi\n"
+        "\n"
+        f'REPO_ROOT="{repo_root}"\n'
+        f'PENDING_FILE="{os.path.join(repo_root, ".outcomegraph", "work", "pending")}"\n'
+        f'WORK_FILE="{os.path.join(repo_root, ".outcomegraph", "work", "pending")}"\n'
+        "mkdir -p \"$(dirname \"$WORK_FILE\")\"\n"
+        f'printf \'%s\\n\' \"' + f'{{\"hook\":\"{hook_name}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}' + '" > \"$WORK_FILE\"\\n'
+        f"{original_invocation}"
+        "exit 0\n"
+    )
+
+
+def _install_bridge_hooks(repo_root: str, hooks_dir: str) -> list[dict[str, str | None]]:
+    os.makedirs(hooks_dir, exist_ok=True)
+    backup_dir = os.path.join(repo_root, AUTOPILOT_BACKUP_DIR)
+    os.makedirs(backup_dir, exist_ok=True)
+    installed: list[dict[str, str | None]] = []
+
+    for hook_name in AUTOPILOT_HOOKS:
+        target = os.path.join(hooks_dir, hook_name)
+        backup: str | None = None
+
+        if os.path.lexists(target):
+            if _is_managed_hook(target):
+                installed.append({"hook": hook_name, "path": target, "backup": None, "status": "already-managed"})
+                continue
+
+            backup = os.path.join(backup_dir, f"{hook_name}.orig")
+            if os.path.islink(target) or os.path.isfile(target):
+                try:
+                    shutil.copy2(target, backup)
+                except OSError as err:
+                    emit_error(f"failed to back up existing {hook_name} hook: {err}", "autopilot", EXIT_RUNTIME, False)
+            else:
+                emit_error(f"existing {hook_name} hook path is not a file", "autopilot", EXIT_RUNTIME, False)
+            os.remove(target)
+
+        with open(target, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(_hook_script(repo_root, hook_name, backup))
+        os.chmod(target, 0o755)
+        installed.append({"hook": hook_name, "path": target, "backup": backup, "status": "installed"})
+
+    return installed
+
+
+def _confirm(message: str) -> bool:
+    if not sys.stdin.isatty():
+        return False
+    while True:
+        try:
+            reply = input(f"{message} [y/N]: ").strip().lower()
+        except EOFError:
+            return False
+        if reply in {"", "n", "no"}:
+            return False
+        if reply in {"y", "yes"}:
+            return True
+        print("Please answer y or n.")
+
+
+def _init_autopilot(force_hooks_path: bool) -> dict[str, object]:
+    repo_root = _git_root()
+
+    existing_path = _hooks_path(repo_root)
+    mode = "bridge-existing"
+    target = existing_path
+    wrote_config = False
+
+    if existing_path is None:
+        target = AUTOPILOT_MANAGED_HOOK_DIR
+        mode = "set-managed-path"
+        _set_hooks_path(repo_root, target)
+        wrote_config = True
+    elif existing_path != AUTOPILOT_MANAGED_HOOK_DIR:
+        if force_hooks_path and not _confirm(f"core.hooksPath is already set to '{existing_path}'. Replace it with '{AUTOPILOT_MANAGED_HOOK_DIR}'?"):
+            emit_error("aborted by user", "autopilot", EXIT_USAGE, False)
+        if force_hooks_path:
+            target = AUTOPILOT_MANAGED_HOOK_DIR
+            mode = "force-managed-path"
+            _set_hooks_path(repo_root, target)
+            wrote_config = True
+
+    resolved_target = _resolve_path(repo_root, target)
+    installed = _install_bridge_hooks(repo_root, resolved_target)
+
+    state = {
+        "version": 1,
+        "installed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        "repo_root": repo_root,
+        "previous_core_hooks_path": existing_path,
+        "installed_core_hooks_path": target if wrote_config else existing_path,
+        "mode": mode,
+        "force_hooks_path": force_hooks_path,
+        "hooks_dir": target,
+        "installed_hooks": installed,
+    }
+
+    state_path = os.path.join(repo_root, AUTOPILOT_STATE_FILE)
+    os.makedirs(os.path.dirname(state_path), exist_ok=True)
+    with open(state_path, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, indent=2)
+
+    return {
+        "status": "ok",
+        "command": "autopilot",
+        "subcommand": "init",
+        "options": {"force_hooks_path": force_hooks_path},
+        "state": state,
+        "message": "autopilot init complete",
+    }
+
+
 def parse_command_flags(
     args: list[str],
     command: str,
@@ -77,10 +269,12 @@ def parse_command_flags(
     allow_profile: bool,
     allow_mode: bool,
     output_json: bool,
+    allow_force_hooks_path: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
     profile = None
     mode = None
+    force_hooks_path = False
 
     i = 0
     while i < len(args):
@@ -155,7 +349,7 @@ def parse_command_flags(
             continue
         if arg.startswith("--mode="):
             if not allow_mode:
-                emit_error(f"{command} does not accept --mode", command, EXIT_USAGE, output_json)
+            emit_error(f"{command} does not accept --mode", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
             if value not in MODE_VALUES:
                 emit_error(
@@ -167,11 +361,26 @@ def parse_command_flags(
             mode = value
             i += 1
             continue
+        if arg == "--force-hooks-path":
+            if not allow_force_hooks_path:
+                emit_error(f"{command} does not accept --force-hooks-path", command, EXIT_USAGE, output_json)
+            force_hooks_path = True
+            i += 1
+            continue
+        if arg.startswith("--force-hooks-path="):
+            if not allow_force_hooks_path:
+                emit_error(f"{command} does not accept --force-hooks-path", command, EXIT_USAGE, output_json)
+            try:
+                force_hooks_path = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --force-hooks-path value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg.startswith("-"):
             emit_error(f"unknown option '{arg}' for {command}", command, EXIT_USAGE, output_json)
         emit_error(f"unexpected argument '{arg}' for {command}", command, EXIT_USAGE, output_json)
 
-    return {"changed": changed, "profile": profile, "mode": mode, "json": output_json}, []
+    return {"changed": changed, "profile": profile, "mode": mode, "force_hooks_path": force_hooks_path, "output_json": output_json}, []
 
 
 def build_payload(
@@ -181,16 +390,20 @@ def build_payload(
     changed: bool = False,
     profile: str | None = None,
     mode: str | None = None,
+    force_hooks_path: bool = False,
     output_json: bool = False,
 ) -> dict[str, object]:
+    options: dict[str, object] = {
+        "changed": changed,
+        "profile": profile,
+        "mode": mode,
+    }
+    if force_hooks_path:
+        options["force_hooks_path"] = force_hooks_path
     payload: dict[str, object] = {
         "status": "ok",
         "command": command,
-        "options": {
-            "changed": changed,
-            "profile": profile,
-            "mode": mode,
-        },
+        "options": options,
     }
     if subcommand:
         payload["subcommand"] = subcommand
@@ -267,7 +480,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         emit_command_result(build_payload("optimize", "prompts", **options), output_json)
         return EXIT_SUCCESS
 
-    if command == "autopilot":
+        if command == "autopilot":
         if not rest:
             emit_error("missing autopilot subcommand\n\nAvailable: init, disable", "autopilot", EXIT_USAGE, output_json)
         sub = rest[0]
@@ -278,7 +491,20 @@ def run_command(args: list[str], output_json: bool) -> int:
                 EXIT_USAGE,
                 output_json,
             )
-        options, _ = parse_command_flags(rest[1:], "autopilot " + sub, False, False, False, output_json)
+        options, _ = parse_command_flags(
+            rest[1:],
+            "autopilot " + sub,
+            False,
+            False,
+            False,
+            output_json,
+            allow_force_hooks_path=sub == "init",
+        )
+        if sub == "init":
+            state = _init_autopilot(bool(options.get("force_hooks_path", False)))
+            state["message"] = "autopilot init command executed."
+            emit_command_result(state, output_json)
+            return EXIT_SUCCESS
         emit_command_result(build_payload("autopilot", sub, **options), output_json)
         return EXIT_SUCCESS
 
