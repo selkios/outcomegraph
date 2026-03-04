@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import datetime
 import sys
+import socket
 
 
 VERSION = "0.1.0-dev"
@@ -24,6 +25,8 @@ AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
 AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
 OG_ROOT = ".outcomegraph"
+WORK_STATE_FILE = ".outcomegraph/work/state.json"
+WORK_LOCK_FILE = ".outcomegraph/work/lock"
 OG_INIT_DIRS = (
     "constitution",
     "capsules",
@@ -38,6 +41,9 @@ OG_INIT_DIRS = (
     "cache",
     "traces",
 )
+WORK_LOCK_STALE_SECONDS = 300
+LOCK_STATUS_LOCKED = "locked"
+LOCK_STATUS_UNLOCKED = "unlocked"
 
 
 def emit_usage() -> str:
@@ -112,6 +118,28 @@ def _git_root() -> str:
 def _utc_timestamp() -> str:
     return datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+def _parse_utc_timestamp(raw: str) -> datetime.datetime | None:
+    try:
+        return datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+def _read_json_file(path: str) -> dict | None:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+def _write_json_file(path: str, payload: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(tmp, path)
+
 
 def _write_file_if_missing(path: str, content: str) -> bool:
     if os.path.exists(path):
@@ -165,13 +193,19 @@ safety:
 """
 
 
-def _build_lock_payload(created_at: str) -> str:
-    state = {"schema_version": 2, "status": "unlocked", "created_at": created_at, "updated_at": created_at, "holder": None}
-    return json.dumps(state, indent=2, sort_keys=True) + "\n"
+def _build_lock_record(
+    created_at: str,
+    status: str = LOCK_STATUS_UNLOCKED,
+    holder: dict | None = None,
+) -> dict:
+    return {"schema_version": 2, "status": status, "created_at": created_at, "updated_at": created_at, "holder": holder}
 
 
-def _build_state_payload(created_at: str) -> str:
-    state = {
+def _build_lock_payload(created_at: str, status: str = LOCK_STATUS_UNLOCKED, holder: dict | None = None) -> str:
+    return json.dumps(_build_lock_record(created_at, status, holder), indent=2, sort_keys=True) + "\n"
+
+def _build_state_record(created_at: str) -> dict:
+    return {
         "schema_version": 2,
         "status": "initialized",
         "mode": "observe",
@@ -179,8 +213,101 @@ def _build_state_payload(created_at: str) -> str:
         "last_sync_id": None,
         "pending": False,
     }
-    return json.dumps(state, indent=2, sort_keys=True) + "\n"
 
+
+def _build_state_payload(created_at: str) -> str:
+    return json.dumps(_build_state_record(created_at), indent=2, sort_keys=True) + "\n"
+
+
+def _build_work_payload(repo_root: str, *, pending: bool | None = None, status: str | None = None, last_sync_id: str | None = None) -> dict:
+    path = os.path.join(repo_root, WORK_STATE_FILE)
+    state = _read_json_file(path) or _build_state_record(_utc_timestamp())
+    if status is not None:
+        state["status"] = status
+    state["updated_at"] = _utc_timestamp()
+    if pending is not None:
+        state["pending"] = bool(pending)
+    if last_sync_id is not None:
+        state["last_sync_id"] = last_sync_id
+    _write_json_file(path, state)
+    return state
+
+
+def _read_work_state(repo_root: str) -> dict:
+    path = os.path.join(repo_root, WORK_STATE_FILE)
+    return _read_json_file(path) or _build_state_record(_utc_timestamp())
+
+
+def _is_lock_stale(lock_payload: dict, now: datetime.datetime) -> bool:
+    if lock_payload.get("status") != LOCK_STATUS_LOCKED:
+        return True
+    updated_at = lock_payload.get("updated_at")
+    if not isinstance(updated_at, str):
+        return True
+    updated = _parse_utc_timestamp(updated_at)
+    if updated is None:
+        return True
+    return (now - updated).total_seconds() > WORK_LOCK_STALE_SECONDS
+
+
+def _acquire_work_lock(repo_root: str, holder: dict) -> tuple[bool, dict | None]:
+    lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    while True:
+        has_lock_file = os.path.exists(lock_path)
+        lock_payload = _read_json_file(lock_path)
+        if lock_payload is not None and not _is_lock_stale(lock_payload, now):
+            return False, lock_payload
+        if has_lock_file:
+            try:
+                os.remove(lock_path)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise RuntimeError(f"failed to remove stale lock: {exc}") from exc
+        if not has_lock_file or lock_payload is None:
+            holder_payload = {"pid": holder.get("pid"), "host": holder.get("host"), "command": holder.get("command")}
+            created_at = _utc_timestamp()
+            payload = _build_lock_record(created_at, LOCK_STATUS_LOCKED, holder_payload)
+            try:
+                with open(lock_path, "x", encoding="utf-8", newline="\n") as handle:
+                    json.dump(payload, handle, indent=2, sort_keys=True)
+                    handle.write("\n")
+                return True, payload
+            except FileExistsError:
+                now = datetime.datetime.now(tz=datetime.timezone.utc)
+                continue
+
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+def _release_work_lock(repo_root: str, holder: dict) -> None:
+    lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    lock_payload = _read_json_file(lock_path)
+    holder_payload = lock_payload.get("holder") if isinstance(lock_payload, dict) else None
+    if isinstance(holder_payload, dict):
+        if holder_payload.get("pid") != holder.get("pid") or holder_payload.get("host") != holder.get("host"):
+            return
+    payload = _build_lock_record(_utc_timestamp(), LOCK_STATUS_UNLOCKED, None)
+    _write_json_file(lock_path, payload)
+
+
+def _mark_pending(repo_root: str, source: str) -> dict:
+    state = _build_work_payload(repo_root, pending=True)
+    state["pending_source"] = source
+    _write_json_file(os.path.join(repo_root, WORK_STATE_FILE), state)
+    return state
+
+
+def _consume_pending(repo_root: str) -> bool:
+    state = _read_work_state(repo_root)
+    if not state.get("pending", False):
+        return False
+    state["pending"] = False
+    state.pop("pending_source", None)
+    state["updated_at"] = _utc_timestamp()
+    _write_json_file(os.path.join(repo_root, WORK_STATE_FILE), state)
+    return True
 
 def _build_materials_lock_payload(created_at: str) -> str:
     payload = {
@@ -211,8 +338,8 @@ def _init_outcomegraph() -> dict[str, object]:
     baseline_files = {
         f"{OG_ROOT}/constitution/default.yaml": _build_constitution_payload(created_at),
         f"{OG_ROOT}/materials.lock": _build_materials_lock_payload(created_at),
-        f"{OG_ROOT}/work/state.json": _build_state_payload(created_at),
-        f"{OG_ROOT}/work/lock": _build_lock_payload(created_at),
+        f"{WORK_STATE_FILE}": _build_state_payload(created_at),
+        f"{WORK_LOCK_FILE}": _build_lock_payload(created_at),
         f"{OG_ROOT}/policy.yaml": _build_policy_payload(created_at),
         f"{OG_ROOT}/config.yaml": _build_config_payload(created_at),
     }
@@ -574,7 +701,33 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "sync":
         options, _ = parse_command_flags(rest, "sync", False, True, True, output_json)
-        emit_command_result(build_payload("sync", **options), output_json)
+        repo_root = _git_root()
+        holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
+        lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
+        if not lock_acquired:
+            _mark_pending(repo_root, f"lock contented by {lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}")
+            emit_command_result(
+                {
+                    "status": "ok",
+                    "command": "sync",
+                    "options": options,
+                    "lock": {"status": "contended", "holder": lock_payload.get("holder") if isinstance(lock_payload, dict) else None},
+                    "pending": True,
+                    "message": "sync is already running; pending work recorded.",
+                },
+                output_json,
+            )
+            return EXIT_SUCCESS
+        try:
+            pending = _consume_pending(repo_root)
+            payload = build_payload("sync", **options)
+            payload["pending"] = False
+            payload["pending_consumed"] = pending
+            payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload}
+            emit_command_result(payload, output_json)
+            return EXIT_SUCCESS
+        finally:
+            _release_work_lock(repo_root, holder)
         return EXIT_SUCCESS
 
     if command == "verify":
