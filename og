@@ -27,10 +27,12 @@ AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
 AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
 OG_ROOT = ".outcomegraph"
+OUTCOME_GITIGNORE = f"{OG_ROOT}/.gitignore"
 WORK_STATE_FILE = ".outcomegraph/work/state.json"
 WORK_LOCK_FILE = ".outcomegraph/work/lock"
 WORK_PENDING_FILE = ".outcomegraph/work/pending"
 EVENTS_DIR = ".outcomegraph/events"
+CAS_DIR = f"{OG_ROOT}/objects"
 RUNTIME_IGNORE_PREFIXES = (
     ".outcomegraph/work/",
     ".outcomegraph/cache/",
@@ -43,6 +45,7 @@ OG_INIT_DIRS = (
     "capsules",
     "refs",
     "decisions",
+    "claims",
     "certificates",
     "datasets",
     "events",
@@ -65,6 +68,8 @@ STATUS_SCHEMA_VERSION = 1
 STATUS_SYNC_STALE_SECONDS = 3600
 STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
+TRACKED_EVIDENCE_TAG = "file"
+UNTRACKED_EVIDENCE_TAG = "cas"
 
 
 def emit_usage() -> str:
@@ -645,6 +650,158 @@ def _write_text_file_if_changed(path: str, content: str) -> bool:
     return True
 
 
+def _content_sha256(payload: bytes) -> str:
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _short_hash(value: str, length: int = 10) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
+
+
+def _safe_slug(value: str) -> str:
+    sanitized = "".join(ch.lower() if ch.isalnum() or ch in "-_" else "-" for ch in value.strip())
+    sanitized = sanitized.strip("-")
+    return sanitized or "item"
+
+
+def _write_text_payload(path: str, payload: object) -> bytes:
+    if isinstance(payload, str):
+        rendered = payload
+    else:
+        rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    encoded = rendered.encode("utf-8")
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(rendered)
+    return encoded
+
+
+def _build_file_pointer(relative_path: str, rendered: bytes, media_type: str) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "type": TRACKED_EVIDENCE_TAG,
+        "target": relative_path,
+        "hash": _content_sha256(rendered),
+        "media_type": media_type,
+        "size": len(rendered),
+    }
+
+
+def _cas_object_path(repo_root: str, content_hash: str) -> str:
+    if not isinstance(content_hash, str) or not content_hash.startswith("sha256:"):
+        raise ValueError("content hash must be sha256:...")
+    digest = content_hash.split(":", 1)[1]
+    if len(digest) != 64:
+        raise ValueError("unsupported content hash length")
+    return os.path.join(repo_root, CAS_DIR, digest[:2], digest[2:])
+
+
+def _store_put(repo_root: str, payload: object, media_type: str = "application/json") -> dict[str, object]:
+    if isinstance(payload, bytes):
+        rendered = payload
+    elif isinstance(payload, str):
+        rendered = payload.encode("utf-8")
+    else:
+        rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+    content_hash = _content_sha256(rendered)
+    blob_path = _cas_object_path(repo_root, content_hash)
+    os.makedirs(os.path.dirname(blob_path), exist_ok=True)
+    if not os.path.exists(blob_path):
+        tmp = f"{blob_path}.tmp"
+        with open(tmp, "wb") as handle:
+            handle.write(rendered)
+        os.replace(tmp, blob_path)
+    return {
+        "schema_version": 2,
+        "type": UNTRACKED_EVIDENCE_TAG,
+        "target": content_hash,
+        "hash": content_hash,
+        "media_type": media_type,
+        "size": len(rendered),
+    }
+
+
+def _store_exists(repo_root: str, content_hash: str) -> bool:
+    try:
+        return os.path.exists(_cas_object_path(repo_root, content_hash))
+    except ValueError:
+        return False
+
+
+def _store_get(repo_root: str, content_hash: str) -> bytes | None:
+    try:
+        path = _cas_object_path(repo_root, content_hash)
+    except ValueError:
+        return None
+    try:
+        with open(path, "rb") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+def _build_claim_payload(
+    claim_id: str,
+    capsule_id: str,
+    run_id: str,
+    profile: str,
+    mode: str,
+    changed_files: list[str],
+    receipt_pointers: list[dict[str, object]],
+) -> dict[str, object]:
+    now = _utc_timestamp()
+    return {
+        "schema_version": 2,
+        "artifact_type": "claim",
+        "id": claim_id,
+        "capsule_id": capsule_id,
+        "text": f"Synthetic claim for {capsule_id} from distill stage.",
+        "category": "behavior",
+        "receipt_pointers": receipt_pointers,
+        "origin": {
+            "run_id": run_id,
+            "profile": profile,
+            "mode": mode,
+            "changed_files": changed_files,
+        },
+        "created_at": now,
+    }
+
+
+def _build_certificate_payload(
+    certificate_id: str,
+    capsule_id: str,
+    run_id: str,
+    claim_ref: str,
+    profile: str,
+    mode: str,
+    receipt_pointers: list[dict[str, object]],
+) -> dict[str, object]:
+    now = _utc_timestamp()
+    return {
+        "schema_version": 2,
+        "artifact_type": "certificate",
+        "id": certificate_id,
+        "capsule_id": capsule_id,
+        "run_id": run_id,
+        "status": "success",
+        "adapter": {
+            "name": "filesystem-store",
+            "version": "1.0.0",
+        },
+        "claim_refs": [claim_ref],
+        "receipt_pointers": receipt_pointers,
+        "replay_context": {
+            "run_id": run_id,
+            "adapter_profile": profile,
+            "mode": mode,
+            "source": "distill-placeholder",
+        },
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
 def _extract_artifact_field(line: str, field_name: str) -> str | None:
     key, sep, value = line.partition(":")
     if sep != ":":
@@ -661,6 +818,39 @@ def _extract_artifact_field(line: str, field_name: str) -> str | None:
 
 def _read_artifact_record(repo_root: str, relative_path: str) -> dict[str, object]:
     full_path = os.path.join(repo_root, relative_path)
+    try:
+        with open(full_path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict):
+            artifact_id = data.get("id")
+            artifact_type = data.get("artifact_type")
+            schema_version = data.get("schema_version")
+            if isinstance(artifact_id, str) and artifact_id.strip():
+                artifact_id = artifact_id.strip()
+            else:
+                artifact_id = None
+            if isinstance(artifact_type, str) and artifact_type.strip():
+                artifact_type = artifact_type.strip()
+            else:
+                artifact_type = None
+            if isinstance(schema_version, int):
+                schema_version = schema_version
+            else:
+                schema_version = None
+            try:
+                size = os.path.getsize(full_path)
+            except OSError:
+                size = 0
+            return {
+                "path": relative_path,
+                "id": artifact_id,
+                "artifact_type": artifact_type,
+                "schema_version": schema_version,
+                "size": size,
+            }
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        pass
+
     artifact_id = None
     artifact_type = None
     schema_version = None
@@ -706,7 +896,7 @@ def _read_artifact_record(repo_root: str, relative_path: str) -> dict[str, objec
 
 
 def _canonical_export_snapshot(repo_root: str) -> dict[str, object]:
-    canonical_roots = ("constitution", "capsules", "refs", "decisions", "certificates", "datasets", "objects")
+    canonical_roots = ("constitution", "capsules", "refs", "decisions", "claims", "certificates", "datasets")
     artifact_files: list[str] = []
     for root in canonical_roots:
         root_path = os.path.join(repo_root, OG_ROOT, root)
@@ -993,6 +1183,16 @@ safety:
 """
 
 
+def _build_outcome_gitignore_payload() -> str:
+    return """# Auto-generated by OutcomeGraph runtime
+cache/
+traces/
+objects/
+events/
+work/
+"""
+
+
 def _build_lock_record(
     created_at: str,
     status: str = LOCK_STATUS_UNLOCKED,
@@ -1155,6 +1355,7 @@ def _init_outcomegraph() -> dict[str, object]:
         f"{WORK_LOCK_FILE}": _build_lock_payload(created_at),
         f"{OG_ROOT}/policy.yaml": _build_policy_payload(created_at),
         f"{OG_ROOT}/config.yaml": _build_config_payload(created_at),
+        OUTCOME_GITIGNORE: _build_outcome_gitignore_payload(),
     }
 
     for relative_path, content in baseline_files.items():
@@ -1642,6 +1843,8 @@ def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
             capsules.add(path.split("/", 1)[1].split(".")[0])
         elif path.startswith("decisions/"):
             capsules.add(path.split("/", 1)[1].split(".")[0])
+        elif path.startswith("claims/"):
+            capsules.add(path.split("/", 1)[1].split(".")[0])
         elif path.startswith("certificates/"):
             capsules.add(path.split("/", 1)[1].split(".")[0])
         elif path.startswith("refs/"):
@@ -1653,7 +1856,13 @@ def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
     return sorted(capsules)
 
 
-def _run_distill_stage(snapshot: dict[str, object], profile: str, mode: str) -> dict[str, object]:
+def _run_distill_stage(
+    repo_root: str,
+    snapshot: dict[str, object],
+    run_id: str,
+    profile: str,
+    mode: str,
+) -> dict[str, object]:
     changed = snapshot["changed_files"]
     changed_capsules = _collect_affected_capsules(changed if isinstance(changed, list) else [])
     if not changed_capsules:
@@ -1668,11 +1877,36 @@ def _run_distill_stage(snapshot: dict[str, object], profile: str, mode: str) -> 
         }
     deltas = []
     for capsule in changed_capsules:
+        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:claim')}"
+        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-distill.json"
+        distill_evidence: dict[str, object] = {
+            "run_id": run_id,
+            "capsule_id": capsule,
+            "stage": "distill",
+            "profile": profile,
+            "mode": mode,
+            "changed_files": snapshot.get("changed_files"),
+            "captured_at": _utc_timestamp(),
+        }
+        trace_bytes = (
+            json.dumps(distill_evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+        ).encode("utf-8")
+        trace_full_path = os.path.join(repo_root, trace_path)
+        os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
+        _write_text_payload(trace_full_path, trace_bytes.decode("utf-8"))
+        receipt_pointers: list[dict[str, object]] = [
+            _build_file_pointer(trace_path, trace_bytes, "application/json"),
+            _store_put(repo_root, distill_evidence, "application/json"),
+        ]
         deltas.append(
             {
                 "capsule_id": capsule,
                 "operation": "synthesize",
                 "source": "git-diff",
+                "changed_files": changed,
+                "claim_id": claim_id,
+                "distill_evidence": distill_evidence,
+                "receipt_pointers": receipt_pointers,
             }
         )
     return {
@@ -1686,7 +1920,7 @@ def _run_distill_stage(snapshot: dict[str, object], profile: str, mode: str) -> 
     }
 
 
-def _run_apply_stage(distill_result: dict[str, object], mode: str) -> dict[str, object]:
+def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: str, mode: str) -> dict[str, object]:
     if distill_result.get("status") != "ok":
         return {
             "name": "apply",
@@ -1696,17 +1930,101 @@ def _run_apply_stage(distill_result: dict[str, object], mode: str) -> dict[str, 
             "applied_changes": 0,
         }
     deltas = distill_result.get("generated_deltas") or []
+    if not isinstance(deltas, list):
+        return {
+            "name": "apply",
+            "status": "error",
+            "message": "Distill result contained malformed deltas.",
+            "mode": mode,
+            "applied_changes": 0,
+            "errors": ["Invalid generated_deltas format"],
+        }
+
+    applied_claims: list[str] = []
+    applied_certs: list[str] = []
+    errors: list[str] = []
+
+    for delta in deltas:
+        if not isinstance(delta, dict):
+            errors.append("Invalid delta entry")
+            continue
+        capsule_id = str(delta.get("capsule_id") or "default")
+        claim_id = str(delta.get("claim_id") or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:fallback')}")
+        receipt_pointers = delta.get("receipt_pointers")
+        if not isinstance(receipt_pointers, list):
+            receipt_pointers = []
+
+        receipt_paths = []
+        for pointer in sorted(receipt_pointers, key=lambda item: json.dumps(item, sort_keys=True)):
+            if isinstance(pointer, dict):
+                receipt_paths.append(pointer)
+
+        changed_files = delta.get("changed_files")
+        if not isinstance(changed_files, list):
+            changed_files = []
+        try:
+            claim_payload = _build_claim_payload(
+                claim_id,
+                capsule_id,
+                run_id,
+                str(distill_result.get("profile") or "analyze"),
+                mode,
+                changed_files if isinstance(changed_files, list) else [],
+                receipt_paths,
+            )
+            claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
+            os.makedirs(os.path.dirname(claim_path), exist_ok=True)
+            _write_json_file(claim_path, claim_payload)
+            applied_claims.append(f"{OG_ROOT}/claims/{claim_id}.json")
+            claim_ref = f"{OG_ROOT}/claims/{claim_id}.json"
+        except Exception as exc:
+            errors.append(f"Failed to write claim for {capsule_id}: {exc}")
+            continue
+
+        try:
+            certificate_id = f"cert-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:certificate')}"
+            cert_receipts = list(receipt_paths)
+            cert_payload = _build_certificate_payload(
+                certificate_id,
+                capsule_id,
+                run_id,
+                claim_ref,
+                str(distill_result.get("profile") or "analyze"),
+                mode,
+                cert_receipts,
+            )
+            cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
+            os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+            _write_json_file(cert_path, cert_payload)
+            applied_certs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+        except Exception as exc:
+            errors.append(f"Failed to write certificate for {capsule_id}: {exc}")
+
+    if errors:
+        return {
+            "name": "apply",
+            "status": "error",
+            "message": "Failed to persist one or more artifacts.",
+            "mode": mode,
+            "applied_changes": len(applied_claims),
+            "applied_claims": applied_claims,
+            "applied_certificates": applied_certs,
+            "errors": errors,
+        }
+
     return {
         "name": "apply",
         "status": "ok",
         "message": "Applied synthetic deltas to canonical artifacts.",
         "mode": mode,
-        "applied_changes": len(deltas),
+        "applied_changes": len(applied_claims),
+        "applied_claims": applied_claims,
+        "applied_certificates": applied_certs,
         "applied_deltas": deltas,
     }
 
 
-def _run_verify_stage(changed_capsules: list[str], mode: str) -> dict[str, object]:
+def _run_verify_stage(repo_root: str, changed_capsules: list[str], run_id: str, mode: str) -> dict[str, object]:
     if not changed_capsules:
         return {
             "name": "verify",
@@ -1714,7 +2032,28 @@ def _run_verify_stage(changed_capsules: list[str], mode: str) -> dict[str, objec
             "message": "No affected capsules; verification deferred.",
             "mode": mode,
             "verified_capsules": [],
+            "receipt_pointers": {},
         }
+    receipts: dict[str, list[dict[str, object]]] = {}
+    for capsule in changed_capsules:
+        payload = {
+            "run_id": run_id,
+            "capsule_id": capsule,
+            "stage": "verify",
+            "mode": mode,
+            "checked_at": _utc_timestamp(),
+        }
+        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-verify.json"
+        trace_payload = (
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+        ).encode("utf-8")
+        trace_full_path = os.path.join(repo_root, trace_path)
+        os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
+        _write_text_payload(trace_full_path, trace_payload.decode("utf-8"))
+        receipts[capsule] = [
+            _build_file_pointer(trace_path, trace_payload, "application/json"),
+            _store_put(repo_root, payload, "application/json"),
+        ]
     return {
         "name": "verify",
         "status": "ok",
@@ -1722,6 +2061,7 @@ def _run_verify_stage(changed_capsules: list[str], mode: str) -> dict[str, objec
         "mode": mode,
         "verified_capsules": changed_capsules,
         "oracle_count": len(changed_capsules),
+        "receipt_pointers": receipts,
     }
 
 
@@ -1840,14 +2180,14 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="distill", last_message="starting distill", last_idempotency_key=idempotency_key)
     distill = _time_step(
         "distill",
-        lambda: _run_distill_stage(snapshot, profile=profile, mode=mode),
+        lambda: _run_distill_stage(repo_root, snapshot, run_id, profile=profile, mode=mode),
     )
     steps.append(distill)
 
     _build_work_payload(repo_root, status="apply", last_message="starting apply")
     apply_result = _time_step(
         "apply",
-        lambda: _run_apply_stage(distill, mode=mode),
+        lambda: _run_apply_stage(repo_root, distill, run_id, mode=mode),
     )
     steps.append(apply_result)
 
@@ -1855,7 +2195,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="verify", last_message="starting verify")
     verify = _time_step(
         "verify",
-        lambda: _run_verify_stage(affected_capsules, mode=mode),
+        lambda: _run_verify_stage(repo_root, affected_capsules, run_id, mode=mode),
     )
     steps.append(verify)
 
