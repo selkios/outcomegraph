@@ -530,38 +530,230 @@ Hook edge cases:
 
 ## 11) Plugin architecture contracts
 
-Interfaces are versioned independently.
+Adapters expose one typed contract per interface family. All plugin entrypoints are registered once at startup and must pass version negotiation.
+
+### 11.1 Versioned manifest
+
+Every plugin exports a `manifest` object:
+
+```yaml
+schema_version: 2
+type: worker|oracle|sandbox|store|exporter
+name: codex
+implementation_version: "1.0.0"
+interface_version: 1
+capabilities:
+  - "distill"
+  - "replay"
+  - "explain"
+entrypoint: "codex://v1"
+```
+
+Core compatibility map is fixed per type:
+
+- `worker`: `interface_version == 1`
+- `oracle`: `interface_version == 1`
+- `sandbox`: `interface_version == 1`
+- `store`: `interface_version == 1`
+- `exporter`: `interface_version == 1`
+
+Incompatible plugin contract:
+
+- Missing `interface_version`
+- Non-integer `interface_version`
+- Mismatch with required interface
+- `schema_version != 2` on manifest
+
+Failure output must include:
+
+- `status: error`
+- `code: ADAPTER_INTERFACE_MISMATCH`
+- `type`
+- `name`
+- `required_interface_version`
+- `detected_interface_version`
+- `remediation` with upgrade/rebuild guidance
+
+### 11.2 Adapter interface contracts
 
 `WorkerAdapter`:
 
-- `distill(input) -> DistillDelta`
-- `replay(input) -> ReplayPlan`
-- `explain(input) -> ClaimSet`
+- `distill(input: DistillInput) -> DistillDelta`
+- `replay(input: ReplayInput) -> ReplayPlan`
+- `explain(input: ExplainInput) -> ClaimSet`
 
 `OracleAdapter`:
 
-- `run(oracle, scope) -> OracleResult`
+- `run(input: OracleInput) -> OracleResult`
 
 `SandboxAdapter`:
 
-- `create(envSpec) -> SandboxRef`
-- `exec(sandboxRef, command) -> ExecResult`
-- `destroy(sandboxRef)`
+- `create(input: EnvSpec) -> SandboxRef`
+- `exec(input: ExecInput) -> ExecResult`
+- `destroy(input: SandboxRef) -> DestroyResult`
 
 `StoreAdapter`:
 
-- `put(bytes) -> contentHash`
-- `get(contentHash) -> bytes`
-- `exists(contentHash) -> bool`
+- `put(input: StorePutInput) -> StorePutResult`
+- `get(input: StoreGetInput) -> StoreGetResult`
+- `exists(input: StoreExistsInput) -> StoreExistsResult`
 
 `ExporterAdapter`:
 
-- `render(context) -> files`
+- `render(input: ExportInput) -> ExportResult`
 
-Compatibility rule:
+### 11.3 Typed payloads
 
-- Plugins declare `interface_version`.
-- Core rejects incompatible plugins with actionable error output.
+```yaml
+# DistillInput
+interface_version: 1
+schema_version: 2
+adapter_profile: analyze|propose|apply
+mode: observe|autonomous
+target_capsules:
+  - id: cap-frontend
+changed_paths:
+  - "src/main.ts"
+policy_ref: ".outcomegraph/policy.yaml"
+run_id: "run-2026-03-04T10:00:00Z"
+```
+
+```yaml
+# DistillDelta
+interface_version: 1
+schema_version: 2
+run_id: "run-001"
+capsule_updates:
+  - id: cap-frontend
+    status: success
+    claims:
+      - id: cl-001
+    decision_refs:
+      - decisions/dec-001.yaml
+    errors: []
+    receipts:
+      - schema_version: 2
+        type: file|cas
+        target: ".outcomegraph/traces/distill-001.ndjson"
+        hash: "sha256:..."
+```
+
+```yaml
+# ReplayPlan
+interface_version: 1
+schema_version: 2
+run_id: "run-001"
+steps:
+  - command: "npm test"
+    expected_exit_code: 0
+    cwd: ".outcomegraph/work/replay/cap-frontend"
+  - command: "pytest -q"
+    expected_exit_code: 0
+    timeout_s: 120
+```
+
+```yaml
+# ClaimSet
+interface_version: 1
+schema_version: 2
+claims:
+  - id: cl-001
+    capsule_id: cap-frontend
+    category: behavior
+    text: "Startup timeout increased from 5s to 8s."
+    receipt_pointers:
+      - schema_version: 2
+        type: file
+        target: ".outcomegraph/traces/claim-001.ndjson"
+```
+
+```yaml
+# OracleInput
+interface_version: 1
+schema_version: 2
+oracle:
+  name: unit_startup
+  command: "npm test -- startup"
+scope:
+  - "src/**/*.ts"
+budget_ms: 120000
+```
+
+```yaml
+# OracleResult
+interface_version: 1
+schema_version: 2
+oracle_name: unit_startup
+status: pass|fail|error|skipped
+observed_code: 0
+duration_ms: 1205
+receipt_pointers:
+  - schema_version: 2
+    type: cas
+    target: "sha256:..."
+```
+
+```yaml
+# EnvSpec / SandboxRef / ExecInput / ExecResult / DestroyResult
+interface_version: 1
+schema_version: 2
+rootfs: ".outcomegraph/work/sandboxes/cap-frontend"
+network: restricted
+timeout_s: 120
+sandbox_id: sbx-001
+status: success
+exit_code: 0
+stdout_ref: ".outcomegraph/traces/sandbox-stdout.ndjson"
+stderr_ref: ".outcomegraph/traces/sandbox-stderr.ndjson"
+```
+
+```yaml
+# Store contracts
+interface_version: 1
+schema_version: 2
+content_hash: "sha256:..."
+stored: true
+blob_exists: true
+bytes: 1234
+```
+
+```yaml
+# Export contracts
+interface_version: 1
+schema_version: 2
+targets:
+  - "AGENTS.md"
+  - "skills/outcome-steward/SKILL.md"
+files_written:
+  - ".outcomegraph/export/AGENTS.md"
+errors: []
+```
+
+### 11.4 Plugin loader and registration API
+
+Core performs startup discovery from:
+
+1. Built-in adapters (for tests and bootstrap)
+2. `.outcomegraph/adapters/<type>/*.json`
+3. Optional `$OG_ADAPTER_PATH` override
+
+Registration flow:
+
+1. instantiate adapter entrypoint
+2. fetch manifest
+3. validate schema and interface versions
+4. register under type and name
+5. set default adapter for each interface family (`worker=codex`, `store=filesystem`, etc.)
+6. make all registrations available through command-time resolution API
+
+Recommended API:
+
+- `adapter_register(type, name, implementation, manifest)`
+- `adapter_get(type, name = default)`
+- `adapter_list(type)`
+- `adapter_set_default(type, name)`
+
+No successful registration occurs when compatibility checks fail.
 
 ## 12) Codex adapter v1
 

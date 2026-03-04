@@ -159,6 +159,60 @@ flowchart TB
   STA --> ST2[Remote CAS]
 ```
 
+### 6.1 Plugin lifecycle and compatibility
+
+At process startup Steward initializes a registry and performs version checks before any autonomous actions:
+
+1. Load candidate adapter manifests from built-ins and configured adapter directories.
+2. Require each manifest to include:
+   - `schema_version: 2`
+   - `type` (`worker`, `oracle`, `sandbox`, `store`, `exporter`)
+   - `name`
+   - `implementation_version`
+   - `interface_version`
+3. Resolve `interface_version` for each type against the supported set:
+   - `worker`: `1`
+   - `oracle`: `1`
+   - `sandbox`: `1`
+   - `store`: `1`
+   - `exporter`: `1`
+4. Reject mismatches with `ADAPTER_INTERFACE_MISMATCH` and abort startup for required adapters.
+5. Register adapters by `(type, name)` and expose the selected default adapter.
+
+Registration API:
+
+- `register(type, name, impl, manifest)`  
+  adds one adapter and verifies contract compatibility.
+- `set_default(type, name)`  
+  selects which adapter handles runtime calls.
+- `resolve(type, name?)`  
+  returns selected adapter for calls in core orchestration.
+- `list(type)`  
+  returns all registered adapters for diagnostics.
+
+Failure behavior:
+
+- Required adapter absent: fail startup with actionable instructions to install/enable a compatible adapter.
+- Required adapter incompatible: fail startup with exact mismatched `interface_version`.
+- Optional adapters: warn and continue using disabled-feature mode.
+
+Example diagnostic for mismatch:
+
+```json
+{
+  "status": "error",
+  "code": "ADAPTER_INTERFACE_MISMATCH",
+  "type": "store",
+  "name": "remote-cas",
+  "required_interface_version": 1,
+  "detected_interface_version": 2,
+  "remediation": [
+    "Install a store plugin that supports interface_version 1.",
+    "Or upgrade steward runtime to support interface_version 2."
+  ]
+}
+```
+
 ## 7) Data boundaries (tracked vs not tracked)
 
 The repo tracks compact replayable truth. Bulky runtime exhaust is kept out of Git by default.
