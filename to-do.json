@@ -222,9 +222,10 @@
       "files": [
         "ARCHITECTURE.md",
         "SPEC-v2.md",
-        "og"
+        "og",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:16:12Z"
+      "updated_at": "2026-03-04T10:16:37Z"
     },
     {
       "id": "OG-SYNC-001",
@@ -358,7 +359,7 @@
       "id": "OG-DAEMON-001",
       "title": "Implement ogd install/start/stop/status for always-on mode",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Provide an optional daemon or watcher entrypoint that schedules sync on filesystem events.",
       "steps": [
         "Add install script and service lifecycle hooks",
@@ -373,9 +374,13 @@
         "OG-HOOK-001"
       ],
       "files": [
-        "SPEC-v2.md",
-        "ARCHITECTURE.md"
-      ]
+        "/home/agent/outcomegraph/og",
+        "/home/agent/outcomegraph/to-do.json",
+        "og",
+        "ogd",
+        "to-do.json"
+      ],
+      "updated_at": "2026-03-04T10:18:06Z"
     },
     {
       "id": "OG-STATUS-001",
@@ -426,7 +431,7 @@
       "id": "OG-DRIFT-001",
       "title": "Implement `og drift` detection and reporting",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Identify canonical truth drift relative to expected policy, signatures, and recent checks.",
       "steps": [
         "Define drift checks for stale certificates and failed policies",
@@ -440,6 +445,15 @@
       "depends_on": [
         "OG-VERIFY-001",
         "OG-INTG-001"
+      ],
+      "updated_at": "2026-03-04T10:19:27Z",
+      "files": [
+        "og",
+        "to-do.json",
+        "README.md",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "QUICKSTART.md"
       ]
     },
     {
