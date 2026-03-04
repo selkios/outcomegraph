@@ -716,15 +716,16 @@
       ],
       "files": [
         "QUICKSTART.md",
-        "SPEC-v2.md"
+        "SPEC-v2.md",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:38:26Z"
+      "updated_at": "2026-03-04T10:38:41Z"
     },
     {
       "id": "OG-DOC-002",
       "title": "Document all tracked artifact locations consistently across SPEC and architecture docs",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Canonical tracked artifact lists should consistently include claims and any other tracked canonical artifact types where currently omitted (e.g., claim paths in SPEC-v2 section 6 and any related docs).",
       "tags": [
         "documentation",
@@ -733,7 +734,8 @@
       "files": [
         "SPEC-v2.md",
         "ARCHITECTURE.md"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:38:56Z"
     }
   ]
 }

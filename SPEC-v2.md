@@ -215,6 +215,7 @@ skills/
   capsules/
   refs/
   decisions/
+  claims/
   certificates/
   datasets/
   events/
@@ -231,6 +232,7 @@ Git-tracked by default:
 - `capsules/**`
 - `refs/**`
 - `decisions/**`
+- `claims/**`
 - `certificates/**` (compact manifests)
 - `export/AGENTS.md`
 - `export/README_OUTCOMES.md`

@@ -260,8 +260,9 @@ flowchart LR
     T2[capsules]
     T3[refs]
     T4[decisions]
-    T5[certificate manifests]
-    T6[generated guidance exports]
+    T5[claims]
+    T6[certificate manifests]
+    T7[generated guidance exports]
   end
 
   subgraph NG[Not tracked by default]
