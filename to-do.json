@@ -545,8 +545,8 @@
       "id": "OG-INTG-001",
       "title": "Implement integrity ledger, hashes, checkpoints, and degraded-state transitions",
       "priority": 4,
-      "status": "todo",
-      "details": "Track append-only events with chained hashes and checkpoint state for trust and recovery.",
+      "status": "done",
+      "details": "Implement integrity ledger and event hash chaining with checkpoint creation and checksum validation, and gate sync on ledger integrity failures by entering degraded state.",
       "steps": [
         "Add event append API and checksum validation",
         "Implement checkpoint creation and signature hooks",
@@ -558,7 +558,13 @@
       ],
       "depends_on": [
         "OG-SYNC-001"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:29:49Z",
+      "files": [
+        "og",
+        "to-do.json"
+      ],
+      "blockers": []
     },
     {
       "id": "OG-STORAGE-001",

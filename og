@@ -14,6 +14,7 @@ import socket
 import hashlib
 import signal
 import time
+import shlex
 
 
 VERSION = "0.1.0-dev"
@@ -34,6 +35,10 @@ WORK_STATE_FILE = ".outcomegraph/work/state.json"
 WORK_LOCK_FILE = ".outcomegraph/work/lock"
 WORK_PENDING_FILE = ".outcomegraph/work/pending"
 EVENTS_DIR = ".outcomegraph/events"
+INTEGRITY_CHECKPOINT_DIR = f"{EVENTS_DIR}/checkpoints"
+INTEGRITY_STATE_FILE = f"{EVENTS_DIR}/integrity_state.json"
+INTEGRITY_CHECKPOINT_INTERVAL = 32
+INTEGRITY_SIGNER_ENV = "OG_INTEGRITY_CHECKPOINT_SIGNER"
 CAS_DIR = f"{OG_ROOT}/objects"
 RUNTIME_IGNORE_PREFIXES = (
     ".outcomegraph/work/",
@@ -869,6 +874,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
     verification = _collect_verification_state(repo_root, sync_event, now)
     certificates = _collect_certificate_freshness(repo_root, now)
     drift = _collect_drift_state(repo_root, now)
+    integrity = _collect_integrity_state(repo_root)
 
     has_pending = bool(state.get("pending", False)) or pending_file_present
     runtime_message = "runtime is idle"
@@ -880,12 +886,15 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         runtime_message = "pending work is queued"
     elif state.get("status") == "degraded":
         runtime_message = "work state is degraded"
+    elif integrity.get("state") == "degraded":
+        runtime_message = "integrity ledger is degraded"
 
     overall_status = "ok"
     if (
         sync["state"] == "degraded"
         or verification["state"] == "degraded"
         or state.get("status") == "degraded"
+        or integrity.get("state") == "degraded"
         or state.get("status") == "error"
     ):
         overall_status = "error"
@@ -923,6 +932,8 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         issues.append({"type": "drift_error", "message": "policy/certificate drift checks failed"})
     elif drift["state"] == "warn":
         issues.append({"type": "drift_warning", "message": "policy/certificate drift checks suggest remediation"})
+    if integrity.get("state") == "degraded":
+        issues.append({"type": "integrity", "message": str(integrity.get("message") or "integrity ledger is degraded")})
 
     if not issues and overall_status == "ok":
         issues = []
@@ -954,6 +965,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
             "message": f"sync={sync['state']}, certificates={certificates['state']}",
         },
         "drift": drift,
+        "integrity": integrity,
         "verification": verification,
         "runtime": {
             "status": state.get("status"),
@@ -985,6 +997,7 @@ def _render_status(payload: dict[str, object]) -> str:
     certificates = freshness.get("certificates", {})
     drift = payload.get("drift", {})
     verification = payload.get("verification", {})
+    integrity = payload.get("integrity", {})
     runtime = payload.get("runtime", {})
     issues = payload.get("issues", [])
     status = payload.get("status", "unknown")
@@ -1002,6 +1015,7 @@ def _render_status(payload: dict[str, object]) -> str:
         f"(count={certificates.get('count')}, latest={certificates.get('newest') or 'none'})"
     )
     lines.append(f"drift: {drift.get('state')}")
+    lines.append(f"integrity: {integrity.get('state')}")
     for check in drift.get("checks", []):
         check_state = check.get("status")
         if str(check_state) == "ok":
@@ -1200,6 +1214,315 @@ def _write_json_file(path: str, payload: dict) -> None:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
     os.replace(tmp, path)
+
+
+def _compute_payload_hash(payload: dict[str, object]) -> str:
+    normalized = {k: payload.get(k) for k in sorted(payload) if k != "event_hash"}
+    body = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return _content_sha256(body)
+
+
+def _build_integrity_state_payload(created_at: str, latest_event_id: str | None, latest_event_hash: str | None, latest_sequence: int) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "artifact_type": "integrity_state",
+        "updated_at": created_at,
+        "latest_event_id": latest_event_id,
+        "latest_event_hash": latest_event_hash,
+        "latest_event_sequence": latest_sequence,
+    }
+
+
+def _read_integrity_state(repo_root: str) -> dict[str, object]:
+    path = os.path.join(repo_root, INTEGRITY_STATE_FILE)
+    payload = _read_json_file(path)
+    if not isinstance(payload, dict):
+        return _build_integrity_state_payload(_utc_timestamp(), None, None, 0)
+    if payload.get("schema_version") != 2:
+        return _build_integrity_state_payload(_utc_timestamp(), None, None, 0)
+    if not isinstance(payload.get("latest_event_sequence"), int):
+        payload["latest_event_sequence"] = 0
+    return payload
+
+
+def _write_integrity_state(repo_root: str, payload: dict[str, object]) -> None:
+    _write_json_file(os.path.join(repo_root, INTEGRITY_STATE_FILE), payload)
+
+
+def _list_event_records(repo_root: str) -> list[tuple[int, str, datetime.datetime | None, dict[str, object]]]:
+    events_path = os.path.join(repo_root, EVENTS_DIR)
+    if not os.path.isdir(events_path):
+        return []
+
+    events: list[tuple[int, str, datetime.datetime | None, dict[str, object]]] = []
+    for filename in sorted(os.listdir(events_path)):
+        if not filename.endswith(".json"):
+            continue
+        file_path = os.path.join(events_path, filename)
+        if not os.path.isfile(file_path):
+            continue
+        payload = _read_json_file(file_path)
+        if not isinstance(payload, dict):
+            continue
+        event_raw_sequence = payload.get("event_sequence")
+        event_sequence = event_raw_sequence if isinstance(event_raw_sequence, int) else 0
+        raw_created_at = payload.get("created_at")
+        created_at = _parse_utc_timestamp(raw_created_at) if isinstance(raw_created_at, str) else None
+        events.append((event_sequence, filename, created_at, payload))
+    events.sort(key=lambda item: (item[0], item[2] or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc), item[1]))
+    return events
+
+
+def _read_latest_integrity_checkpoint(repo_root: str) -> tuple[dict[str, object], str] | tuple[None, None]:
+    checkpoint_path = os.path.join(repo_root, INTEGRITY_CHECKPOINT_DIR)
+    if not os.path.isdir(checkpoint_path):
+        return None, None
+    candidates: list[tuple[int, str, dict[str, object]]] = []
+    for filename in os.listdir(checkpoint_path):
+        if not filename.endswith(".json"):
+            continue
+        full_path = os.path.join(checkpoint_path, filename)
+        if not os.path.isfile(full_path):
+            continue
+        payload = _read_json_file(full_path)
+        if not isinstance(payload, dict):
+            continue
+        raw_sequence = payload.get("end_sequence")
+        sequence = raw_sequence if isinstance(raw_sequence, int) else 0
+        candidates.append((sequence, filename, payload))
+    if not candidates:
+        return None, None
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    _, filename, payload = candidates[-1]
+    return payload, os.path.join(checkpoint_path, filename)
+
+
+def _sign_integrity_checkpoint(repo_root: str, payload: dict[str, object]) -> dict[str, object] | None:
+    signer = os.environ.get(INTEGRITY_SIGNER_ENV)
+    if not signer:
+        return None
+    try:
+        command = shlex.split(signer)
+    except ValueError as exc:
+        return {
+            "status": "error",
+            "command": signer,
+            "message": f"invalid signer command: {exc}",
+        }
+    try:
+        payload_text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        proc = subprocess.run(
+            command,
+            input=payload_text,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+    except Exception as exc:
+        return {
+            "status": "error",
+            "command": signer,
+            "message": f"signature command failed: {exc}",
+        }
+    if proc.returncode != 0:
+        return {
+            "status": "error",
+            "command": signer,
+            "return_code": proc.returncode,
+            "message": proc.stderr.strip() or "signature command exited unsuccessfully",
+        }
+    signature = (proc.stdout or "").strip()
+    if not signature:
+        return {"status": "error", "command": signer, "message": "signature command returned empty output"}
+    return {
+        "status": "signed",
+        "command": signer,
+        "value": signature,
+    }
+
+
+def _write_integrity_checkpoint(
+    repo_root: str,
+    end_sequence: int,
+    event_id: str,
+    event_hash: str,
+    previous_hash: str | None,
+) -> str:
+    path = os.path.join(repo_root, INTEGRITY_CHECKPOINT_DIR)
+    os.makedirs(path, exist_ok=True)
+    now = _utc_timestamp()
+    payload: dict[str, object] = {
+        "schema_version": 2,
+        "artifact_type": "integrity_checkpoint",
+        "id": f"checkpoint-{end_sequence:08d}",
+        "created_at": now,
+        "end_sequence": end_sequence,
+        "end_event_id": event_id,
+        "end_event_hash": event_hash,
+        "previous_event_hash": previous_hash,
+    }
+    payload["checkpoint_hash"] = _compute_payload_hash(payload)
+    signature = _sign_integrity_checkpoint(repo_root, payload)
+    if signature is not None:
+        payload["signature"] = signature
+    checksum_path = os.path.join(path, f"{payload['id']}.json")
+    _write_json_file(checksum_path, payload)
+    return checksum_path
+
+
+def _append_ledger_event(repo_root: str, payload: dict[str, object]) -> tuple[str, dict[str, object]]:
+    if not isinstance(payload, dict):
+        raise TypeError("event payload must be a dict")
+    event_id = payload.get("id")
+    if not isinstance(event_id, str) or not event_id:
+        raise ValueError("event payload missing id")
+
+    state = _read_integrity_state(repo_root)
+    latest_sequence = int(state.get("latest_event_sequence", 0) or 0)
+    latest_hash = state.get("latest_event_hash")
+    if latest_hash is not None and not isinstance(latest_hash, str):
+        latest_hash = None
+
+    payload = dict(payload)
+    payload["event_sequence"] = latest_sequence + 1
+    payload["previous_event_hash"] = latest_hash
+    payload["event_hash"] = _compute_payload_hash(payload)
+    path = os.path.join(repo_root, EVENTS_DIR, f"{event_id}.json")
+    _write_json_file(path, payload)
+
+    state_payload = _build_integrity_state_payload(
+        _utc_timestamp(),
+        str(event_id),
+        str(payload["event_hash"]),
+        int(payload["event_sequence"]),
+    )
+    _write_integrity_state(repo_root, state_payload)
+
+    if int(payload["event_sequence"]) % INTEGRITY_CHECKPOINT_INTERVAL == 0:
+        _write_integrity_checkpoint(
+            repo_root,
+            int(payload["event_sequence"]),
+            event_id,
+            payload["event_hash"],  # type: ignore[arg-type]
+            latest_hash,
+        )
+    return path, payload
+
+
+def _validate_event_chain(repo_root: str) -> dict[str, object]:
+    events = _list_event_records(repo_root)
+    if not events:
+        return {
+            "status": "ok",
+            "state": "ok",
+            "message": "integrity ledger has no events yet",
+            "event_count": 0,
+            "valid": True,
+            "event_sequence": 0,
+            "event_hash": None,
+        }
+
+    checkpoint, _ = _read_latest_integrity_checkpoint(repo_root)
+    expected_sequence = int(checkpoint.get("end_sequence", 0) if isinstance(checkpoint, dict) else 0)
+    previous_hash = checkpoint.get("end_event_hash") if isinstance(checkpoint, dict) else None
+    previous_hash = previous_hash if isinstance(previous_hash, str) else None
+
+    expected_next = expected_sequence + 1
+    total = 0
+    for raw_sequence, _, _, event in events:
+        event_sequence = raw_sequence
+        if event_sequence == 0:
+            continue
+        if event_sequence <= expected_sequence:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"integrity duplicate/ordered event sequence #{event_sequence}",
+                "event_count": total,
+            }
+        if event_sequence != expected_next:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"integrity sequence gap detected at event #{event_sequence}",
+                "event_count": total,
+            }
+        if "event_hash" not in event:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"integrity checksum missing for event #{event_sequence}",
+                "event_count": total,
+            }
+        payload = dict(event)
+        if payload.get("artifact_type") in {"integrity_checkpoint", "integrity_state"}:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"unexpected artifact type in ledger at event #{event_sequence}",
+                "event_count": total,
+            }
+        actual_previous_hash = payload.get("previous_event_hash")
+        if expected_sequence == 0 and actual_previous_hash is not None:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": "integrity genesis event has unexpected previous hash",
+                "event_count": total,
+            }
+        if previous_hash is not None and actual_previous_hash != previous_hash:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"integrity link break at event #{event_sequence}",
+                "event_count": total,
+            }
+        stored_hash = str(payload.get("event_hash"))
+        computed = _compute_payload_hash({k: v for k, v in payload.items() if k != "event_hash"})
+        if stored_hash != computed:
+            return {
+                "status": "degraded",
+                "state": "degraded",
+                "valid": False,
+                "message": f"integrity hash mismatch for event #{event_sequence}",
+                "event_count": total,
+            }
+        expected_next += 1
+        expected_sequence = event_sequence
+        previous_hash = stored_hash
+        total = event_sequence
+
+    return {
+        "status": "ok",
+        "state": "ok",
+        "valid": True,
+        "message": "integrity ledger verified",
+        "event_count": total,
+        "event_sequence": expected_sequence,
+        "event_hash": previous_hash,
+    }
+
+
+def _collect_integrity_state(repo_root: str) -> dict[str, object]:
+    result = _validate_event_chain(repo_root)
+    event_count = result.get("event_count")
+    return {
+        "state": "degraded" if result.get("status") != "ok" else "ok",
+        "status": result.get("status"),
+        "message": result.get("message"),
+        "valid": bool(result.get("valid")),
+        "event_count": event_count,
+        "event_sequence": result.get("event_sequence"),
+        "event_hash": result.get("event_hash"),
+        "checkpoint": _read_latest_integrity_checkpoint(repo_root)[0],
+    }
 
 
 def _write_file_if_missing(path: str, content: str) -> bool:
@@ -4635,8 +4958,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
         "snapshot": payload["snapshot"],
         "steps": payload["steps"],
     }
-    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
-    _write_json_file(path, event_payload)
+    path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
@@ -4653,8 +4975,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
     }
-    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
-    _write_json_file(path, event_payload)
+    path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
@@ -4671,8 +4992,7 @@ def _record_verify_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
     }
-    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
-    _write_json_file(path, event_payload)
+    path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
@@ -4706,8 +5026,7 @@ def _record_drift_report_event(repo_root: str, payload: dict[str, object], total
         "drift": payload.get("drift", {}),
         "remediation": payload.get("drift", {}).get("remediation", []),
     }
-    path = os.path.join(repo_root, EVENTS_DIR, f"{run_id}.json")
-    _write_json_file(path, event_payload)
+    path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
@@ -4891,6 +5210,23 @@ def run_command(args: list[str], output_json: bool) -> int:
     if command == "sync":
         options, _ = parse_command_flags(rest, "sync", False, True, True, output_json)
         repo_root = _git_root()
+        integrity = _validate_event_chain(repo_root)
+        if integrity.get("status") != "ok":
+            _build_work_payload(
+                repo_root,
+                status="degraded",
+                last_message="integrity ledger validation failed",
+            )
+            payload = {
+                "status": "error",
+                "command": "sync",
+                "code": "INTEGRITY_CHECK_FAILED",
+                "options": options,
+                "integrity": integrity,
+                "message": f"integrity check failed: {integrity.get('message', 'ledger validation error')}",
+            }
+            emit_command_result(payload, output_json)
+            return EXIT_RUNTIME
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
