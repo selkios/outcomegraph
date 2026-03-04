@@ -610,7 +610,7 @@
         "OG-VERIFY-001",
         "OG-INTG-001"
       ],
-      "updated_at": "2026-03-04T10:35:38Z",
+      "updated_at": "2026-03-04T10:35:52Z",
       "files": [
         "og",
         "to-do.json"
@@ -669,8 +669,8 @@
       "id": "OG-TEST-001",
       "title": "Build comprehensive test coverage for sync, verify, replay, and hooks",
       "priority": 4,
-      "status": "todo",
-      "details": "Add unit/integration tests that validate core invariants and failure modes defined in spec.",
+      "status": "done",
+      "details": "Added unit tests for sync idempotency/pending handling, verify/replay failure paths, adapter compatibility denials, policy checks, and hook install/uninstall fixtures.",
       "steps": [
         "Create fixtures for hook install/uninstall and fallback diff baselines",
         "Add sync idempotency and pending-state tests",
@@ -685,6 +685,10 @@
         "OG-LOCK-001",
         "OG-SYNC-001",
         "OG-VERIFY-001"
+      ],
+      "updated_at": "2026-03-04T10:37:23Z",
+      "files": [
+        "tests/test_og_sync_verify_replay_hooks.py"
       ]
     }
   ]
