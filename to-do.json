@@ -319,10 +319,13 @@
         "OG-ADAPTER-001"
       ],
       "files": [
-        "SPEC-v2.md",
-        "ARCHITECTURE.md"
+        "/home/agent/outcomegraph/ARCHITECTURE.md",
+        "/home/agent/outcomegraph/SPEC-v2.md",
+        "/home/agent/outcomegraph/to-do.json",
+        "ARCHITECTURE.md",
+        "SPEC-v2.md"
       ],
-      "updated_at": "2026-03-04T10:10:38Z"
+      "updated_at": "2026-03-04T10:10:43Z"
     },
     {
       "id": "OG-REPLAY-002",
@@ -374,7 +377,7 @@
       "id": "OG-STATUS-001",
       "title": "Implement `og status` fresh/pending/verification dashboard",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Report sync freshness, pending work, certificate freshness, and degraded states.",
       "steps": [
         "Define machine-readable status schema",
@@ -388,6 +391,11 @@
       "depends_on": [
         "OG-SYNC-001",
         "OG-VERIFY-001"
+      ],
+      "updated_at": "2026-03-04T10:11:27Z",
+      "files": [
+        "og",
+        "to-do.json"
       ]
     },
     {
