@@ -110,7 +110,7 @@
       "id": "OG-HOOK-002",
       "title": "Implement `og autopilot disable` teardown and restore",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Remove installed bridge scripts and restore previous git hook configuration when available.",
       "steps": [
         "Read persisted hook state and remove outcome-managed hooks",
@@ -123,6 +123,11 @@
       ],
       "depends_on": [
         "OG-HOOK-001"
+      ],
+      "updated_at": "2026-03-04T10:10:03Z",
+      "files": [
+        "og",
+        "to-do.json"
       ]
     },
     {
@@ -445,7 +450,7 @@
         "og",
         "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:09:27Z"
+      "updated_at": "2026-03-04T10:09:32Z"
     },
     {
       "id": "OG-MCP-001",
