@@ -152,8 +152,8 @@
       "id": "OG-CHANGES-001",
       "title": "Build change-detection and baseline fallback logic",
       "priority": 2,
-      "status": "todo",
-      "details": "Map working-tree changes to affected capsules with robust baseline handling.",
+      "status": "done",
+      "details": "Map working-tree changes to affected capsules with robust baseline handling. Change detection baseline fallback and runtime-ignore paths now defined in sync contract.",
       "steps": [
         "Detect diff against HEAD~1 when available",
         "Fallback to ORIG_HEAD merge-base/full-sync edge cases",
@@ -169,7 +169,8 @@
       "files": [
         "SPEC-v2.md",
         "ARCHITECTURE.md"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:10:11Z"
     },
     {
       "id": "OG-ADAPTER-001",

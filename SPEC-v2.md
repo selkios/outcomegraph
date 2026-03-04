@@ -477,14 +477,33 @@ og sync
 
 1. Acquire repo lock.
 2. Snapshot working tree and commit state.
-3. Compute affected capsules.
-4. Build idempotency key.
-5. Run `distill` (if needed).
-6. Apply structured deltas.
-7. Run fast verify loop (policy-driven).
-8. Refresh exports.
-9. Record run summary.
-10. Release lock.
+3. Resolve change baseline:
+
+- Prefer `HEAD~1` when available.
+- Else, if `ORIG_HEAD` exists, use `git merge-base ORIG_HEAD HEAD`.
+- Else, fallback to empty-tree/full-sync semantics (all tracked, non-runtime paths are treated as changed).
+4. Compute changed paths against the resolved baseline.
+5. Filter out runtime directories from changed paths:
+
+- `.outcomegraph/work/**`
+- `.outcomegraph/cache/**`
+- `.outcomegraph/events/**`
+- `.outcomegraph/objects/**`
+
+6. Map filtered paths to target capsules.
+7. Build idempotency key.
+8. Run `distill` (if needed).
+9. Apply structured deltas.
+10. Run fast verify loop (policy-driven).
+11. Refresh exports.
+12. Record run summary.
+13. Release lock.
+
+Edge cases:
+
+- If `HEAD` exists but `HEAD~1` does not (initial commit), sync uses empty-tree comparison.
+- If `ORIG_HEAD` exists but `merge-base` fails, sync escalates to full scope diff mode.
+- If all detected paths are runtime-tracked-only (filtered out), `Changes detected` is false unless `--force-full-sync` is set.
 
 ## 9) Concurrency and trigger model
 

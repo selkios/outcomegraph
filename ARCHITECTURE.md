@@ -79,7 +79,8 @@ This keeps locking, dedupe, policy, and safety in one place.
 flowchart TD
   S[og sync] --> L{Acquire lock}
   L -- no --> Q[Set pending=true and exit]
-  L -- yes --> D{Changes detected}
+  L -- yes --> B[Resolve diff baseline]
+  B --> D{Changes detected}
   D -- no --> VS{Verify stale or scheduled}
   D -- yes --> M[Map changes to capsules]
   M --> W[Run distill via WorkerAdapter]
@@ -92,6 +93,19 @@ flowchart TD
   E --> R[Record sync summary event]
   R --> U[Release lock]
 ```
+
+### 3.1 Change detection and baseline fallback
+
+- Baseline resolution order:
+  - `HEAD~1` when available
+  - `git merge-base ORIG_HEAD HEAD` when `HEAD~1` is unavailable and `ORIG_HEAD` exists
+  - synthetic empty-tree baseline when both are unavailable
+- Runtime directories are ignored before mapping:
+  - `.outcomegraph/work/**`
+  - `.outcomegraph/cache/**`
+  - `.outcomegraph/events/**`
+  - `.outcomegraph/objects/**`
+- If filtering removes all diff paths, sync treats the tree as unchanged for this pass unless a full-sync flag is requested.
 
 ## 4) Distillation flow (Codex v1 adapter)
 
@@ -107,7 +121,7 @@ sequenceDiagram
 
   T->>OG: start sync
   OG->>OG: acquire lock + idempotency check
-  OG->>G: inspect diffs and affected capsules
+  OG->>G: resolve baseline, inspect filtered diffs, and map to affected capsules
   OG->>C: codex exec with output schema
   C-->>OG: structured deltas + claims + evidence pointers
   OG->>OG: validate schema and policy
