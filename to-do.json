@@ -426,7 +426,7 @@
       "id": "OG-EXPORT-001",
       "title": "Generate deterministic exports for AGENTS, skills, and MCP resources",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Build exporter adapter pipeline that derives control surfaces from canonical artifacts.",
       "steps": [
         "Implement renderers for AGENTS.md and README_OUTCOMES outputs",
@@ -442,9 +442,10 @@
         "OG-SYNC-001"
       ],
       "files": [
-        "SPEC-v2.md",
-        "ARCHITECTURE.md"
-      ]
+        "og",
+        "to-do.json"
+      ],
+      "updated_at": "2026-03-04T10:09:27Z"
     },
     {
       "id": "OG-MCP-001",

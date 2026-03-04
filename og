@@ -51,6 +51,12 @@ OG_INIT_DIRS = (
     "cache",
     "traces",
 )
+EXPORT_PATHS = {
+    "agents": ".outcomegraph/export/AGENTS.md",
+    "outcomes": ".outcomegraph/export/README_OUTCOMES.md",
+    "mcp_resources": ".outcomegraph/export/mcp-resources.json",
+    "skill": "skills/outcome-steward/SKILL.md",
+}
 WORK_LOCK_STALE_SECONDS = 300
 LOCK_STATUS_LOCKED = "locked"
 LOCK_STATUS_UNLOCKED = "unlocked"
@@ -157,6 +163,331 @@ def _write_file_if_missing(path: str, content: str) -> bool:
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(content)
     return True
+
+
+def _write_text_file_if_changed(path: str, content: str) -> bool:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(content)
+    try:
+        with open(path, "r", encoding="utf-8") as existing:
+            existing_payload = existing.read()
+        with open(tmp, "r", encoding="utf-8") as updated:
+            updated_payload = updated.read()
+        if existing_payload == updated_payload:
+            os.remove(tmp)
+            return False
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+    os.replace(tmp, path)
+    return True
+
+
+def _extract_artifact_field(line: str, field_name: str) -> str | None:
+    key, sep, value = line.partition(":")
+    if sep != ":":
+        return None
+    if key.strip() != field_name:
+        return None
+    clean = value.partition("#")[0].strip()
+    if not clean:
+        return None
+    if clean.startswith(('"', "'")) and clean.endswith(('"', "'")) and len(clean) > 1:
+        clean = clean[1:-1]
+    return clean
+
+
+def _read_artifact_record(repo_root: str, relative_path: str) -> dict[str, object]:
+    full_path = os.path.join(repo_root, relative_path)
+    artifact_id = None
+    artifact_type = None
+    schema_version = None
+    try:
+        with open(full_path, "r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                if raw_line.lstrip().startswith("-"):
+                    continue
+                value = _extract_artifact_field(raw_line, "id")
+                if value and artifact_id is None:
+                    artifact_id = value
+                    continue
+                value = _extract_artifact_field(raw_line, "artifact_type")
+                if value and artifact_type is None:
+                    artifact_type = value
+                    continue
+                value = _extract_artifact_field(raw_line, "schema_version")
+                if value and schema_version is None:
+                    try:
+                        schema_version = int(value)
+                    except ValueError:
+                        schema_version = None
+                if artifact_id is not None and artifact_type is not None and schema_version is not None:
+                    break
+    except OSError:
+        return {"path": relative_path, "id": None, "artifact_type": None, "schema_version": None, "size": 0}
+
+    try:
+        size = os.path.getsize(full_path)
+    except OSError:
+        size = 0
+
+    if artifact_id is None:
+        base = os.path.basename(relative_path)
+        artifact_id = base.split(".")[0]
+    return {
+        "path": relative_path,
+        "id": artifact_id,
+        "artifact_type": artifact_type,
+        "schema_version": schema_version,
+        "size": size,
+    }
+
+
+def _canonical_export_snapshot(repo_root: str) -> dict[str, object]:
+    canonical_roots = ("constitution", "capsules", "refs", "decisions", "certificates", "datasets", "objects")
+    artifact_files: list[str] = []
+    for root in canonical_roots:
+        root_path = os.path.join(repo_root, OG_ROOT, root)
+        if not os.path.isdir(root_path):
+            continue
+        for dirpath, _, filenames in os.walk(root_path):
+            for filename in sorted(filenames):
+                if filename.startswith("."):
+                    continue
+                if not filename.endswith((".yaml", ".yml", ".json")):
+                    continue
+                relative_path = os.path.relpath(os.path.join(dirpath, filename), repo_root).replace("\\", "/")
+                artifact_files.append(relative_path)
+
+    for filename in ("materials.lock", "policy.yaml", "config.yaml"):
+        full_path = os.path.join(repo_root, OG_ROOT, filename)
+        if os.path.exists(full_path):
+            artifact_files.append(f"{OG_ROOT}/{filename}")
+
+    artifact_files = sorted(set(artifact_files))
+
+    records = [_read_artifact_record(repo_root, path) for path in artifact_files]
+    by_scope: dict[str, int] = {}
+    ids_by_scope: dict[str, list[str]] = {}
+    for record in records:
+        rel_path = record["path"]
+        scope = rel_path.split("/", 2)[1] if rel_path.startswith(f"{OG_ROOT}/") else rel_path.split("/", 1)[0]
+        by_scope[scope] = by_scope.get(scope, 0) + 1
+        artifact_id = record.get("id")
+        if isinstance(artifact_id, str) and artifact_id:
+            ids_by_scope.setdefault(scope, []).append(artifact_id)
+    return {
+        "generated_at": _utc_timestamp(),
+        "artifacts": records,
+        "counts": {
+            "total": len(records),
+            "by_scope": by_scope,
+        },
+        "ids_by_scope": {scope: sorted(set(ids)) for scope, ids in ids_by_scope.items()},
+    }
+
+
+def _render_agents_export(snapshot: dict[str, object]) -> str:
+    counts = snapshot["counts"]
+    by_scope = counts["by_scope"]
+    lines = [
+        "# AGENTS",
+        "",
+        "This file is generated by OutcomeGraph export stage.",
+        f"Generated at: {snapshot['generated_at']}",
+        "",
+        "## Command surface",
+        "- og init",
+        "- og sync",
+        "- og verify --changed",
+        "- og replay --changed",
+        "- og status",
+        "- og export",
+        "- og explain",
+        "- og drift",
+        "- og mcp-server",
+        "- og optimize prompts",
+        "- og autopilot init|disable",
+        "- og daemon install|start|stop|status",
+        "",
+        f"- Canonical artifact directories tracked: {sorted(list(by_scope.keys()))}",
+        f"- Total canonical artifacts: {counts['total']}",
+        "",
+    ]
+    for scope in sorted(by_scope):
+        lines.extend([f"- `{scope}`: {by_scope[scope]} item(s)"])
+    lines.extend(
+        [
+            "",
+            "## Export semantics",
+            "- Exports are generated deterministically from canonical artifacts.",
+            "- Writes are idempotent: unchanged content is not rewritten.",
+            "- Control-surface files are projections only; canonical truth remains in `.outcomegraph` artifacts.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _render_readme_outcomes(snapshot: dict[str, object]) -> str:
+    counts = snapshot["counts"]
+    ids_by_scope = snapshot["ids_by_scope"]
+    lines = [
+        "# OutcomeGraph Export Snapshot",
+        "",
+        "Derived from `.outcomegraph` canonical artifacts at export time.",
+        f"Generated at: {snapshot['generated_at']}",
+        "",
+        f"- Total artifacts observed: {counts['total']}",
+        "",
+        "## Scope breakdown",
+    ]
+    for scope in sorted(counts["by_scope"]):
+        lines.append(f"- `{scope}`: {counts['by_scope'][scope]} file(s)")
+    lines.append("")
+    lines.append("## Artifact IDs")
+    for scope in sorted(ids_by_scope):
+        entries = sorted(ids_by_scope[scope])
+        if not entries:
+            continue
+        lines.append(f"- {scope}:")
+        for value in entries:
+            lines.append(f"  - {value}")
+    lines.extend(["", "## Files tracked for export", ""])
+    for record in sorted(snapshot["artifacts"], key=lambda item: item["path"]):
+        path = record["path"]
+        artifact_type = record.get("artifact_type")
+        schema_version = record.get("schema_version")
+        if isinstance(artifact_type, str):
+            tag = artifact_type
+        elif isinstance(schema_version, int):
+            tag = f"schema_version:{schema_version}"
+        else:
+            tag = "raw"
+        lines.append(f"- `{path}` ({tag})")
+    return "\n".join(lines) + "\n"
+
+
+def _render_skill_export(snapshot: dict[str, object]) -> str:
+    counts = snapshot["counts"]
+    lines = [
+        "# OutcomeGraph Steward Skill",
+        "",
+        "Scope: This skill documents canonical Steward workflows for bootstrap, sync, and control-surface updates.",
+        f"Generated at: {snapshot['generated_at']}",
+        "",
+        "## 1) Bootstrap",
+        "- Run `og init` to create required OutcomeGraph directories and baseline metadata.",
+        "- Ensure `.outcomegraph/` exists with `constitution`, `capsules`, `refs`, `decisions`, `certificates`, `datasets`, `events`, `objects`, and `work`.",
+        "",
+        "## 2) Deterministic sync flow",
+        "1. Run `og sync` for the canonical refresh loop.",
+        "2. Distill changes into synthetic deltas.",
+        "3. Apply deltas and refresh exports.",
+        "4. Emit structured summary into `.outcomegraph/events`.",
+        "",
+        "## 3) Verification and replay expectations",
+        "- Use `og verify --changed` after focused edits.",
+        "- Use `og replay --changed` when behavior parity validation is required.",
+        "- Handle verification failures by inspecting certificate and error signals before continuing.",
+        "",
+        "## 4) Failure handling",
+        "- If lock contention occurs, treat command result as `pending` and rerun.",
+        "- Preserve existing canonical artifacts when worker or oracle stages are unavailable.",
+        "- Keep exporting control surfaces from available truth where possible.",
+        "",
+        "## 5) Artifact health",
+        f"- Tracked canonical paths currently include {counts['total']} known artifact files.",
+        "- Export refresh includes `export/AGENTS.md`, `export/README_OUTCOMES.md`, and `export/mcp-resources.json`.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
+    resources = [
+        {
+            "uri": "outcomegraph://tools/sync",
+            "name": "sync",
+            "description": "Run autonomous reconcile pipeline.",
+            "category": "tool",
+        },
+        {
+            "uri": "outcomegraph://tools/verify",
+            "name": "verify",
+            "description": "Run fast verification on impacted capsules.",
+            "category": "tool",
+        },
+        {
+            "uri": "outcomegraph://tools/replay",
+            "name": "replay",
+            "description": "Run replay checks against canonical artifacts.",
+            "category": "tool",
+        },
+        {
+            "uri": "outcomegraph://tools/explain",
+            "name": "explain",
+            "description": "Explain claims and provenance pointers.",
+            "category": "tool",
+        },
+        {
+            "uri": "outcomegraph://tools/status",
+            "name": "status",
+            "description": "Read runtime and freshness summary.",
+            "category": "tool",
+        },
+    ]
+    resources.extend(
+        {
+            "uri": f"outcomegraph://{scope}",
+            "name": scope,
+            "description": f"Canonical artifact projection for {scope} scope.",
+            "category": "artifact",
+            "paths": [record["path"] for record in snapshot["artifacts"] if record["path"].startswith(f"{OG_ROOT}/{scope}")],
+        }
+        for scope in sorted(snapshot["counts"]["by_scope"])
+    )
+    payload = {
+        "schema_version": 2,
+        "artifact_type": "mcp_resource_export",
+        "id": "mcp-export",
+        "generated_at": snapshot["generated_at"],
+        "tools": sorted(resources[:5], key=lambda item: item["name"]),
+        "resources": sorted(resources[5:], key=lambda item: item["uri"]),
+        "prompts": [
+            "bootstrap",
+            "replay",
+            "repair",
+        ],
+        "artifact_counts": {scope: snapshot["counts"]["by_scope"][scope] for scope in sorted(snapshot["counts"]["by_scope"])},
+        "status": "ok",
+    }
+    return json.dumps(payload, sort_keys=True, indent=2) + "\n"
+
+
+def _run_export_refresh(repo_root: str) -> tuple[list[str], list[str], dict[str, object]]:
+    snapshot = _canonical_export_snapshot(repo_root)
+    updated_exports: list[str] = []
+    unchanged_exports: list[str] = []
+
+    outputs = {
+        EXPORT_PATHS["agents"]: _render_agents_export(snapshot),
+        EXPORT_PATHS["outcomes"]: _render_readme_outcomes(snapshot),
+        EXPORT_PATHS["skill"]: _render_skill_export(snapshot),
+        EXPORT_PATHS["mcp_resources"]: _render_mcp_resource_export(snapshot),
+    }
+
+    for relative_path, content in outputs.items():
+        absolute_path = os.path.join(repo_root, relative_path)
+        changed = _write_text_file_if_changed(absolute_path, content)
+        rel = relative_path.replace("\\", "/")
+        if changed:
+            updated_exports.append(rel)
+        else:
+            unchanged_exports.append(rel)
+
+    return updated_exports, unchanged_exports, snapshot
 
 
 def _build_constitution_payload(created_at: str) -> str:
@@ -827,22 +1158,32 @@ def _run_verify_stage(changed_capsules: list[str], mode: str) -> dict[str, objec
     }
 
 
-def _run_export_stage(apply_result: dict[str, object], mode: str) -> dict[str, object]:
-    if apply_result.get("status") not in {"ok", "skipped"}:
+def _run_export_stage(repo_root: str, mode: str) -> dict[str, object]:
+    try:
+        updated_exports, unchanged_exports, snapshot = _run_export_refresh(repo_root)
+        message = "Export refresh completed."
+        if not updated_exports:
+            message = "Export refresh completed with no content changes."
         return {
             "name": "export",
-            "status": "skipped",
-            "message": "Apply stage unavailable; export deferred.",
+            "status": "ok",
+            "message": message,
+            "mode": mode,
+            "updated_exports": sorted(updated_exports),
+            "unchanged_exports": sorted(unchanged_exports),
+            "artifact_total": snapshot["counts"]["total"],
+            "artifact_counts": snapshot["counts"]["by_scope"],
+            "snapshot_generated_at": snapshot["generated_at"],
+        }
+    except Exception as exc:
+        return {
+            "name": "export",
+            "status": "error",
+            "message": f"Export refresh failed: {exc}",
             "mode": mode,
             "updated_exports": [],
+            "unchanged_exports": [],
         }
-    return {
-        "name": "export",
-        "status": "ok",
-        "message": "Export refresh is scheduled by runtime policy.",
-        "mode": mode,
-        "updated_exports": ["export/AGENTS.md", "export/README_OUTCOMES.md"],
-    }
 
 
 def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
@@ -954,7 +1295,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="export", last_message="starting export")
     export = _time_step(
         "export",
-        lambda: _run_export_stage(apply_result, mode=mode),
+        lambda: _run_export_stage(repo_root, mode=mode),
     )
     steps.append(export)
 
@@ -1080,7 +1421,22 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "export":
         options, _ = parse_command_flags(rest, "export", False, False, False, output_json)
-        emit_command_result(build_payload("export", **options), output_json)
+        repo_root = _git_root()
+        export = _run_export_stage(repo_root, mode="observe")
+        status = "ok" if export.get("status") == "ok" else "error"
+        payload = {
+            "status": status,
+            "command": "export",
+            "options": options,
+            "steps": [export],
+            "message": export.get("message", "export completed"),
+            "updated_exports": export.get("updated_exports", []),
+            "unchanged_exports": export.get("unchanged_exports", []),
+            "snapshot_generated_at": export.get("snapshot_generated_at"),
+            "artifact_total": export.get("artifact_total", 0),
+            "artifact_counts": export.get("artifact_counts", {}),
+        }
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "explain":
