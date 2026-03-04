@@ -1,0 +1,595 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "OutcomeGraph",
+    "root": "."
+  },
+  "source_files": [
+    "README.md",
+    "SPEC-v2.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md"
+  ],
+  "tasks": [
+    {
+      "id": "OG-CLI-001",
+      "title": "Implement the `og` CLI contract with core command parsing",
+      "priority": 1,
+      "status": "done",
+      "details": "Create a stable CLI entrypoint that supports required commands and consistent exit codes/help text.",
+      "steps": [
+        "Define command registry for init, sync, verify, replay, status, export, explain, drift, mcp-server, optimize prompts, autopilot, and daemon wrappers",
+        "Add argument parsing for `--changed` flags and profile/mode options",
+        "Implement structured error handling and return codes for scripted CI use"
+      ],
+      "tags": [
+        "cli",
+        "foundation"
+      ],
+      "files": [
+        "README.md",
+        "SPEC-v2.md",
+        "og",
+        "ogd"
+      ],
+      "updated_at": "2026-03-04T09:00:00Z"
+    },
+    {
+      "id": "OG-SCHEMA-001",
+      "title": "Define canonical OutcomeGraph v2 artifact schemas and migration/version checks",
+      "priority": 1,
+      "status": "todo",
+      "details": "Implement canonical data models for capsules, refs, decisions, certificates, materials lock, claims, and receipt pointers with schema_version 2.",
+      "steps": [
+        "Create schema definitions for all artifact types",
+        "Add validation for schema_version and required core fields",
+        "Implement migration guardrails for unsupported legacy versions"
+      ],
+      "tags": [
+        "schema",
+        "artifact-graph"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "README.md"
+      ]
+    },
+    {
+      "id": "OG-INIT-001",
+      "title": "Build `og init` bootstrap workflow",
+      "priority": 1,
+      "status": "todo",
+      "details": "Initialize required `.outcomegraph` directories and baseline metadata for a managed repository.",
+      "steps": [
+        "Create constitution, capsules, refs, decisions, certificates, datasets, events, objects, export, work, cache, and traces directories",
+        "Create initial constitution and lock/state files",
+        "Generate default policy and config files for observe mode"
+      ],
+      "tags": [
+        "bootstrap",
+        "initialization"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "QUICKSTART.md"
+      ]
+    },
+    {
+      "id": "OG-HOOK-001",
+      "title": "Implement `og autopilot init` hook setup with non-destructive behavior",
+      "priority": 1,
+      "status": "todo",
+      "details": "Install hooks or bridge scripts without silently clobbering existing git hook configuration.",
+      "steps": [
+        "Detect existing `core.hooksPath` and decide install strategy",
+        "Persist previous hook configuration for restore",
+        "Support `--force-hooks-path` and explicit consent prompts",
+        "Configure hook scripts to mark pending work and no-op in autonomous context"
+      ],
+      "tags": [
+        "autopilot",
+        "hooks"
+      ],
+      "depends_on": [
+        "OG-INIT-001"
+      ]
+    },
+    {
+      "id": "OG-HOOK-002",
+      "title": "Implement `og autopilot disable` teardown and restore",
+      "priority": 2,
+      "status": "todo",
+      "details": "Remove installed bridge scripts and restore previous git hook configuration when available.",
+      "steps": [
+        "Read persisted hook state and remove outcome-managed hooks",
+        "Restore original hooks path and scripts",
+        "Handle missing state files with safe no-op behavior"
+      ],
+      "tags": [
+        "autopilot",
+        "hooks"
+      ],
+      "depends_on": [
+        "OG-HOOK-001"
+      ]
+    },
+    {
+      "id": "OG-LOCK-001",
+      "title": "Implement `.outcomegraph/work/lock` coordination and pending state",
+      "priority": 1,
+      "status": "todo",
+      "details": "Guarantee single active sync per repo and pending-marking when contention occurs.",
+      "steps": [
+        "Create lock acquisition with stale-lock detection",
+        "Write pending=true on contention and exit cleanly",
+        "Consume pending state on next successful run"
+      ],
+      "tags": [
+        "runtime",
+        "concurrency"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-CHANGES-001",
+      "title": "Build change-detection and baseline fallback logic",
+      "priority": 2,
+      "status": "todo",
+      "details": "Map working-tree changes to affected capsules with robust baseline handling.",
+      "steps": [
+        "Detect diff against HEAD~1 when available",
+        "Fallback to ORIG_HEAD merge-base/full-sync edge cases",
+        "Ignore runtime directories (`.outcomegraph/work`, `cache`, `objects`, `events`) in triggers"
+      ],
+      "tags": [
+        "sync",
+        "diffing"
+      ],
+      "depends_on": [
+        "OG-LOCK-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-ADAPTER-001",
+      "title": "Define versioned adapter interfaces for worker, oracle, sandbox, store, and exporter",
+      "priority": 2,
+      "status": "todo",
+      "details": "Introduce pluggable interfaces with compatibility checks by interface_version.",
+      "steps": [
+        "Define interfaces and typed result contracts",
+        "Add plugin loader and registration API",
+        "Reject incompatible plugins with actionable diagnostics"
+      ],
+      "tags": [
+        "adapters",
+        "architecture"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-WORKER-001",
+      "title": "Implement Codex worker adapter v1 distillation and replay adapter",
+      "priority": 2,
+      "status": "todo",
+      "details": "Support non-interactive distill/replay/explain with schema-validated outputs.",
+      "steps": [
+        "Run codex in analyze/propose/apply profile modes",
+        "Normalize DistillDelta, ReplayPlan, and ClaimSet payloads",
+        "Enforce structured output schema and fail fast on malformed results"
+      ],
+      "tags": [
+        "adapter",
+        "codex",
+        "distillation"
+      ],
+      "depends_on": [
+        "OG-ADAPTER-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-SYNC-001",
+      "title": "Implement `og sync` as the autonomous entrypoint",
+      "priority": 1,
+      "status": "todo",
+      "details": "Execute lock -> diff -> distill -> apply -> verify -> export -> summary in one orchestrated job flow.",
+      "steps": [
+        "Implement idempotency key and short-circuit logic",
+        "Sequence sync steps per specification",
+        "Emit structured sync summary event and runtime status updates"
+      ],
+      "tags": [
+        "runtime",
+        "orchestration"
+      ],
+      "depends_on": [
+        "OG-LOCK-001",
+        "OG-CHANGES-001",
+        "OG-WORKER-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "README.md"
+      ]
+    },
+    {
+      "id": "OG-VERIFY-001",
+      "title": "Implement fast verify loop and oracle execution",
+      "priority": 2,
+      "status": "todo",
+      "details": "Run only affected-oracle checks on changed scope and persist verification receipts.",
+      "steps": [
+        "Select impacted oracles from changed capsules",
+        "Invoke oracle adapter and collect receipt data",
+        "Persist certificate fragments and evidence pointers"
+      ],
+      "tags": [
+        "verification",
+        "oracles"
+      ],
+      "depends_on": [
+        "OG-SYNC-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-VERIFY-002",
+      "title": "Implement command `og verify --changed`",
+      "priority": 3,
+      "status": "todo",
+      "details": "Expose manual fast verification with changed-scope filtering and output formatting.",
+      "steps": [
+        "Compute minimal impacted set from git change input",
+        "Run verification jobs and aggregate oracle outcomes",
+        "Print machine-readable and human-readable summaries"
+      ],
+      "tags": [
+        "cli",
+        "verification"
+      ],
+      "depends_on": [
+        "OG-VERIFY-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "QUICKSTART.md"
+      ]
+    },
+    {
+      "id": "OG-REPLAY-001",
+      "title": "Implement replay loop for changed capsules in clean environments",
+      "priority": 2,
+      "status": "todo",
+      "details": "Rebuild from materialized truth in fresh sandboxes and compare behavior equivalence outputs.",
+      "steps": [
+        "Create isolated worktree/sandbox for each replay unit",
+        "Execute replay plan and capture oracle evidence",
+        "Generate replay certificates with provenance metadata"
+      ],
+      "tags": [
+        "replay",
+        "verification"
+      ],
+      "depends_on": [
+        "OG-SYNC-001",
+        "OG-ADAPTER-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-REPLAY-002",
+      "title": "Implement command `og replay --changed`",
+      "priority": 3,
+      "status": "todo",
+      "details": "Run replay on the changed set and report parity results plus failures.",
+      "steps": [
+        "Route command path to replay loop selection",
+        "Output certificate IDs and replay status",
+        "Record stale/unknown verification state in status"
+      ],
+      "tags": [
+        "cli",
+        "replay"
+      ],
+      "depends_on": [
+        "OG-REPLAY-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "QUICKSTART.md"
+      ]
+    },
+    {
+      "id": "OG-DAEMON-001",
+      "title": "Implement ogd install/start/stop/status for always-on mode",
+      "priority": 3,
+      "status": "todo",
+      "details": "Provide an optional daemon or watcher entrypoint that schedules sync on filesystem events.",
+      "steps": [
+        "Add install script and service lifecycle hooks",
+        "Implement watch paths and ignore sets for runtime directories",
+        "Honor `OG_AUTOPILOT=1` to avoid hook loops"
+      ],
+      "tags": [
+        "daemon",
+        "autopilot"
+      ],
+      "depends_on": [
+        "OG-HOOK-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-STATUS-001",
+      "title": "Implement `og status` fresh/pending/verification dashboard",
+      "priority": 2,
+      "status": "todo",
+      "details": "Report sync freshness, pending work, certificate freshness, and degraded states.",
+      "steps": [
+        "Define machine-readable status schema",
+        "Surface stale, unknown, or degraded verification states",
+        "Render concise CLI summary for humans and scripts"
+      ],
+      "tags": [
+        "cli",
+        "observability"
+      ],
+      "depends_on": [
+        "OG-SYNC-001",
+        "OG-VERIFY-001"
+      ]
+    },
+    {
+      "id": "OG-EXPLAIN-001",
+      "title": "Implement `og explain` claim and evidence tracing",
+      "priority": 3,
+      "status": "todo",
+      "details": "Present why a capsule changed, what claims were made, and linked receipts or file pointers.",
+      "steps": [
+        "Aggregate decisions, deltas, and certificate references",
+        "Render evidence chain in CLI output",
+        "Support filtering by capsule/ref/certificate id"
+      ],
+      "tags": [
+        "cli",
+        "provenance"
+      ],
+      "depends_on": [
+        "OG-WORKER-001",
+        "OG-VERIFY-001"
+      ]
+    },
+    {
+      "id": "OG-DRIFT-001",
+      "title": "Implement `og drift` detection and reporting",
+      "priority": 3,
+      "status": "todo",
+      "details": "Identify canonical truth drift relative to expected policy, signatures, and recent checks.",
+      "steps": [
+        "Define drift checks for stale certificates and failed policies",
+        "Expose actionable remediation hints",
+        "Integrate with status and event ledger outputs"
+      ],
+      "tags": [
+        "verification",
+        "provenance"
+      ],
+      "depends_on": [
+        "OG-VERIFY-001",
+        "OG-INTG-001"
+      ]
+    },
+    {
+      "id": "OG-EXPORT-001",
+      "title": "Generate deterministic exports for AGENTS, skills, and MCP resources",
+      "priority": 2,
+      "status": "todo",
+      "details": "Build exporter adapter pipeline that derives control surfaces from canonical artifacts.",
+      "steps": [
+        "Implement renderers for AGENTS.md and README_OUTCOMES outputs",
+        "Implement skill and MCP resource file generation",
+        "Ensure deterministic ordering and idempotent writes"
+      ],
+      "tags": [
+        "exports",
+        "plugins"
+      ],
+      "depends_on": [
+        "OG-SCHEMA-001",
+        "OG-SYNC-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-MCP-001",
+      "title": "Implement `og mcp-server` control surface",
+      "priority": 3,
+      "status": "todo",
+      "details": "Expose required MCP tools/resources/prompts over a stable control endpoint.",
+      "steps": [
+        "Implement tools: sync, verify, replay, explain, status",
+        "Expose resources for capsules, refs, constitutions, certificates",
+        "Expose bootstrap, replay, and repair prompts"
+      ],
+      "tags": [
+        "mcp",
+        "integration"
+      ],
+      "depends_on": [
+        "OG-CLI-001",
+        "OG-EXPORT-001"
+      ]
+    },
+    {
+      "id": "OG-SEC-001",
+      "title": "Enforce safe-by-default autonomy policy controls",
+      "priority": 1,
+      "status": "todo",
+      "details": "Default `observe` mode should only allow safe artifacts and prevent implicit code mutations.",
+      "steps": [
+        "Apply allow/deny lists for writes, network, dependencies, and deployment actions",
+        "Require explicit opt-in for broader agent/edit modes",
+        "Emit policy violations and actionable remediation messages"
+      ],
+      "tags": [
+        "security",
+        "policy"
+      ],
+      "depends_on": [
+        "OG-INIT-001"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "OG-INTG-001",
+      "title": "Implement integrity ledger, hashes, checkpoints, and degraded-state transitions",
+      "priority": 4,
+      "status": "todo",
+      "details": "Track append-only events with chained hashes and checkpoint state for trust and recovery.",
+      "steps": [
+        "Add event append API and checksum validation",
+        "Implement checkpoint creation and signature hooks",
+        "Transition to degraded state on integrity failure and block autonomous writes"
+      ],
+      "tags": [
+        "integrity",
+        "reliability"
+      ],
+      "depends_on": [
+        "OG-SYNC-001"
+      ]
+    },
+    {
+      "id": "OG-STORAGE-001",
+      "title": "Implement content-addressed store and separation of tracked vs untracked evidence",
+      "priority": 2,
+      "status": "todo",
+      "details": "Store bulky evidence in CAS while tracking compact pointers from canonical artifacts.",
+      "steps": [
+        "Create local CAS adapter for put/get/exists",
+        "Link evidence pointers to certificates and claims",
+        "Configure `.outcomegraph` entries for ignored traces/caches/local blobs"
+      ],
+      "tags": [
+        "storage",
+        "artifacts"
+      ],
+      "depends_on": [
+        "OG-ADAPTER-001"
+      ]
+    },
+    {
+      "id": "OG-RECOVERY-001",
+      "title": "Add degraded-mode behavior and repair paths",
+      "priority": 4,
+      "status": "todo",
+      "details": "Keep workflows unblocked when worker/oracle/storage components fail while surfacing recovery-needed state.",
+      "steps": [
+        "Implement pending markers for unavailable worker runtime",
+        "Preserve existing certificates on oracle failures and continue status/export",
+        "Support rebuild of derived index when storage metadata is corrupted"
+      ],
+      "tags": [
+        "resilience",
+        "recovery"
+      ],
+      "depends_on": [
+        "OG-SYNC-001",
+        "OG-VERIFY-001",
+        "OG-INTG-001"
+      ]
+    },
+    {
+      "id": "OG-OPT-001",
+      "title": "Implement experimental prompt optimization workflow",
+      "priority": 4,
+      "status": "todo",
+      "details": "Add offline prompt tuning command with dataset evaluation and manual promotion gate checks.",
+      "steps": [
+        "Create eval dataset schema and execution path",
+        "Compare candidate prompt performance against baseline",
+        "Block automatic promotion and require manual approval"
+      ],
+      "tags": [
+        "optimization",
+        "prompts"
+      ],
+      "depends_on": [
+        "OG-CLI-001",
+        "OG-SYNC-001"
+      ]
+    },
+    {
+      "id": "OG-REPO-001",
+      "title": "Deliver required documentation set for v2.1 implementation",
+      "priority": 5,
+      "status": "todo",
+      "details": "Publish required schema and operational documentation artifacts in-repo with versioned references.",
+      "steps": [
+        "Create/refresh architecture and plugin API references",
+        "Add failure and recovery runbooks",
+        "Add security policy and migration guidance"
+      ],
+      "tags": [
+        "documentation"
+      ],
+      "depends_on": [
+        "OG-SCHEMA-001",
+        "OG-INTG-001",
+        "OG-RECOVERY-001"
+      ]
+    },
+    {
+      "id": "OG-TEST-001",
+      "title": "Build comprehensive test coverage for sync, verify, replay, and hooks",
+      "priority": 4,
+      "status": "todo",
+      "details": "Add unit/integration tests that validate core invariants and failure modes defined in spec.",
+      "steps": [
+        "Create fixtures for hook install/uninstall and fallback diff baselines",
+        "Add sync idempotency and pending-state tests",
+        "Cover worker/adapter compatibility and safety-policy denials"
+      ],
+      "tags": [
+        "testing",
+        "quality"
+      ],
+      "depends_on": [
+        "OG-CLI-001",
+        "OG-LOCK-001",
+        "OG-SYNC-001",
+        "OG-VERIFY-001"
+      ]
+    }
+  ]
+}

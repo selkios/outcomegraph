@@ -142,40 +142,50 @@ Responsibilities:
 
 ## 5) CLI contract
 
-The stable command contract is:
+The stable contract is command-focused, with explicit parsing behavior and return semantics.
 
 ```bash
 og init
-og sync
-og verify --changed
-og replay --changed
+og sync [--profile analyze|propose|apply] [--mode observe|autonomous]
+og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]
+og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]
 og status
 og export
 og explain
 og drift
 og mcp-server
 og optimize prompts
-```
-
-Autopilot management:
-
-```bash
 og autopilot init
 og autopilot disable
-```
+og daemon install
+og daemon start
+og daemon stop
+og daemon status
 
-Optional daemon management:
-
-```bash
 ogd install
 ogd start
 ogd stop
 ogd status
 ```
 
-Convenience wrappers may exist, but are non-normative:
+Core parsing rules:
 
-- `og init --autonomous --codex` is an alias that composes `og init` + `og autopilot init`.
+- All command and flag validation is explicit and exits with command-appropriate error codes.
+- `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
+- `--profile` and `--mode` are validated against finite enumerations.
+- Unknown options or subcommands are treated as usage errors.
+
+Exit codes:
+
+- `0` success
+- `1` runtime / implementation failure
+- `64` usage, validation, or contract violation
+
+Structured output:
+
+- `--json` prints parseable result/error payloads to stdout (for scripts and CI).
+- Success payload includes `status`, `command`, `subcommand`, and parsed `options`.
+- Error payload includes `status`, `code`, `command`, and `message`.
 
 ## 6) Repository layout and tracking policy
 
@@ -544,4 +554,3 @@ v2.3:
 4. Every claim has evidence pointers.
 5. Verification and replay are continuous loops, not one-off ceremonies.
 6. Adapters are replaceable without changing canonical artifact semantics.
-

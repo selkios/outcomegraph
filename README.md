@@ -2,12 +2,49 @@
 
 OutcomeGraph is a Git-native artifact graph for replayable software, with Steward as the always-on sidecar that keeps artifacts current.
 
-Start here:
+## Start here
 
 - Main specification: [SPEC-v2.md](./SPEC-v2.md)
 
-Core idea:
+## Core idea
 
 - Code is a materialization.
 - Artifacts are durable truth.
-- Steward keeps truth in sync while work happens.
+- Steward keeps truth in sync.
+
+## CLI contract
+
+`og` is the stable execution boundary for humans, agents, CI, and MCP clients.
+
+```bash
+og init
+og sync
+og verify --changed
+og replay --changed
+og status
+og export
+og explain
+og drift
+og mcp-server
+og optimize prompts
+og autopilot init
+og autopilot disable
+og daemon install|start|stop|status   # command aliases for ogd
+
+ogd install|start|stop|status        # dedicated daemon wrappers
+```
+
+Common options:
+
+- `--profile {analyze|propose|apply}`
+- `--mode {observe|autonomous}`
+- `--changed` (for changed-scope operations)
+- `--json` for machine-readable results and errors
+
+## Exit codes
+
+- `0` success
+- `1` runtime/implementation failure
+- `64` usage/validation failure
+
+Use `--json` with CI callers to get parseable success/error payloads.
