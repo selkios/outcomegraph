@@ -1,0 +1,126 @@
+# OutcomeGraph Runbooks (v2.1)
+
+Status: Draft v2.1  
+Date: 2026-03-04  
+Source: [SPEC-v2.md](./SPEC-v2.md)
+
+## 1) Operational runbook
+
+### 1.1 New repo bootstrap
+
+1. Run `og init`.
+2. Confirm `.outcomegraph` directories and constitution are present.
+3. Run `og sync`.
+4. Run `og status` and verify:
+   - freshness state is current,
+   - lock is free,
+   - no unknown verification status for tracked capsules.
+
+### 1.2 Day-to-day human flow
+
+1. Make code edits.
+2. Run `og sync`.
+3. Inspect summary output.
+4. Run `og verify --changed` for uncertain surfaces.
+5. Run `og explain` when traceability is needed.
+6. If needed, run `og replay --changed` for stronger behavioral confirmation.
+
+### 1.3 Autonomous flow
+
+1. Run `og autopilot init` once.
+2. Verify hooks/daemon install.
+3. Use `ogd start` or keep CI-triggered hooks in place.
+4. Run `og status` on cadence and on alert.
+
+### 1.4 Safe-mode checks
+
+- `.outcomegraph` and generated exports are writable in default flow.
+- code writes, dependency mutators, or deployment actions require explicit autonomy mode and allowlist policy.
+
+## 2) Failure runbook
+
+### 2.1 Lock contention
+
+Symptom: `og sync` exits without running job and reports pending state.
+
+Recovery:
+
+- Retry after active run finishes.
+- Confirm `og status` no longer shows active sync.
+- Pending work will be picked up on next run.
+
+### 2.2 `POLICY_DENIED`
+
+Symptom: structured error with `code: POLICY_DENIED`.
+
+Recovery:
+
+- Review target action against policy category.
+- Add explicit allowlist entry in `.outcomegraph/policy.yaml` where safe.
+- Re-run using required autonomy mode if policy requires it.
+
+### 2.3 Worker unavailable
+
+Symptom: distill failures and no new claims/decisions.
+
+Recovery:
+
+- Check worker binary/runtime availability.
+- Do not block local coding.
+- Continue with `og status` and rerun sync on next loop.
+
+### 2.4 Oracle unavailable or failing
+
+Symptom: verification state becomes stale/unknown with failed certificates.
+
+Recovery:
+
+- Fix oracle command/runtime.
+- Re-run `og verify --changed`.
+- For persistent failures, run `og replay --changed` to confirm behavioral evidence separately.
+
+### 2.5 Adapter/interface mismatch
+
+Symptom: startup error with `ADAPTER_INTERFACE_MISMATCH`.
+
+Recovery:
+
+- Install matching adapter version matching required interface.
+- Restart command entrypoint.
+- Validate diagnostics with the plugin list output.
+
+### 2.6 Storage/index corruption
+
+Symptom: inability to read existing objects or manifests.
+
+Recovery:
+
+- Preserve canonical artifact files as source of truth.
+- Rebuild derived index from canonical evidence path.
+- Re-run `og sync` and `og status`.
+
+## 3) Recovery runbook
+
+### 3.1 Recover from pending/degraded state
+
+1. Capture current status: `og status`.
+2. Inspect pending marker and latest sync summary.
+3. Fix underlying dependency (policy, runtime, oracle, adapter).
+4. Re-run `og sync`.
+5. Confirm status transitions to healthy/fresh and certificates are emitted again.
+
+### 3.2 Re-run with narrowed scope
+
+Use changed-scope commands to isolate regressions:
+
+- `og verify --changed`
+- `og replay --changed`
+- `og sync` after baseline cleanup.
+
+### 3.3 Escalation
+
+If recovery remains blocked:
+
+- collect latest event logs and status JSON output,
+- include environment details (`OG_*`, mode, profile),
+- capture last successful adapter and policy snapshots before escalation.

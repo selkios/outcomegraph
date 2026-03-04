@@ -477,6 +477,8 @@ Rule:
   - Mixed versions inside `.outcomegraph` are a hard error.
   - Migration must be explicit and validated by rerunning schema checks.
 
+Detailed migration playbooks (including v1 -> v2 transitions and mixed-version remediation) are in [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md).
+
 ## 8) Steward runtime contract
 
 Steward runs typed, short-lived jobs:
@@ -574,6 +576,8 @@ Hook edge cases:
 Adapters expose one typed contract per interface family. All plugin entrypoints are registered once at startup and must pass version negotiation.
 
 ### 11.1 Versioned manifest
+
+See [PLUGIN_API.md](./PLUGIN_API.md) for the complete manifest schema, adapter interface signatures, and typed payload reference.
 
 Every plugin exports a `manifest` object:
 
@@ -943,6 +947,8 @@ Violations are first-class `og` errors with action and remediations:
 
 Automated actions must exit with usage-like status `64` for policy misconfiguration and runtime-like status `1` for enforcement denials.
 
+See [SECURITY_POLICY.md](./SECURITY_POLICY.md) for a canonical policy file example, allow/deny semantics, and remediation playbooks.
+
 ## 14) Verification and replay loops
 
 Three loops:
@@ -1119,6 +1125,14 @@ OutcomeGraph must ship with:
 - migration guide
 
 Docs are versioned with the CLI and schema.
+
+For this implementation, the published in-repo documentation set is:
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [PLUGIN_API.md](./PLUGIN_API.md)
+- [RUNBOOKS.md](./RUNBOOKS.md)
+- [SECURITY_POLICY.md](./SECURITY_POLICY.md)
+- [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
 
 ## 20) Roadmap
 

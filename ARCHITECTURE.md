@@ -235,6 +235,20 @@ Example diagnostic for mismatch:
 }
 ```
 
+For the complete interface contract and payload schemas by type, see [PLUGIN_API.md](./PLUGIN_API.md).
+
+## 11) Failure and recovery runbook
+
+Runtime events that block or degrade autonomy map to runbook actions in [RUNBOOKS.md](./RUNBOOKS.md).
+
+| Condition | Immediate effect | Recovery action |
+| --- | --- | --- |
+| Lock contention | pending state set and run exits | Wait for active run; next run consumes pending state |
+| Worker unavailable | pending distill + existing artifacts preserved | Retry on next run; continue status/export generation |
+| Oracle failure | stale/unknown verification state surfaced | Re-run targeted `og verify --changed` or `og replay --changed` |
+| Plugin mismatch | command exits with `ADAPTER_INTERFACE_MISMATCH` | Install compatible plugin / update implementation |
+| Storage/index corruption | degraded mode with rebuild guidance | Preserve canonical artifacts; rebuild index from ledger |
+
 ## 7) Data boundaries (tracked vs not tracked)
 
 The repo tracks compact replayable truth. Bulky runtime exhaust is kept out of Git by default.

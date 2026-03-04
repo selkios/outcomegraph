@@ -12,6 +12,16 @@ OutcomeGraph is a Git-native artifact graph for replayable software, with Stewar
 - Artifacts are durable truth.
 - Steward keeps truth in sync.
 
+## Documentation index (v2.1)
+
+- [SPEC-v2.md](./SPEC-v2.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [PLUGIN_API.md](./PLUGIN_API.md)
+- [RUNBOOKS.md](./RUNBOOKS.md)
+- [SECURITY_POLICY.md](./SECURITY_POLICY.md)
+- [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
+- [QUICKSTART.md](./QUICKSTART.md)
+
 ## CLI contract
 
 `og` is the stable execution boundary for humans, agents, CI, and MCP clients.

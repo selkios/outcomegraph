@@ -649,8 +649,8 @@
       "id": "OG-REPO-001",
       "title": "Deliver required documentation set for v2.1 implementation",
       "priority": 5,
-      "status": "todo",
-      "details": "Publish required schema and operational documentation artifacts in-repo with versioned references.",
+      "status": "done",
+      "details": "Delivered v2.1 documentation set: plugin API reference, runbooks, security policy, migration guide, and root-doc discoverability updates.",
       "steps": [
         "Create/refresh architecture and plugin API references",
         "Add failure and recovery runbooks",
@@ -663,7 +663,18 @@
         "OG-SCHEMA-001",
         "OG-INTG-001",
         "OG-RECOVERY-001"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:37:58Z",
+      "files": [
+        "README.md",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "PLUGIN_API.md",
+        "RUNBOOKS.md",
+        "SECURITY_POLICY.md",
+        "MIGRATION_GUIDE.md"
+      ],
+      "blockers": []
     },
     {
       "id": "OG-TEST-001",
@@ -686,9 +697,10 @@
         "OG-SYNC-001",
         "OG-VERIFY-001"
       ],
-      "updated_at": "2026-03-04T10:37:23Z",
+      "updated_at": "2026-03-04T10:37:32Z",
       "files": [
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ]
     }
   ]
