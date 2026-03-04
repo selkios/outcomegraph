@@ -400,6 +400,11 @@ def _read_latest_sync_event(repo_root: str) -> tuple[dict | None, datetime.datet
     return latest_event, latest_timestamp
 
 
+def _read_latest_replay_event(repo_root: str) -> tuple[dict | None, datetime.datetime | None]:
+    latest_event, latest_timestamp, _ = _read_latest_event_record(repo_root, "replay")
+    return latest_event, latest_timestamp
+
+
 def _read_latest_drift_event(repo_root: str) -> tuple[dict | None, datetime.datetime | None, str | None]:
     return _read_latest_event_record(repo_root, "drift")
 
@@ -490,59 +495,102 @@ def _collect_certificate_freshness(repo_root: str, now: datetime.datetime) -> di
     }
 
 
-def _collect_verification_state(sync_event: dict | None, now: datetime.datetime) -> dict[str, object]:
-    if sync_event is None:
+def _collect_verification_state(
+    repo_root: str,
+    sync_event: dict | None,
+    now: datetime.datetime,
+) -> dict[str, object]:
+    replay_event, _ = _read_latest_replay_event(repo_root)
+
+    def _verification_from_event(event: dict[str, object], step_name: str) -> dict[str, object]:
+        created_at_raw = event.get("created_at")
+        created_at = _parse_utc_timestamp(created_at_raw) if isinstance(created_at_raw, str) else None
+        age = int((now - created_at).total_seconds()) if created_at else None
+        steps = event.get("steps") if isinstance(event.get("steps"), list) else []
+        matching_step = None
+        for raw_step in steps:
+            if not isinstance(raw_step, dict):
+                continue
+            if raw_step.get("name") == step_name:
+                matching_step = raw_step
+                break
+
+        status = matching_step.get("status") if isinstance(matching_step, dict) else event.get("status")
+        status_text = status if isinstance(status, str) else "unknown"
+        status_lower = status_text.lower()
+
+        if status_lower == "error":
+            state = "degraded"
+            if step_name == "replay":
+                message = "replay failures detected in last replay event"
+            else:
+                message = "verification failures detected in last sync"
+        elif status_lower == "ok":
+            state = "fresh" if (age is None or age <= STATUS_VERIFY_STALE_SECONDS) else "stale"
+            message = "verification recently completed"
+            if state == "stale":
+                message = "verification is older than freshness threshold"
+        elif status_lower == "skipped":
+            state = "unknown"
+            message = "verification was not required for last sync event"
+        else:
+            state = "unknown"
+            if matching_step is None:
+                message = f"no {step_name} step found in latest {event.get('command')} event"
+            else:
+                message = f"{step_name} result could not be interpreted"
+
+        return {
+            "state": state,
+            "status": status_text,
+            "run_id": event.get("run_id") if isinstance(event.get("run_id"), str) else None,
+            "age_seconds": age,
+            "age_human": _humanize_duration(age),
+            "message": message,
+            "last_verified_at": created_at_raw if isinstance(created_at_raw, str) else None,
+            "sync_status": event.get("status", "unknown"),
+            "steps": steps,
+            "threshold_seconds": STATUS_VERIFY_STALE_SECONDS,
+            "event_created_at": created_at_raw if isinstance(created_at_raw, str) else None,
+            "command": event.get("command"),
+        }
+
+    candidates: list[tuple[datetime.datetime | None, dict[str, object]]] = []
+    if isinstance(sync_event, dict):
+        candidates.append(
+            (
+                _parse_utc_timestamp(sync_event.get("created_at"))
+                if isinstance(sync_event.get("created_at"), str)
+                else None,
+                _verification_from_event(sync_event, "verify"),
+            )
+        )
+    if isinstance(replay_event, dict):
+        candidates.append(
+            (
+                _parse_utc_timestamp(replay_event.get("created_at"))
+                if isinstance(replay_event.get("created_at"), str)
+                else None,
+                _verification_from_event(replay_event, "replay"),
+            )
+        )
+
+    if not candidates:
         return {
             "state": "unknown",
             "status": "unknown",
             "run_id": None,
             "age_seconds": None,
             "age_human": _humanize_duration(None),
-            "message": "no sync summary available",
+            "message": "no sync or replay summary available",
             "steps": [],
             "threshold_seconds": STATUS_VERIFY_STALE_SECONDS,
         }
 
-    run_id = sync_event.get("run_id")
-    created_at_raw = sync_event.get("created_at")
-    created_at = _parse_utc_timestamp(created_at_raw) if isinstance(created_at_raw, str) else None
-    age = int((now - created_at).total_seconds()) if created_at else None
-    steps = sync_event.get("steps") if isinstance(sync_event.get("steps"), list) else []
-    verify_step = None
-    for raw_step in steps:
-        if not isinstance(raw_step, dict):
-            continue
-        if raw_step.get("name") == "verify":
-            verify_step = raw_step
-            break
-    verify_status = verify_step.get("status") if isinstance(verify_step, dict) else None
-    if verify_status == "error":
-        state = "degraded"
-        message = "verification failures detected in last sync"
-    elif verify_status == "ok":
-        state = "fresh" if (age is None or age <= STATUS_VERIFY_STALE_SECONDS) else "stale"
-        message = "verification recently completed"
-        if state == "stale":
-            message = "verification is older than freshness threshold"
-    elif verify_status == "skipped":
-        state = "unknown"
-        message = "verification was not required for last sync event"
-    else:
-        state = "unknown"
-        message = "no verification step found in latest sync event"
+    def _candidate_key(item: tuple[datetime.datetime | None, dict[str, object]]) -> datetime.datetime:
+        return item[0] if item[0] is not None else datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
 
-    return {
-        "state": state,
-        "status": verify_status if isinstance(verify_status, str) else "unknown",
-        "run_id": run_id if isinstance(run_id, str) else None,
-        "age_seconds": age,
-        "age_human": _humanize_duration(age),
-        "message": message,
-        "last_verified_at": created_at_raw if isinstance(created_at_raw, str) else None,
-        "sync_status": sync_event.get("status", "unknown"),
-        "steps": steps,
-        "threshold_seconds": STATUS_VERIFY_STALE_SECONDS,
-    }
+    return max(candidates, key=_candidate_key)[1]
 
 
 def _collect_sync_freshness(sync_event: dict | None, now: datetime.datetime) -> dict[str, object]:
@@ -818,7 +866,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
     pending_file_present, pending_file_source = _read_work_pending_file(repo_root)
     sync_event, _ = _read_latest_sync_event(repo_root)
     sync = _collect_sync_freshness(sync_event, now)
-    verification = _collect_verification_state(sync_event, now)
+    verification = _collect_verification_state(repo_root, sync_event, now)
     certificates = _collect_certificate_freshness(repo_root, now)
     drift = _collect_drift_state(repo_root, now)
 
@@ -1494,12 +1542,21 @@ def _normalize_replay_plan(raw: object) -> dict[str, object]:
             if isinstance(cwd, str) and cwd.strip():
                 step["cwd"] = cwd.strip()
             steps.append(step)
+    parity_results = raw.get("parity_results")
+    if parity_results is None:
+        parity_results = raw.get("equivalence")
+    if parity_results is None:
+        parity_results = raw.get("parity")
     return {
         "schema_version": WORKER_SCHEMA_VERSION,
         "interface_version": WORKER_INTERFACE_VERSION,
         "run_id": run_id,
         "capsule_id": capsule_id,
         "steps": steps,
+        "status": str(raw.get("status") or "ok"),
+        "message": str(raw.get("message") or ""),
+        "parity_results": parity_results,
+        "failures": _safe_string_list(raw.get("failures")),
     }
 
 
@@ -3889,6 +3946,11 @@ def _run_replay_stage(
 
     changed_materials = _collect_changed_materials(repo_root, changed_files if changed_only else [])
     plans: list[dict[str, object]] = []
+    replay_results: list[dict[str, object]] = []
+    certificate_ids: list[str] = []
+    certificate_refs: list[str] = []
+    errors: list[str] = []
+    overall_failed = False
 
     for capsule in targets:
         trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-replay.json"
@@ -3905,21 +3967,115 @@ def _run_replay_stage(
             plan["adapter_receipts"] = receipts
             plans.append(plan)
         except WorkerAdapterError as exc:
-            return {
-                "name": "replay",
-                "status": "error",
-                "message": str(exc),
-                "mode": mode,
-                "replay_plans": plans,
-                "errors": [str(exc)],
+            error_message = str(exc)
+            errors.append(error_message)
+            overall_failed = True
+            replay_results.append(
+                {
+                    "capsule_id": capsule,
+                    "status": "error",
+                    "plan_status": "error",
+                    "certificate_id": None,
+                    "trace": trace_path,
+                    "failures": [error_message],
+                    "parity_results": None,
+                }
+            )
+            continue
+
+        step_status = str(plan.get("status") or "ok")
+        lower_status = step_status.lower()
+        replay_status = "success"
+        if lower_status in {"error", "failed", "fail", "warn"}:
+            replay_status = "failed"
+            overall_failed = True
+
+        certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
+        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
+
+        replay_results.append(
+            {
+                "capsule_id": capsule,
+                "status": replay_status,
+                "plan_status": step_status,
+                "certificate_id": certificate_id,
+                "trace": trace_path,
+                "failures": _safe_string_list(plan.get("failures")),
+                "parity_results": plan.get("parity_results"),
             }
+        )
+        certificate_ids.append(certificate_id)
+        certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+
+        try:
+            claim_payload = _build_claim_payload(
+                claim_id,
+                capsule,
+                run_id,
+                "replay",
+                mode,
+                changed_files if changed_only else [],
+                _normalize_receipt_pointers(
+                    plan.get("adapter_receipts", []),
+                    field=f"replay_plans[{len(replay_results)-1}].adapter_receipts",
+                ),
+                text=f"Replay stage for {capsule} completed with plan status '{step_status}'.",
+            )
+            claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
+            os.makedirs(os.path.dirname(claim_path), exist_ok=True)
+            _write_json_file(claim_path, claim_payload)
+        except Exception as exc:
+            errors.append(f"Failed to write replay claim for {capsule}: {exc}")
+            overall_failed = True
+            replay_results[-1]["status"] = "error"
+            replay_results[-1]["failures"].append(f"claim persistence failed: {exc}")
+            continue
+
+        try:
+            cert_payload = _build_certificate_payload(
+                certificate_id,
+                capsule,
+                run_id,
+                [f"{OG_ROOT}/claims/{claim_id}.json"],
+                "replay",
+                mode,
+                [p for p in plan.get("adapter_receipts", []) if isinstance(p, dict)],
+                status="success" if replay_status == "success" else "failed",
+                source="replay",
+                adapter_name=WORKER_ADAPTER_NAME,
+            )
+            cert_payload["replay_context"] = {
+                "run_id": run_id,
+                "adapter_profile": profile,
+                "sandbox_root": f"{OG_ROOT}/work/replay/{run_id}/{_safe_slug(capsule)}",
+                "changed_materials": changed_materials,
+                "equivalence": plan.get("parity_results"),
+            }
+            certificate_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
+            os.makedirs(os.path.dirname(certificate_path), exist_ok=True)
+            _write_json_file(certificate_path, cert_payload)
+        except Exception as exc:
+            errors.append(f"Failed to write replay certificate for {capsule}: {exc}")
+            overall_failed = True
+            replay_results[-1]["status"] = "error"
+            replay_results[-1]["certificate_id"] = None
+            replay_results[-1]["failures"].append(f"certificate persistence failed: {exc}")
+            replay_results[-1]["plan_status"] = "error"
+            if certificate_id in certificate_ids:
+                certificate_ids.remove(certificate_id)
+            if f"{OG_ROOT}/certificates/{certificate_id}.json" in certificate_refs:
+                certificate_refs.remove(f"{OG_ROOT}/certificates/{certificate_id}.json")
 
     return {
         "name": "replay",
-        "status": "ok",
-        "message": "Replay adapter produced executable plans.",
+        "status": "error" if overall_failed else "ok",
+        "message": "Replay adapter completed with failures." if overall_failed else "Replay adapter produced executable plans.",
         "mode": mode,
         "replay_plans": plans,
+        "replay_results": replay_results,
+        "certificate_ids": certificate_ids,
+        "certificate_refs": certificate_refs,
+        "errors": errors,
     }
 
 
@@ -4380,6 +4536,24 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
     return path
 
 
+def _record_replay_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
+    event_payload = {
+        "schema_version": 2,
+        "artifact_type": "replay_summary",
+        "id": payload["run_id"],
+        "status": payload["status"],
+        "command": "replay",
+        "subcommand": None,
+        "duration_ms": total_ms,
+        "created_at": _utc_timestamp(),
+        "snapshot": snapshot,
+        "steps": payload.get("steps", []),
+    }
+    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
+    _write_json_file(path, event_payload)
+    return path
+
+
 def _build_drift_payload(repo_root: str, options: dict[str, object]) -> dict[str, object]:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     drift_state = _collect_drift_state(repo_root, now)
@@ -4632,6 +4806,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         mode = str(options.get("mode") or "observe")
         snapshot = _collect_sync_snapshot(repo_root, profile, mode)
         run_id = _build_run_id("replay", _short_hash(f"{profile}:{mode}:{snapshot.get('changed_count', 0)}", 8))
+        start_at = time.perf_counter()
         replay = _run_replay_stage(
             repo_root=repo_root,
             snapshot=snapshot,
@@ -4648,8 +4823,13 @@ def run_command(args: list[str], output_json: bool) -> int:
             "steps": [replay],
             "message": replay.get("message", "replay adapter completed"),
             "replay_plans": replay.get("replay_plans", []),
+            "replay_results": replay.get("replay_results", []),
+            "certificate_ids": replay.get("certificate_ids", []),
+            "certificate_refs": replay.get("certificate_refs", []),
             "errors": replay.get("errors", []),
         }
+        payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
+        payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
         emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 

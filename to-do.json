@@ -336,8 +336,8 @@
       "id": "OG-REPLAY-002",
       "title": "Implement command `og replay --changed`",
       "priority": 3,
-      "status": "todo",
-      "details": "Run replay on the changed set and report parity results plus failures.",
+      "status": "done",
+      "details": "Implemented replay changed-path selection plus plan result normalization, parity/failure reporting, certificate outputs, and replay summary events consumed by status verification state.",
       "steps": [
         "Route command path to replay loop selection",
         "Output certificate IDs and replay status",
@@ -352,8 +352,10 @@
       ],
       "files": [
         "SPEC-v2.md",
-        "QUICKSTART.md"
-      ]
+        "QUICKSTART.md",
+        "og"
+      ],
+      "updated_at": "2026-03-04T10:25:40Z"
     },
     {
       "id": "OG-DAEMON-001",
