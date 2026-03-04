@@ -426,7 +426,7 @@
         "OG-WORKER-001",
         "OG-VERIFY-001"
       ],
-      "updated_at": "2026-03-04T10:22:24Z",
+      "updated_at": "2026-03-04T10:22:31Z",
       "files": [
         "og",
         "to-do.json"
@@ -492,7 +492,7 @@
       "id": "OG-MCP-001",
       "title": "Implement `og mcp-server` control surface",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Expose required MCP tools/resources/prompts over a stable control endpoint.",
       "steps": [
         "Implement tools: sync, verify, replay, explain, status",
@@ -506,6 +506,11 @@
       "depends_on": [
         "OG-CLI-001",
         "OG-EXPORT-001"
+      ],
+      "updated_at": "2026-03-04T10:23:10Z",
+      "files": [
+        "og",
+        "to-do.json"
       ]
     },
     {

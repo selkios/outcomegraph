@@ -63,6 +63,40 @@ EXPORT_PATHS = {
     "mcp_resources": ".outcomegraph/export/mcp-resources.json",
     "skill": "skills/outcome-steward/SKILL.md",
 }
+MCP_CONTROL_TOOL_DEFS = (
+    {
+        "uri": "outcomegraph://tools/sync",
+        "name": "sync",
+        "description": "Run autonomous reconcile pipeline.",
+        "category": "tool",
+    },
+    {
+        "uri": "outcomegraph://tools/verify",
+        "name": "verify",
+        "description": "Run fast verification on impacted capsules.",
+        "category": "tool",
+    },
+    {
+        "uri": "outcomegraph://tools/replay",
+        "name": "replay",
+        "description": "Run replay checks against canonical artifacts.",
+        "category": "tool",
+    },
+    {
+        "uri": "outcomegraph://tools/explain",
+        "name": "explain",
+        "description": "Explain claims and provenance pointers.",
+        "category": "tool",
+    },
+    {
+        "uri": "outcomegraph://tools/status",
+        "name": "status",
+        "description": "Read runtime and freshness summary.",
+        "category": "tool",
+    },
+)
+MCP_CONTROL_RESOURCES = ("capsules", "refs", "constitution", "certificates")
+MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
 WORK_LOCK_STALE_SECONDS = 300
 LOCK_STATUS_LOCKED = "locked"
 LOCK_STATUS_UNLOCKED = "unlocked"
@@ -1925,6 +1959,87 @@ def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
         "status": "ok",
     }
     return json.dumps(payload, sort_keys=True, indent=2) + "\n"
+
+
+def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, object]) -> dict[str, object]:
+    artifact_counts = snapshot.get("counts", {}).get("by_scope", {}) if isinstance(snapshot.get("counts"), dict) else {}
+    return {
+        "schema_version": 2,
+        "command": "mcp-server",
+        "options": options,
+        "tools": sorted(MCP_CONTROL_TOOL_DEFS, key=lambda item: item["name"]),
+        "resources": [
+            {
+                "uri": f"outcomegraph://{scope}",
+                "name": scope,
+                "description": f"Canonical artifact projection for {scope} scope.",
+                "category": "artifact",
+                "paths": sorted(
+                    [
+                        record["path"]
+                        for record in snapshot.get("artifacts", [])
+                        if isinstance(record, dict)
+                        and str(record.get("path", "")).startswith(f"{OG_ROOT}/{scope}")
+                    ]
+                ),
+            }
+            for scope in MCP_CONTROL_RESOURCES
+        ],
+        "prompts": list(MCP_CONTROL_PROMPTS),
+        "artifact_counts": {scope: artifact_counts.get(scope, 0) for scope in MCP_CONTROL_RESOURCES},
+        "status": "ok",
+        "generated_at": snapshot.get("generated_at"),
+        "message": "MCP control surface available from canonical artifact projections.",
+    }
+
+
+def _run_mcp_server_stage(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    try:
+        snapshot = _canonical_export_snapshot(repo_root)
+        payload = _build_mcp_server_payload(snapshot, options)
+        return payload
+    except Exception as exc:
+        return {
+            "schema_version": 2,
+            "status": "error",
+            "command": "mcp-server",
+            "options": options,
+            "tools": [],
+            "resources": [],
+            "prompts": list(MCP_CONTROL_PROMPTS),
+            "message": f"Unable to render mcp-server control surface: {exc}",
+        }
+
+
+def _render_mcp_server(payload: dict[str, object]) -> str:
+    tools = payload.get("tools", [])
+    resources = payload.get("resources", [])
+    prompts = payload.get("prompts", [])
+    lines = ["mcp-server control surface", ""]
+    if payload.get("status") == "error":
+        return f"{payload.get('status', 'error')}: {payload.get('message', 'unknown error')}\n"
+
+    lines.append("tools:")
+    for item in sorted(tools, key=lambda value: str(value.get("name", ""))):
+        name = item.get("name") or item.get("uri")
+        uri = item.get("uri", "outcomegraph://tools/unknown")
+        description = item.get("description", "")
+        lines.append(f"- {name}: {uri}")
+        if description:
+            lines.append(f"  {description}")
+
+    lines.append("")
+    lines.append("resources:")
+    for item in sorted(resources, key=lambda value: str(value.get("name", ""))):
+        name = item.get("name", "")
+        count = len(item.get("paths", []))
+        lines.append(f"- {name} ({count} file(s))")
+        for path in sorted(item.get("paths", [])):
+            lines.append(f"  - {path}")
+
+    lines.append("")
+    lines.append(f"prompts: {', '.join(str(value) for value in prompts)}")
+    return "\n".join(lines) + "\n"
 
 
 def _run_export_refresh(repo_root: str) -> tuple[list[str], list[str], dict[str, object]]:
@@ -4627,7 +4742,11 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "mcp-server":
         options, _ = parse_command_flags(rest, "mcp-server", False, False, False, output_json)
-        emit_command_result(build_payload("mcp-server", **options), output_json)
+        repo_root = _git_root()
+        payload = _run_mcp_server_stage(repo_root, options)
+        if not output_json and payload.get("status") == "ok":
+            payload["message"] = _render_mcp_server(payload)
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "optimize":
