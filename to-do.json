@@ -664,15 +664,16 @@
         "OG-INTG-001",
         "OG-RECOVERY-001"
       ],
-      "updated_at": "2026-03-04T10:37:58Z",
+      "updated_at": "2026-03-04T10:38:05Z",
       "files": [
-        "README.md",
-        "SPEC-v2.md",
         "ARCHITECTURE.md",
+        "MIGRATION_GUIDE.md",
         "PLUGIN_API.md",
+        "README.md",
         "RUNBOOKS.md",
         "SECURITY_POLICY.md",
-        "MIGRATION_GUIDE.md"
+        "SPEC-v2.md",
+        "to-do.json"
       ],
       "blockers": []
     },
@@ -701,6 +702,37 @@
       "files": [
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
+      ]
+    },
+    {
+      "id": "OG-DOC-001",
+      "title": "Align QUICKSTART dataset example schema with SPEC-v2",
+      "priority": 2,
+      "status": "done",
+      "details": "The QUICKSTART.md sample eval_dataset uses a string for expected_contains, while SPEC-v2 defines expected_contains as an array; update docs or schema handling to match and avoid parser confusion.",
+      "tags": [
+        "documentation",
+        "spec-alignment"
+      ],
+      "files": [
+        "QUICKSTART.md",
+        "SPEC-v2.md"
+      ],
+      "updated_at": "2026-03-04T10:38:26Z"
+    },
+    {
+      "id": "OG-DOC-002",
+      "title": "Document all tracked artifact locations consistently across SPEC and architecture docs",
+      "priority": 2,
+      "status": "todo",
+      "details": "Canonical tracked artifact lists should consistently include claims and any other tracked canonical artifact types where currently omitted (e.g., claim paths in SPEC-v2 section 6 and any related docs).",
+      "tags": [
+        "documentation",
+        "spec-alignment"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md"
       ]
     }
   ]

@@ -66,7 +66,7 @@ The dataset format is:
     {
       "id": "q-001",
       "input": "What is the failure mode here?",
-      "expected_contains": "checks and retries"
+      "expected_contains": ["checks and retries"]
     }
   ]
 }
