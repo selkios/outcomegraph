@@ -23,6 +23,21 @@ AUTOPILOT_HOOKS = ("pre-commit", "post-commit", "post-merge", "post-checkout", "
 AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
 AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
+OG_ROOT = ".outcomegraph"
+OG_INIT_DIRS = (
+    "constitution",
+    "capsules",
+    "refs",
+    "decisions",
+    "certificates",
+    "datasets",
+    "events",
+    "objects",
+    "export",
+    "work",
+    "cache",
+    "traces",
+)
 
 
 def emit_usage() -> str:
@@ -92,6 +107,138 @@ def _git_root() -> str:
     if result.returncode != 0:
         emit_error("not inside a git repository", None, EXIT_RUNTIME, False)
     return result.stdout.strip()
+
+
+def _utc_timestamp() -> str:
+    return datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_file_if_missing(path: str, content: str) -> bool:
+    if os.path.exists(path):
+        return False
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(content)
+    return True
+
+
+def _build_constitution_payload(created_at: str) -> str:
+    return f"""schema_version: 2
+created_at: "{created_at}"
+mode: observe
+policy:
+  default_mode: observe
+  allow:
+    - ".outcomegraph/**"
+    - "AGENTS.md"
+  deny:
+    - "autonomous application code edits"
+    - "dependency installation"
+    - "network actions"
+"""
+
+
+def _build_policy_payload(created_at: str) -> str:
+    return f"""schema_version: 2
+created_at: "{created_at}"
+name: observe-policy
+mode: observe
+allowed_paths:
+  - ".outcomegraph/**"
+  - "export/**"
+  - "AGENTS.md"
+forbidden_actions:
+  - modify_application_code
+  - install_dependencies
+  - deploy
+  - push_branches
+"""
+
+
+def _build_config_payload(created_at: str) -> str:
+    return f"""schema_version: 2
+created_at: "{created_at}"
+mode: observe
+profile: analyze
+safety:
+  policy_file: policy.yaml
+  max_writes_per_run: 64
+"""
+
+
+def _build_lock_payload(created_at: str) -> str:
+    state = {"schema_version": 2, "status": "unlocked", "created_at": created_at, "updated_at": created_at, "holder": None}
+    return json.dumps(state, indent=2, sort_keys=True) + "\n"
+
+
+def _build_state_payload(created_at: str) -> str:
+    state = {
+        "schema_version": 2,
+        "status": "initialized",
+        "mode": "observe",
+        "updated_at": created_at,
+        "last_sync_id": None,
+        "pending": False,
+    }
+    return json.dumps(state, indent=2, sort_keys=True) + "\n"
+
+
+def _build_materials_lock_payload(created_at: str) -> str:
+    payload = {
+        "schema_version": 2,
+        "created_at": created_at,
+        "material_paths": [],
+        "notes": "bootstrap-generated lockfile placeholder",
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def _init_outcomegraph() -> dict[str, object]:
+    repo_root = _git_root()
+    created_dirs: list[str] = []
+    existing_dirs: list[str] = []
+    created_files: list[str] = []
+    existing_files: list[str] = []
+
+    for directory in OG_INIT_DIRS:
+        target = os.path.join(repo_root, OG_ROOT, directory)
+        if os.path.isdir(target):
+            existing_dirs.append(f"{OG_ROOT}/{directory}")
+        else:
+            os.makedirs(target, exist_ok=True)
+            created_dirs.append(f"{OG_ROOT}/{directory}")
+
+    created_at = _utc_timestamp()
+    baseline_files = {
+        f"{OG_ROOT}/constitution/default.yaml": _build_constitution_payload(created_at),
+        f"{OG_ROOT}/materials.lock": _build_materials_lock_payload(created_at),
+        f"{OG_ROOT}/work/state.json": _build_state_payload(created_at),
+        f"{OG_ROOT}/work/lock": _build_lock_payload(created_at),
+        f"{OG_ROOT}/policy.yaml": _build_policy_payload(created_at),
+        f"{OG_ROOT}/config.yaml": _build_config_payload(created_at),
+    }
+
+    for relative_path, content in baseline_files.items():
+        full_path = os.path.join(repo_root, relative_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        if _write_file_if_missing(full_path, content):
+            created_files.append(relative_path)
+        else:
+            existing_files.append(relative_path)
+
+    return {
+        "status": "ok",
+        "command": "init",
+        "options": {},
+        "created": {
+            "directories": created_dirs,
+            "files": created_files,
+        },
+        "existing": {
+            "directories": existing_dirs,
+            "files": existing_files,
+        },
+        "message": "OutcomeGraph init complete. Observe-mode bootstrap artifacts are in place.",
+    }
 
 
 def _hooks_path(repo_root: str) -> str | None:
@@ -349,7 +496,7 @@ def parse_command_flags(
             continue
         if arg.startswith("--mode="):
             if not allow_mode:
-            emit_error(f"{command} does not accept --mode", command, EXIT_USAGE, output_json)
+                emit_error(f"{command} does not accept --mode", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
             if value not in MODE_VALUES:
                 emit_error(
@@ -422,7 +569,7 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "init":
         options, _ = parse_command_flags(rest, "init", False, False, False, output_json)
-        emit_command_result(build_payload("init", **options), output_json)
+        emit_command_result(_init_outcomegraph(), output_json)
         return EXIT_SUCCESS
 
     if command == "sync":
@@ -480,7 +627,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         emit_command_result(build_payload("optimize", "prompts", **options), output_json)
         return EXIT_SUCCESS
 
-        if command == "autopilot":
+    if command == "autopilot":
         if not rest:
             emit_error("missing autopilot subcommand\n\nAvailable: init, disable", "autopilot", EXIT_USAGE, output_json)
         sub = rest[0]
