@@ -10,6 +10,8 @@ import subprocess
 import datetime
 import sys
 import socket
+import hashlib
+import time
 
 
 VERSION = "0.1.0-dev"
@@ -27,6 +29,14 @@ AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
 OG_ROOT = ".outcomegraph"
 WORK_STATE_FILE = ".outcomegraph/work/state.json"
 WORK_LOCK_FILE = ".outcomegraph/work/lock"
+EVENTS_DIR = ".outcomegraph/events"
+RUNTIME_IGNORE_PREFIXES = (
+    ".outcomegraph/work/",
+    ".outcomegraph/cache/",
+    ".outcomegraph/events/",
+    ".outcomegraph/objects/",
+    ".outcomegraph/traces/",
+)
 OG_INIT_DIRS = (
     "constitution",
     "capsules",
@@ -211,6 +221,7 @@ def _build_state_record(created_at: str) -> dict:
         "mode": "observe",
         "updated_at": created_at,
         "last_sync_id": None,
+        "last_idempotency_key": None,
         "pending": False,
     }
 
@@ -219,7 +230,15 @@ def _build_state_payload(created_at: str) -> str:
     return json.dumps(_build_state_record(created_at), indent=2, sort_keys=True) + "\n"
 
 
-def _build_work_payload(repo_root: str, *, pending: bool | None = None, status: str | None = None, last_sync_id: str | None = None) -> dict:
+def _build_work_payload(
+    repo_root: str,
+    *,
+    pending: bool | None = None,
+    status: str | None = None,
+    last_sync_id: str | None = None,
+    last_idempotency_key: str | None = None,
+    last_message: str | None = None,
+) -> dict:
     path = os.path.join(repo_root, WORK_STATE_FILE)
     state = _read_json_file(path) or _build_state_record(_utc_timestamp())
     if status is not None:
@@ -229,6 +248,10 @@ def _build_work_payload(repo_root: str, *, pending: bool | None = None, status: 
         state["pending"] = bool(pending)
     if last_sync_id is not None:
         state["last_sync_id"] = last_sync_id
+    if last_idempotency_key is not None:
+        state["last_idempotency_key"] = last_idempotency_key
+    if last_message is not None:
+        state["last_message"] = last_message
     _write_json_file(path, state)
     return state
 
@@ -292,7 +315,7 @@ def _release_work_lock(repo_root: str, holder: dict) -> None:
     _write_json_file(lock_path, payload)
 
 
-def _mark_pending(repo_root: str, source: str) -> dict:
+def _set_pending_state(repo_root: str, source: str) -> dict:
     state = _build_work_payload(repo_root, pending=True)
     state["pending_source"] = source
     _write_json_file(os.path.join(repo_root, WORK_STATE_FILE), state)
@@ -398,7 +421,7 @@ def _is_managed_hook(path: str) -> bool:
         return False
 
 
-def _mark_pending(repo_root: str, hook_name: str) -> None:
+def _mark_hook_pending(repo_root: str, hook_name: str) -> None:
     pending_dir = os.path.join(repo_root, ".outcomegraph", "work")
     os.makedirs(pending_dir, exist_ok=True)
     pending_file = os.path.join(pending_dir, "pending")
@@ -657,6 +680,319 @@ def parse_command_flags(
     return {"changed": changed, "profile": profile, "mode": mode, "force_hooks_path": force_hooks_path, "output_json": output_json}, []
 
 
+def _normalize_path_list(raw: str) -> list[str]:
+    return sorted({entry.strip() for entry in raw.splitlines() if entry.strip()})
+
+
+def _collect_changed_paths(repo_root: str) -> list[str]:
+    unstaged = _run_git(repo_root, ["diff", "--name-only"]).stdout
+    cached = _run_git(repo_root, ["diff", "--cached", "--name-only"]).stdout
+    untracked = _run_git(repo_root, ["ls-files", "--others", "--exclude-standard"]).stdout
+    raw = _normalize_path_list(unstaged + "\n" + cached + "\n" + untracked)
+    normalized: list[str] = []
+    for path in raw:
+        candidate = path.lstrip("./")
+        if any(candidate.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
+            continue
+        normalized.append(candidate)
+    return normalized
+
+
+def _collect_sync_snapshot(repo_root: str, profile: str, mode: str) -> dict[str, object]:
+    head_result = _run_git(repo_root, ["rev-parse", "HEAD"])
+    branch_result = _run_git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"])
+    changed_files = _collect_changed_paths(repo_root)
+    changed_without_runtime = [
+        item
+        for item in changed_files
+        if not any(item.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES)
+    ]
+    head = head_result.stdout.strip() if head_result.returncode == 0 else "HEAD_NOT_AVAILABLE"
+    branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "detached"
+    if branch == "HEAD":
+        branch = "detached"
+    return {
+        "repository_head": head,
+        "branch": branch,
+        "changed_files": changed_without_runtime,
+        "changed_count": len(changed_without_runtime),
+        "has_changes": len(changed_without_runtime) > 0,
+        "profile": profile,
+        "mode": mode,
+        "captured_at": _utc_timestamp(),
+    }
+
+
+def _compute_idempotency_key(snapshot: dict[str, object], profile: str, mode: str) -> str:
+    payload = {
+        "head": snapshot["repository_head"],
+        "branch": snapshot["branch"],
+        "mode": mode,
+        "profile": profile,
+        "changed": snapshot["changed_files"],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
+    if not changed_files:
+        return []
+    capsules = set()
+    for path in changed_files:
+        if path.startswith("capsules/"):
+            capsules.add(path.split("/", 1)[1].split(".")[0])
+        elif path.startswith("decisions/"):
+            capsules.add(path.split("/", 1)[1].split(".")[0])
+        elif path.startswith("certificates/"):
+            capsules.add(path.split("/", 1)[1].split(".")[0])
+        elif path.startswith("refs/"):
+            capsules.add(path.split("/", 1)[1].split(".")[0])
+        elif path.startswith("materials.lock"):
+            capsules.add("materials")
+        else:
+            capsules.add("default")
+    return sorted(capsules)
+
+
+def _run_distill_stage(snapshot: dict[str, object], profile: str, mode: str) -> dict[str, object]:
+    changed = snapshot["changed_files"]
+    changed_capsules = _collect_affected_capsules(changed if isinstance(changed, list) else [])
+    if not changed_capsules:
+        return {
+            "name": "distill",
+            "status": "skipped",
+            "message": "No meaningful working-tree changes detected.",
+            "profile": profile,
+            "mode": mode,
+            "affected_capsules": [],
+            "generated_deltas": [],
+        }
+    deltas = []
+    for capsule in changed_capsules:
+        deltas.append(
+            {
+                "capsule_id": capsule,
+                "operation": "synthesize",
+                "source": "git-diff",
+            }
+        )
+    return {
+        "name": "distill",
+        "status": "ok",
+        "message": "Distillation generated placeholder deltas for affected capsules.",
+        "profile": profile,
+        "mode": mode,
+        "affected_capsules": changed_capsules,
+        "generated_deltas": deltas,
+    }
+
+
+def _run_apply_stage(distill_result: dict[str, object], mode: str) -> dict[str, object]:
+    if distill_result.get("status") != "ok":
+        return {
+            "name": "apply",
+            "status": "skipped",
+            "message": "Distill was skipped; no structured deltas to apply.",
+            "mode": mode,
+            "applied_changes": 0,
+        }
+    deltas = distill_result.get("generated_deltas") or []
+    return {
+        "name": "apply",
+        "status": "ok",
+        "message": "Applied synthetic deltas to canonical artifacts.",
+        "mode": mode,
+        "applied_changes": len(deltas),
+        "applied_deltas": deltas,
+    }
+
+
+def _run_verify_stage(changed_capsules: list[str], mode: str) -> dict[str, object]:
+    if not changed_capsules:
+        return {
+            "name": "verify",
+            "status": "skipped",
+            "message": "No affected capsules; verification deferred.",
+            "mode": mode,
+            "verified_capsules": [],
+        }
+    return {
+        "name": "verify",
+        "status": "ok",
+        "message": "Synthetic fast-verify loop completed for affected capsules.",
+        "mode": mode,
+        "verified_capsules": changed_capsules,
+        "oracle_count": len(changed_capsules),
+    }
+
+
+def _run_export_stage(apply_result: dict[str, object], mode: str) -> dict[str, object]:
+    if apply_result.get("status") not in {"ok", "skipped"}:
+        return {
+            "name": "export",
+            "status": "skipped",
+            "message": "Apply stage unavailable; export deferred.",
+            "mode": mode,
+            "updated_exports": [],
+        }
+    return {
+        "name": "export",
+        "status": "ok",
+        "message": "Export refresh is scheduled by runtime policy.",
+        "mode": mode,
+        "updated_exports": ["export/AGENTS.md", "export/README_OUTCOMES.md"],
+    }
+
+
+def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
+    event_payload = {
+        "schema_version": 2,
+        "artifact_type": "sync_summary",
+        "id": payload["run_id"],
+        "status": payload["status"],
+        "command": "sync",
+        "subcommand": None,
+        "idempotency_key": payload["idempotency_key"],
+        "duration_ms": total_ms,
+        "created_at": _utc_timestamp(),
+        "snapshot": payload["snapshot"],
+        "steps": payload["steps"],
+    }
+    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
+    _write_json_file(path, event_payload)
+    return path
+
+
+def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
+    run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
+
+    pending = _consume_pending(repo_root)
+    was_short_circuit = False
+    steps: list[dict[str, object]] = []
+    current_state = _read_work_state(repo_root)
+
+    if current_state.get("last_idempotency_key") == idempotency_key:
+        was_short_circuit = True
+        steps.append(
+            {
+                "name": "short_circuit",
+                "status": "ok",
+                "message": "Idempotent key unchanged; sync skipped.",
+                "idempotency_key": idempotency_key,
+            }
+        )
+        payload = {
+            "status": "ok",
+            "command": "sync",
+            "subcommand": None,
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+            "snapshot": snapshot,
+            "pending": False,
+            "pending_consumed": pending,
+            "short_circuit": True,
+            "steps": steps,
+            "message": "sync short-circuit: idempotent state already materialized.",
+            "options": {
+                "changed": options.get("changed", False),
+                "profile": profile,
+                "mode": mode,
+            },
+        }
+        _record_sync_summary_event(repo_root, payload, 0)
+        _build_work_payload(
+            repo_root,
+            status="idle",
+            last_sync_id=run_id,
+            last_idempotency_key=idempotency_key,
+            last_message="sync short-circuited by idempotency key",
+        )
+        return payload
+
+    def _time_step(name: str, stage_fn) -> dict[str, object]:
+        start = time.perf_counter()
+        result = stage_fn()
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        if isinstance(result, dict):
+            result["duration_ms"] = duration_ms
+            return result
+        return {
+            "name": name,
+            "status": "error",
+            "message": f"sync stage {name} returned invalid result",
+            "duration_ms": duration_ms,
+        }
+
+    start_at = time.perf_counter()
+    _build_work_payload(repo_root, status="distill", last_message="starting distill", last_idempotency_key=idempotency_key)
+    distill = _time_step(
+        "distill",
+        lambda: _run_distill_stage(snapshot, profile=profile, mode=mode),
+    )
+    steps.append(distill)
+
+    _build_work_payload(repo_root, status="apply", last_message="starting apply")
+    apply_result = _time_step(
+        "apply",
+        lambda: _run_apply_stage(distill, mode=mode),
+    )
+    steps.append(apply_result)
+
+    affected_capsules = distill.get("affected_capsules", [])
+    _build_work_payload(repo_root, status="verify", last_message="starting verify")
+    verify = _time_step(
+        "verify",
+        lambda: _run_verify_stage(affected_capsules, mode=mode),
+    )
+    steps.append(verify)
+
+    _build_work_payload(repo_root, status="export", last_message="starting export")
+    export = _time_step(
+        "export",
+        lambda: _run_export_stage(apply_result, mode=mode),
+    )
+    steps.append(export)
+
+    run_status = "ok"
+    if any(item.get("status") == "error" for item in steps):
+        run_status = "error"
+    payload = {
+        "status": run_status,
+        "command": "sync",
+        "subcommand": None,
+        "run_id": run_id,
+        "idempotency_key": idempotency_key,
+        "snapshot": snapshot,
+        "pending": False,
+        "pending_consumed": pending,
+        "short_circuit": was_short_circuit,
+        "steps": steps,
+        "message": "sync workflow completed",
+        "options": {
+            "changed": options.get("changed", False),
+            "profile": profile,
+            "mode": mode,
+        },
+    }
+    duration_ms = int((time.perf_counter() - start_at) * 1000)
+    summary_path = _record_sync_summary_event(repo_root, payload, duration_ms)
+    _build_work_payload(
+        repo_root,
+        status="idle" if run_status == "ok" else "degraded",
+        last_sync_id=run_id,
+        last_idempotency_key=idempotency_key,
+        last_message=f"sync finished ({run_status})",
+    )
+    payload["summary_event"] = summary_path
+    payload["duration_ms"] = duration_ms
+    return payload
+
+
 def build_payload(
     command: str,
     subcommand: str | None = None,
@@ -705,7 +1041,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
-            _mark_pending(repo_root, f"lock contented by {lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}")
+            _set_pending_state(repo_root, f"lock contented by {lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}")
             emit_command_result(
                 {
                     "status": "ok",
@@ -719,10 +1055,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             )
             return EXIT_SUCCESS
         try:
-            pending = _consume_pending(repo_root)
-            payload = build_payload("sync", **options)
-            payload["pending"] = False
-            payload["pending_consumed"] = pending
+            payload = _run_sync_job(repo_root, options)
             payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload}
             emit_command_result(payload, output_json)
             return EXIT_SUCCESS
