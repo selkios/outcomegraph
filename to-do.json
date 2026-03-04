@@ -51,10 +51,11 @@
         "artifact-graph"
       ],
       "files": [
+        "README.md",
         "SPEC-v2.md",
-        "README.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:05:42Z"
+      "updated_at": "2026-03-04T10:05:47Z"
     },
     {
       "id": "OG-INIT-001",
@@ -464,7 +465,7 @@
       "id": "OG-SEC-001",
       "title": "Enforce safe-by-default autonomy policy controls",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Default `observe` mode should only allow safe artifacts and prevent implicit code mutations.",
       "steps": [
         "Apply allow/deny lists for writes, network, dependencies, and deployment actions",
@@ -481,7 +482,8 @@
       "files": [
         "SPEC-v2.md",
         "ARCHITECTURE.md"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:05:58Z"
     },
     {
       "id": "OG-INTG-001",

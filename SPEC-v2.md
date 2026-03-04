@@ -613,6 +613,87 @@ Prompt/forbid by default:
 
 Policy is declarative and versioned in config.
 
+### 13.1 Policy versioning and file format
+
+Default policy file: `.outcomegraph/policy.yaml` (optional).
+
+If no file exists, OutcomeGraph uses the built-in observe-default:
+
+```yaml
+schema_version: 2
+mode: observe
+policy_id: observe-default-v1
+allow:
+  file_writes:
+    - ".outcomegraph/**"
+    - "export/**"
+    - "skills/outcome-steward/**"
+  verify_commands:
+    - "npm test --listTests"
+    - "npm test"
+    - "go test ./..."
+    - "pytest -q"
+  sandbox_operations:
+    - create_isolated_worktree
+    - read_repo_state
+    - read_artifacts
+deny:
+  file_writes:
+    - "src/**"
+    - "lib/**"
+    - "app/**"
+    - "packages/**"
+  network:
+    - unrestricted
+  dependencies:
+    - npm install
+    - pip install
+    - cargo add
+    - go mod tidy
+  deployment:
+    - push
+    - git commit --amend
+    - github pr create
+    - gha workflow_dispatch
+```
+
+### 13.2 Safe-by-default enforcement rules
+
+`og sync` and downstream autonomous jobs must perform this check before any non-observation action:
+
+1. Resolve effective mode (`observe` or `autonomous`) from parsed CLI mode and environment override.
+2. Load `.outcomegraph/policy.yaml` if present; otherwise use built-in defaults.
+3. Merge in repository-level policy extensions (if present) and validate schema version 2.
+4. Evaluate candidate actions against allow/deny lists in this order:
+   - Explicit deny always wins.
+   - Explicit allow in active mode enables action.
+   - Missing allow entry disables action with `POLICY_DENIED`.
+
+Observed mode supports only safe actions from section 13.1 and read-only oracle/sandbox operations.
+Broader write/deploy actions require `--mode autonomous` and explicit allowlisting.
+
+### 13.3 Policy violations and remediation output
+
+Violations are first-class `og` errors with action and remediations:
+
+```json
+{
+  "status": "error",
+  "code": "POLICY_DENIED",
+  "command": "sync",
+  "mode": "observe",
+  "category": "file_writes",
+  "target": "src/app/main.ts",
+  "message": "Observe mode forbids application code writes without explicit allowlist.",
+  "remediation": [
+    "Run with --mode autonomous only for this explicit action.",
+    "Add the path to allowlist.file_writes in .outcomegraph/policy.yaml."
+  ]
+}
+```
+
+Automated actions must exit with usage-like status `64` for policy misconfiguration and runtime-like status `1` for enforcement denials.
+
 ## 14) Verification and replay loops
 
 Three loops:

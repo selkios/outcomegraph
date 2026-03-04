@@ -193,6 +193,12 @@ Default mode is safe-by-default (`observe`):
 - product code edits require explicit broader mode
 - failures in worker runtime degrade to pending state, not workflow blockage
 
+Autonomy is controlled by a policy evaluator in every runtime path:
+
+- `og sync` computes candidate actions from distill/apply stages
+- policy stage evaluates writes, network calls, dependency actions, and deploys
+- policy rejection aborts only the unsafe action and records a policy event
+
 ```mermaid
 flowchart TD
   A[Autonomous job starts] --> B{Worker available}
@@ -200,10 +206,27 @@ flowchart TD
   B -- no --> D[Mark pending work]
   D --> E[Keep status and exports current]
   E --> F[Retry on next sync]
-  C --> G{Policy violation}
-  G -- yes --> H[Abort write and report]
-  G -- no --> I[Commit artifact updates]
+  C --> G[Policy evaluator]
+  G --> H{Policy violation}
+  H -- no --> I[Commit artifact updates]
+  H -- yes --> J[Abort unsafe action and emit remediation]
+  J --> K[Pending + status message]
+  K --> E
 ```
+
+Default policy documents (`.outcomegraph/policy.yaml`) include:
+
+- allow lists for:
+  - artifact writes
+  - permitted verify command families
+  - sanctioned sandbox operations
+- deny lists for:
+  - application code writes
+  - dependency mutators (`install`, `update`, `add`, `upgrade`)
+  - unrestricted network operations
+  - deployment operations (branch push/PR/open PR actions)
+
+Explicit autonomous mode (`--mode autonomous`) is required before allowlisted writes/deploys can be executed; observe mode always treats these as blocking.
 
 ## 9) Operational touchpoints
 
