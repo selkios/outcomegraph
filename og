@@ -71,6 +71,26 @@ STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
 TRACKED_EVIDENCE_TAG = "file"
 UNTRACKED_EVIDENCE_TAG = "cas"
+WORKER_ADAPTER_NAME = "codex"
+WORKER_INTERFACE_VERSION = 1
+WORKER_SCHEMA_VERSION = 2
+WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+
+
+def _build_worker_manifest() -> dict[str, object]:
+    return {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "type": "worker",
+        "name": WORKER_ADAPTER_NAME,
+        "implementation_version": "1.0.0",
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "capabilities": ["distill", "replay", "explain"],
+        "entrypoint": "codex://v1",
+    }
+
+
+class WorkerAdapterError(ValueError):
+    """Raised when a worker adapter returns malformed structured output."""
 
 
 def emit_usage() -> str:
@@ -124,6 +144,41 @@ def parse_bool_option(raw: str) -> bool:
     if value in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"invalid boolean value '{raw}'")
+
+
+def _build_run_id(prefix: str, run_suffix: str | None = None) -> str:
+    suffix = run_suffix or _short_hash(f"{prefix}:{_utc_timestamp()}", 10)
+    return f"{prefix}-{_utc_timestamp().replace(':', '').replace('-', '')}-{suffix}"
+
+
+def _string_list(raw: object, field: str, *, required: bool = False) -> list[str]:
+    if raw is None:
+        if required:
+            raise WorkerAdapterError(f"{field} must be present and be a list")
+        return []
+    if not isinstance(raw, list):
+        raise WorkerAdapterError(f"{field} must be a list")
+    values: list[str] = []
+    for item in raw:
+        if isinstance(item, str) and item.strip():
+            values.append(item.strip())
+    if required and not values:
+        raise WorkerAdapterError(f"{field} must contain at least one item")
+    return values
+
+
+def _required_str(raw: object, field: str) -> str:
+    if not isinstance(raw, str) or not raw.strip():
+        raise WorkerAdapterError(f"{field} must be a non-empty string")
+    return raw.strip()
+
+
+def _optional_int(raw: object, field: str, default: int | None = None) -> int | None:
+    if raw is None:
+        return default
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise WorkerAdapterError(f"{field} must be an integer")
+    return raw
 
 
 def _run_git(repo_root: str, args: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
@@ -741,6 +796,349 @@ def _store_get(repo_root: str, content_hash: str) -> bytes | None:
         return None
 
 
+def _run_codex_worker(
+    role: str,
+    payload: dict[str, object],
+    repo_root: str,
+    trace_path: str,
+    timeout_seconds: int = WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    manifest = _build_worker_manifest()
+    if manifest.get("schema_version") != WORKER_SCHEMA_VERSION:
+        raise WorkerAdapterError("worker manifest schema mismatch")
+    if manifest.get("interface_version") != WORKER_INTERFACE_VERSION:
+        raise WorkerAdapterError("worker interface version mismatch")
+
+    payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    command_variants = [
+        ["codex", "exec", "--non-interactive", role],
+        ["codex", "exec", role, "--non-interactive"],
+        ["codex", "exec", "--json", role],
+        ["codex", "exec", role, "--json"],
+        ["codex", "exec", role],
+    ]
+
+    last_error = "codex executable was not found"
+    output = ""
+    error_output = ""
+    duration_ms = 0
+
+    for command in command_variants:
+        start = time.perf_counter()
+        try:
+            proc = subprocess.run(
+                command,
+                input=payload_json,
+                text=True,
+                capture_output=True,
+                cwd=repo_root,
+                timeout=timeout_seconds,
+            )
+        except FileNotFoundError:
+            last_error = "codex executable was not found"
+            continue
+        except subprocess.TimeoutExpired as exc:
+            raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
+
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        output = proc.stdout or ""
+        error_output = proc.stderr or ""
+        if proc.returncode != 0:
+            last_error = f"codex exec failed for {role}: rc={proc.returncode}"
+            continue
+        if not output.strip():
+            last_error = f"codex exec returned empty output for {role}"
+            continue
+        break
+    else:
+        raise WorkerAdapterError(last_error)
+
+    parsed = _parse_worker_output(role, output)
+    trace_payload = {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "status": "ok",
+        "role": role,
+        "adapter": manifest.get("name"),
+        "input": payload,
+        "duration_ms": duration_ms,
+        "returncode": 0,
+        "stdout": output,
+        "stderr": error_output,
+    }
+    trace_text = json.dumps(trace_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+    full_trace_path = os.path.join(repo_root, trace_path)
+    _write_text_payload(full_trace_path, trace_text)
+    trace_bytes = trace_text.encode("utf-8")
+    return parsed, [
+        _build_file_pointer(trace_path, trace_bytes, "application/json"),
+        _store_put(repo_root, trace_bytes, "application/json"),
+    ]
+
+
+def _parse_worker_output(role: str, raw: str) -> dict[str, object]:
+    if raw is None or not raw.strip():
+        raise WorkerAdapterError(f"codex output for {role} is empty")
+
+    parsed_payload: dict[str, object] | None = None
+    for line in raw.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, dict):
+            raise WorkerAdapterError(f"codex output for {role} must be a JSON object")
+        parsed_payload = parsed
+
+    if parsed_payload is not None:
+        return parsed_payload
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise WorkerAdapterError(f"codex output for {role} is not valid JSON") from exc
+    if not isinstance(parsed, dict):
+        raise WorkerAdapterError(f"codex output for {role} must be a JSON object")
+    return parsed
+
+
+def _normalize_receipt_pointer(raw: object, *, field: str) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object")
+    schema_version = raw.get("schema_version")
+    if schema_version != WORKER_SCHEMA_VERSION:
+        raise WorkerAdapterError(f"{field} schema_version mismatch")
+    pointer_type = raw.get("type")
+    if pointer_type not in {TRACKED_EVIDENCE_TAG, UNTRACKED_EVIDENCE_TAG}:
+        raise WorkerAdapterError(f"{field}.type must be file or cas")
+    target = _required_str(raw.get("target"), f"{field}.target")
+    normalized: dict[str, object] = {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "type": pointer_type,
+        "target": target,
+    }
+    value_hash = raw.get("hash")
+    if isinstance(value_hash, str) and value_hash:
+        normalized["hash"] = value_hash
+    media_type = raw.get("media_type")
+    if isinstance(media_type, str) and media_type:
+        normalized["media_type"] = media_type
+    size = raw.get("size")
+    if isinstance(size, int):
+        normalized["size"] = size
+    return normalized
+
+
+def _normalize_receipt_pointers(raw: object, *, field: str, required: bool = False) -> list[dict[str, object]]:
+    if raw is None:
+        if required:
+            raise WorkerAdapterError(f"{field} is required")
+        return []
+    if not isinstance(raw, list):
+        raise WorkerAdapterError(f"{field} must be a list")
+    pointers = [_normalize_receipt_pointer(pointer, field=f"{field}[{index}]") for index, pointer in enumerate(raw)]
+    if required and not pointers:
+        raise WorkerAdapterError(f"{field} must include at least one pointer")
+    return pointers
+
+
+def _normalize_claim_payloads(raw: object, *, field: str) -> list[dict[str, object]]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise WorkerAdapterError(f"{field} must be a list")
+    claims: list[dict[str, object]] = []
+    for index, raw_claim in enumerate(raw):
+        if not isinstance(raw_claim, dict):
+            raise WorkerAdapterError(f"{field}[{index}] must be an object")
+        claim_id = str(raw_claim.get("id") or "").strip()
+        if not claim_id:
+            claim_id = f"cl-{_short_hash(f'{field}:{index}', 10)}"
+        capsule_id = _required_str(raw_claim.get("capsule_id"), f"{field}[{index}].capsule_id")
+        claim_receipts = _normalize_receipt_pointers(
+            raw_claim.get("receipt_pointers"),
+            field=f"{field}[{index}].receipt_pointers",
+            required=True,
+        )
+        claims.append(
+            {
+                "id": claim_id,
+                "capsule_id": capsule_id,
+                "category": str(raw_claim.get("category") or "behavior").strip() or "behavior",
+                "text": str(raw_claim.get("text") or "Synthetic claim from codex adapter output.").strip(),
+                "receipt_pointers": claim_receipts,
+            }
+        )
+    return claims
+
+
+def _normalize_distill_delta(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError("distill output must be an object")
+    if raw.get("schema_version") != WORKER_SCHEMA_VERSION:
+        raise WorkerAdapterError("distill output schema_version must be 2")
+    if raw.get("interface_version") != WORKER_INTERFACE_VERSION:
+        raise WorkerAdapterError("distill output interface_version mismatch")
+    run_id = _required_str(raw.get("run_id"), "run_id")
+    updates_raw = raw.get("capsule_updates")
+    if not isinstance(updates_raw, list) or not updates_raw:
+        raise WorkerAdapterError("distill output must include non-empty capsule_updates")
+    updates: list[dict[str, object]] = []
+    for index, raw_update in enumerate(updates_raw):
+        if not isinstance(raw_update, dict):
+            raise WorkerAdapterError(f"capsule_updates[{index}] must be an object")
+        updates.append(
+            {
+                "id": _required_str(raw_update.get("id"), f"capsule_updates[{index}].id"),
+                "status": str(raw_update.get("status") or "success"),
+                "claims": _normalize_claim_payloads(
+                    raw_update.get("claims"),
+                    field=f"capsule_updates[{index}].claims",
+                ),
+                "decision_refs": _string_list(
+                    raw_update.get("decision_refs"),
+                    f"capsule_updates[{index}].decision_refs",
+                ),
+                "errors": _string_list(
+                    raw_update.get("errors"),
+                    f"capsule_updates[{index}].errors",
+                ),
+                "receipts": _normalize_receipt_pointers(
+                    raw_update.get("receipts"),
+                    field=f"capsule_updates[{index}].receipts",
+                ),
+                "changed_files": _string_list(
+                    raw_update.get("changed_files"),
+                    f"capsule_updates[{index}].changed_files",
+                ),
+            }
+        )
+    return {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "run_id": run_id,
+        "capsule_updates": updates,
+    }
+
+
+def _normalize_replay_plan(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError("replay output must be an object")
+    if raw.get("schema_version") != WORKER_SCHEMA_VERSION:
+        raise WorkerAdapterError("replay output schema_version must be 2")
+    if raw.get("interface_version") != WORKER_INTERFACE_VERSION:
+        raise WorkerAdapterError("replay output interface_version mismatch")
+    run_id = _required_str(raw.get("run_id"), "run_id")
+    capsule_id = _required_str(raw.get("capsule_id"), "capsule_id")
+    raw_steps = raw.get("steps")
+    if raw_steps is None:
+        steps: list[dict[str, object]] = []
+    elif not isinstance(raw_steps, list):
+        raise WorkerAdapterError("replay output steps must be a list")
+    else:
+        steps = []
+        for index, raw_step in enumerate(raw_steps):
+            if not isinstance(raw_step, dict):
+                raise WorkerAdapterError(f"replay steps[{index}] must be an object")
+            command = _required_str(raw_step.get("command"), f"replay steps[{index}].command")
+            step = {"command": command}
+            expected_exit_code = _optional_int(
+                raw_step.get("expected_exit_code"),
+                f"replay steps[{index}].expected_exit_code",
+                default=0,
+            )
+            if expected_exit_code is not None:
+                step["expected_exit_code"] = expected_exit_code
+            timeout_s = _optional_int(raw_step.get("timeout_s"), f"replay steps[{index}].timeout_s", default=None)
+            if timeout_s is not None:
+                step["timeout_s"] = timeout_s
+            cwd = raw_step.get("cwd")
+            if isinstance(cwd, str) and cwd.strip():
+                step["cwd"] = cwd.strip()
+            steps.append(step)
+    return {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "run_id": run_id,
+        "capsule_id": capsule_id,
+        "steps": steps,
+    }
+
+
+def _normalize_claim_set(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError("claim set output must be an object")
+    if raw.get("schema_version") != WORKER_SCHEMA_VERSION:
+        raise WorkerAdapterError("claim set output schema_version must be 2")
+    if raw.get("interface_version") != WORKER_INTERFACE_VERSION:
+        raise WorkerAdapterError("claim set output interface_version mismatch")
+    return {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "claims": _normalize_claim_payloads(raw.get("claims"), field="claims"),
+    }
+
+
+def _build_distill_input(
+    run_id: str,
+    profile: str,
+    mode: str,
+    target_capsules: list[str],
+    changed_paths: list[str],
+    policy_ref: str = ".outcomegraph/policy.yaml",
+) -> dict[str, object]:
+    return {
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "adapter_profile": profile,
+        "mode": mode,
+        "target_capsules": [{"id": capsule} for capsule in target_capsules],
+        "changed_paths": changed_paths,
+        "policy_ref": policy_ref,
+        "run_id": run_id,
+    }
+
+
+def _build_replay_input(
+    run_id: str,
+    profile: str,
+    mode: str,
+    capsule_id: str,
+    changed_materials: list[dict[str, object]],
+    source_ref: str = "HEAD",
+    materials_lock_ref: str = ".outcomegraph/materials.lock",
+) -> dict[str, object]:
+    return {
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "run_id": run_id,
+        "mode": mode,
+        "adapter_profile": profile,
+        "capsule_id": capsule_id,
+        "source_ref": source_ref,
+        "materials_lock_ref": materials_lock_ref,
+        "changed_materials": changed_materials,
+    }
+
+
+def _build_explain_input(
+    run_id: str,
+    profile: str,
+    mode: str,
+    target_capsules: list[str],
+) -> dict[str, object]:
+    return {
+        "interface_version": WORKER_INTERFACE_VERSION,
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "run_id": run_id,
+        "mode": mode,
+        "adapter_profile": profile,
+        "target_capsules": [{"id": capsule} for capsule in target_capsules],
+    }
+
+
 def _build_claim_payload(
     claim_id: str,
     capsule_id: str,
@@ -750,16 +1148,17 @@ def _build_claim_payload(
     changed_files: list[str],
     receipt_pointers: list[dict[str, object]],
     text: str | None = None,
+    category: str = "behavior",
 ) -> dict[str, object]:
     now = _utc_timestamp()
-    claim_text = text or f"Synthetic claim for {capsule_id} from distill stage."
+    claim_text = text or f"Synthetic claim for {capsule_id} from codex worker stage."
     return {
         "schema_version": 2,
         "artifact_type": "claim",
         "id": claim_id,
         "capsule_id": capsule_id,
         "text": claim_text,
-        "category": "behavior",
+        "category": category or "behavior",
         "receipt_pointers": receipt_pointers,
         "origin": {
             "run_id": run_id,
@@ -775,14 +1174,20 @@ def _build_certificate_payload(
     certificate_id: str,
     capsule_id: str,
     run_id: str,
-    claim_ref: str,
+    claim_refs: list[str],
     profile: str,
     mode: str,
     receipt_pointers: list[dict[str, object]],
     status: str = "success",
     source: str = "distill-placeholder",
+    adapter_name: str = "filesystem-store",
+    adapter_version: str = "1.0.0",
 ) -> dict[str, object]:
     now = _utc_timestamp()
+    normalized_refs: list[str] = []
+    for raw_ref in claim_refs:
+        if isinstance(raw_ref, str) and raw_ref:
+            normalized_refs.append(raw_ref)
     return {
         "schema_version": 2,
         "artifact_type": "certificate",
@@ -791,10 +1196,10 @@ def _build_certificate_payload(
         "run_id": run_id,
         "status": status,
         "adapter": {
-            "name": "filesystem-store",
-            "version": "1.0.0",
+            "name": adapter_name,
+            "version": adapter_version,
         },
-        "claim_refs": [claim_ref],
+        "claim_refs": sorted(set(normalized_refs)),
         "receipt_pointers": receipt_pointers,
         "replay_context": {
             "run_id": run_id,
@@ -2021,6 +2426,40 @@ def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
     return sorted(capsules)
 
 
+def _list_known_capsules(repo_root: str) -> list[str]:
+    capsules_dir = os.path.join(repo_root, OG_ROOT, "capsules")
+    if not os.path.isdir(capsules_dir):
+        return []
+    capsules = set()
+    for filename in sorted(os.listdir(capsules_dir)):
+        if not filename.endswith((".json", ".yaml", ".yml")):
+            continue
+        if filename.startswith("."):
+            continue
+        capsules.add(os.path.splitext(filename)[0])
+    return sorted(capsules)
+
+
+def _file_sha256(relative_path: str, repo_root: str) -> str | None:
+    candidate = os.path.join(repo_root, relative_path)
+    try:
+        with open(candidate, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        return f"sha256:{digest}"
+    except OSError:
+        return None
+
+
+def _collect_changed_materials(repo_root: str, changed_files: list[str]) -> list[dict[str, object]]:
+    materials: list[dict[str, object]] = []
+    for path in changed_files:
+        digest = _file_sha256(path, repo_root)
+        if digest is None:
+            continue
+        materials.append({"path": path, "digest": digest})
+    return materials
+
+
 def _run_distill_stage(
     repo_root: str,
     snapshot: dict[str, object],
@@ -2040,44 +2479,53 @@ def _run_distill_stage(
             "affected_capsules": [],
             "generated_deltas": [],
         }
-    deltas = []
-    for capsule in changed_capsules:
-        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:claim')}"
-        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-distill.json"
-        distill_evidence: dict[str, object] = {
-            "run_id": run_id,
-            "capsule_id": capsule,
-            "stage": "distill",
+
+    if not isinstance(changed, list):
+        changed = []
+    changed_files = [str(entry) for entry in changed]
+    distill_input = _build_distill_input(
+        run_id=run_id,
+        profile=profile,
+        mode=mode,
+        target_capsules=changed_capsules,
+        changed_paths=changed_files,
+        policy_ref=f"{OG_ROOT}/policy.yaml",
+    )
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-distill.json"
+    try:
+        output, receipts = _run_codex_worker("distill", distill_input, repo_root, trace_path)
+        delta_payload = _normalize_distill_delta(output)
+        deltas = []
+        for update in delta_payload["capsule_updates"]:
+            raw_delta = update if isinstance(update, dict) else {}
+            deltas.append(
+                {
+                    "capsule_id": str(raw_delta.get("id")),
+                    "status": str(raw_delta.get("status") or "success"),
+                    "claims": raw_delta.get("claims"),
+                    "decision_refs": raw_delta.get("decision_refs"),
+                    "errors": raw_delta.get("errors"),
+                    "receipts": raw_delta.get("receipts") if isinstance(raw_delta.get("receipts"), list) else [],
++                    "changed_files": raw_delta.get("changed_files", changed_files),
+                    "adapter_receipts": receipts,
+                }
+            )
+    except WorkerAdapterError as exc:
+        return {
+            "name": "distill",
+            "status": "error",
+            "message": str(exc),
             "profile": profile,
             "mode": mode,
-            "changed_files": snapshot.get("changed_files"),
-            "captured_at": _utc_timestamp(),
+            "affected_capsules": changed_capsules,
+            "generated_deltas": [],
+            "errors": [str(exc)],
         }
-        trace_bytes = (
-            json.dumps(distill_evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-        ).encode("utf-8")
-        trace_full_path = os.path.join(repo_root, trace_path)
-        os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
-        _write_text_payload(trace_full_path, trace_bytes.decode("utf-8"))
-        receipt_pointers: list[dict[str, object]] = [
-            _build_file_pointer(trace_path, trace_bytes, "application/json"),
-            _store_put(repo_root, distill_evidence, "application/json"),
-        ]
-        deltas.append(
-            {
-                "capsule_id": capsule,
-                "operation": "synthesize",
-                "source": "git-diff",
-                "changed_files": changed,
-                "claim_id": claim_id,
-                "distill_evidence": distill_evidence,
-                "receipt_pointers": receipt_pointers,
-            }
-        )
+
     return {
         "name": "distill",
         "status": "ok",
-        "message": "Distillation generated placeholder deltas for affected capsules.",
+        "message": "Distill adapter produced normalized deltas.",
         "profile": profile,
         "mode": mode,
         "affected_capsules": changed_capsules,
@@ -2114,11 +2562,18 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
             errors.append("Invalid delta entry")
             continue
         capsule_id = str(delta.get("capsule_id") or "default")
-        claim_id = str(delta.get("claim_id") or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:fallback')}")
+        if str(delta.get("status") or "success") != "success":
+            delta_errors = delta.get("errors")
+            if isinstance(delta_errors, list):
+                errors.extend([str(item) for item in delta_errors if str(item)])
+            errors.append(f"distill reported non-success for capsule {capsule_id}")
+            continue
         receipt_pointers = delta.get("receipt_pointers")
         if not isinstance(receipt_pointers, list):
             receipt_pointers = []
-
+        for pointer in delta.get("adapter_receipts", []):
+            if isinstance(pointer, dict):
+                receipt_pointers.append(pointer)
         receipt_paths = []
         for pointer in sorted(receipt_pointers, key=lambda item: json.dumps(item, sort_keys=True)):
             if isinstance(pointer, dict):
@@ -2127,21 +2582,60 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
         changed_files = delta.get("changed_files")
         if not isinstance(changed_files, list):
             changed_files = []
+        claims = delta.get("claims")
+        if isinstance(claims, list):
+            raw_claims = claims
+        else:
+            raw_claims = []
         try:
-            claim_payload = _build_claim_payload(
-                claim_id,
-                capsule_id,
-                run_id,
-                str(distill_result.get("profile") or "analyze"),
-                mode,
-                changed_files if isinstance(changed_files, list) else [],
-                receipt_paths,
-            )
-            claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
-            os.makedirs(os.path.dirname(claim_path), exist_ok=True)
-            _write_json_file(claim_path, claim_payload)
-            applied_claims.append(f"{OG_ROOT}/claims/{claim_id}.json")
-            claim_ref = f"{OG_ROOT}/claims/{claim_id}.json"
+            claim_refs = []
+            if not raw_claims:
+                claim_id = f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:fallback')}"
+                generated_claims = [
+                    {
+                        "id": claim_id,
+                        "capsule_id": capsule_id,
+                        "category": "behavior",
+                        "text": f"Synthetic claim for {capsule_id} from distill stage.",
+                        "receipt_pointers": receipt_paths,
+                    }
+                ]
+            else:
+                generated_claims = []
+                for claim in raw_claims:
+                    if not isinstance(claim, dict):
+                        continue
+                    if claim.get("capsule_id") and claim.get("capsule_id") != capsule_id:
+                        continue
+                    generated_claims.append(
+                        {
+                        "id": str(claim.get("id") or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"),
+                        "capsule_id": str(claim.get("capsule_id") or capsule_id),
+                        "category": str(claim.get("category") or "behavior"),
+                        "text": str(claim.get("text") or f"Synthetic claim for {capsule_id} from distill stage."),
+                        "receipt_pointers": claim.get("receipt_pointers") if isinstance(claim.get("receipt_pointers"), list) else [],
+                    }
+                )
+            for generated_claim in generated_claims:
+                claim_payload = _build_claim_payload(
+                    str(generated_claim["id"]),
+                    str(generated_claim["capsule_id"]),
+                    run_id,
+                    str(distill_result.get("profile") or "analyze"),
+                    mode,
+                    changed_files if isinstance(changed_files, list) else [],
+                    _normalize_receipt_pointers(
+                        generated_claim.get("receipt_pointers"),
+                        field="generated_claim.receipt_pointers",
+                    ),
+                    text=str(generated_claim["text"]),
+                    category=str(generated_claim["category"]),
+                )
+                claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{generated_claim['id']}.json")
+                os.makedirs(os.path.dirname(claim_path), exist_ok=True)
+                _write_json_file(claim_path, claim_payload)
+                applied_claims.append(f"{OG_ROOT}/claims/{generated_claim['id']}.json")
+                claim_refs.append(f"{OG_ROOT}/claims/{generated_claim['id']}.json")
         except Exception as exc:
             errors.append(f"Failed to write claim for {capsule_id}: {exc}")
             continue
@@ -2153,11 +2647,14 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
                 certificate_id,
                 capsule_id,
                 run_id,
-                claim_ref,
+                claim_refs,
                 str(distill_result.get("profile") or "analyze"),
                 mode,
                 cert_receipts,
+                adapter_name=WORKER_ADAPTER_NAME,
             )
+            if not claim_refs:
+                raise RuntimeError("no claim refs produced")
             cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
             os.makedirs(os.path.dirname(cert_path), exist_ok=True)
             _write_json_file(cert_path, cert_payload)
@@ -2187,6 +2684,105 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
         "applied_certificates": applied_certs,
         "applied_deltas": deltas,
     }
+
+
+def _run_replay_stage(
+    repo_root: str,
+    snapshot: dict[str, object],
+    run_id: str,
+    profile: str,
+    mode: str,
+    changed_only: bool = True,
+) -> dict[str, object]:
+    if not isinstance(snapshot, dict):
+        return {
+            "name": "replay",
+            "status": "error",
+            "message": "Invalid snapshot payload",
+            "mode": mode,
+            "replay_plans": [],
+        }
+    changed_files = snapshot.get("changed_files")
+    if not isinstance(changed_files, list):
+        changed_files = []
+
+    changed_files = [str(item) for item in changed_files]
+    targets = _collect_affected_capsules(changed_files) if changed_only else _list_known_capsules(repo_root)
+    if not targets:
+        targets = ["default"]
+
+    changed_materials = _collect_changed_materials(repo_root, changed_files if changed_only else [])
+    plans: list[dict[str, object]] = []
+
+    for capsule in targets:
+        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-replay.json"
+        try:
+            input_payload = _build_replay_input(
+                run_id=run_id,
+                profile=profile,
+                mode=mode,
+                capsule_id=capsule,
+                changed_materials=changed_materials,
+            )
+            output, receipts = _run_codex_worker("replay", input_payload, repo_root, trace_path)
+            plan = _normalize_replay_plan(output)
+            plan["adapter_receipts"] = receipts
+            plans.append(plan)
+        except WorkerAdapterError as exc:
+            return {
+                "name": "replay",
+                "status": "error",
+                "message": str(exc),
+                "mode": mode,
+                "replay_plans": plans,
+                "errors": [str(exc)],
+            }
+
+    return {
+        "name": "replay",
+        "status": "ok",
+        "message": "Replay adapter produced executable plans.",
+        "mode": mode,
+        "replay_plans": plans,
+    }
+
+
+def _run_explain_stage(
+    repo_root: str,
+    profile: str,
+    mode: str,
+    run_id: str,
+) -> dict[str, object]:
+    capsule_ids = _list_known_capsules(repo_root)
+    if not capsule_ids:
+        capsule_ids = ["default"]
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-explain.json"
+    try:
+        input_payload = _build_explain_input(
+            run_id=run_id,
+            profile=profile,
+            mode=mode,
+            target_capsules=capsule_ids,
+        )
+        output, receipts = _run_codex_worker("explain", input_payload, repo_root, trace_path)
+        claim_set = _normalize_claim_set(output)
+        return {
+            "name": "explain",
+            "status": "ok",
+            "message": "Explain adapter returned claim set.",
+            "mode": mode,
+            "claims": claim_set.get("claims", []),
+            "adapter_receipts": receipts,
+        }
+    except WorkerAdapterError as exc:
+        return {
+            "name": "explain",
+            "status": "error",
+            "message": str(exc),
+            "mode": mode,
+            "claims": [],
+            "errors": [str(exc)],
+        }
 
 
 def _run_verify_stage(
@@ -2268,7 +2864,7 @@ def _run_verify_stage(
             certificate_id,
             capsule,
             run_id,
-            claim_ref,
+            [claim_ref],
             "verify",
             mode,
             receipt_pointers,
@@ -2552,7 +3148,30 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "replay":
         options, _ = parse_command_flags(rest, "replay", True, True, True, output_json)
-        emit_command_result(build_payload("replay", **options), output_json)
+        repo_root = _git_root()
+        profile = str(options.get("profile") or "analyze")
+        mode = str(options.get("mode") or "observe")
+        snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+        run_id = _build_run_id("replay", _short_hash(f"{profile}:{mode}:{snapshot.get('changed_count', 0)}", 8))
+        replay = _run_replay_stage(
+            repo_root=repo_root,
+            snapshot=snapshot,
+            run_id=run_id,
+            profile=profile,
+            mode=mode,
+            changed_only=bool(options.get("changed")),
+        )
+        payload = {
+            "status": "ok" if replay.get("status") == "ok" else "error",
+            "command": "replay",
+            "options": options,
+            "run_id": run_id,
+            "steps": [replay],
+            "message": replay.get("message", "replay adapter completed"),
+            "replay_plans": replay.get("replay_plans", []),
+            "errors": replay.get("errors", []),
+        }
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "status":
@@ -2585,8 +3204,27 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_SUCCESS
 
     if command == "explain":
-        options, _ = parse_command_flags(rest, "explain", False, False, False, output_json)
-        emit_command_result(build_payload("explain", **options), output_json)
+        options, _ = parse_command_flags(rest, "explain", False, True, True, output_json)
+        repo_root = _git_root()
+        profile = str(options.get("profile") or "analyze")
+        mode = str(options.get("mode") or "observe")
+        run_id = _build_run_id("explain", _short_hash(f"{profile}:{mode}", 8))
+        explain = _run_explain_stage(
+            repo_root=repo_root,
+            profile=profile,
+            mode=mode,
+            run_id=run_id,
+        )
+        payload = {
+            "status": "ok" if explain.get("status") == "ok" else "error",
+            "command": "explain",
+            "options": options,
+            "run_id": run_id,
+            "message": explain.get("message", "explain adapter completed"),
+            "claims": explain.get("claims", []),
+            "errors": explain.get("errors", []),
+        }
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "drift":

@@ -204,7 +204,7 @@
       "id": "OG-WORKER-001",
       "title": "Implement Codex worker adapter v1 distillation and replay adapter",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Support non-interactive distill/replay/explain with schema-validated outputs.",
       "steps": [
         "Run codex in analyze/propose/apply profile modes",
@@ -220,9 +220,11 @@
         "OG-ADAPTER-001"
       ],
       "files": [
+        "ARCHITECTURE.md",
         "SPEC-v2.md",
-        "ARCHITECTURE.md"
-      ]
+        "og"
+      ],
+      "updated_at": "2026-03-04T10:16:12Z"
     },
     {
       "id": "OG-SYNC-001",
@@ -272,9 +274,10 @@
         "OG-SYNC-001"
       ],
       "files": [
-        "og"
+        "og",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:13:28Z",
+      "updated_at": "2026-03-04T10:13:34Z",
       "blockers": []
     },
     {
