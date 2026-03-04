@@ -119,7 +119,7 @@ Core commands:
   og replay [--changed]
   og status
   og export
-  og explain
+  og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]]
   og drift
   og mcp-server
   og optimize prompts
@@ -949,6 +949,125 @@ def _render_drift(payload: dict[str, object]) -> str:
     for item in drift.get("remediation", []):
         if isinstance(item, str):
             lines.append(f"remediation: {item}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_explain(payload: dict[str, object]) -> str:
+    claims = payload.get("claims", [])
+    certificates = payload.get("certificates", [])
+    deltas = payload.get("deltas", [])
+    errors = payload.get("errors", [])
+    filters = payload.get("filters", {})
+    status = payload.get("status", "ok")
+    lines = [f"explain: {status}", ""]
+
+    rendered_filters = [
+        f"{key}={','.join(value)}" for key, value in filters.items() if isinstance(value, list) and value
+    ]
+    if rendered_filters:
+        lines.append("filters: " + " ".join(rendered_filters))
+
+    if payload.get("target_capsules"):
+        target_capsules = payload.get("target_capsules")
+        if isinstance(target_capsules, list) and target_capsules:
+            lines.append("target capsules: " + ", ".join(target_capsules))
+
+    if not claims and not certificates and not deltas:
+        lines.append(payload.get("message", "No explain artifacts found."))
+        if errors:
+            lines.append("errors:")
+            for error in errors:
+                if isinstance(error, str):
+                    lines.append(f"- {error}")
+        return "\n".join(lines) + "\n"
+
+    for claim in claims:
+        if not isinstance(claim, dict):
+            continue
+        claim_id = str(claim.get("id") or "")
+        capsule_id = str(claim.get("capsule_id") or "default")
+        lines.append(f"- claim {claim_id} [capsule={capsule_id}]")
+        text = str(claim.get("text") or "").strip()
+        if text:
+            lines.append(f"  text: {text}")
+        category = str(claim.get("category") or "behavior")
+        lines.append(f"  category: {category}")
+        if claim.get("path"):
+            lines.append(f"  path: {claim['path']}")
+
+        linked_decisions = claim.get("linked_decisions", [])
+        if linked_decisions:
+            lines.append("  decisions:")
+            for decision in linked_decisions:
+                if not isinstance(decision, dict):
+                    continue
+                lines.append(
+                    f"    - {decision.get('id')} "
+                    f"({decision.get('status')}, capsule={decision.get('capsule_id')})"
+                )
+                statement = str(decision.get("statement") or "").strip()
+                if statement:
+                    lines.append(f"      statement: {statement}")
+                evidence_refs = decision.get("evidence_refs")
+                if isinstance(evidence_refs, list) and evidence_refs:
+                    lines.append("      evidence refs:")
+                    for item in evidence_refs:
+                        lines.append(f"      - {item}")
+
+        linked_certificates = claim.get("linked_certificates", [])
+        if linked_certificates:
+            lines.append("  certificates:")
+            for certificate in linked_certificates:
+                if not isinstance(certificate, dict):
+                    continue
+                lines.append(
+                    f"    - {certificate.get('id')} "
+                    f"({certificate.get('status')}, capsule={certificate.get('capsule_id')})"
+                )
+                if certificate.get("path"):
+                    lines.append(f"      path: {certificate['path']}")
+
+        claim_deltas = claim.get("deltas", [])
+        if claim_deltas:
+            lines.append("  deltas:")
+            for delta in claim_deltas:
+                if not isinstance(delta, dict):
+                    continue
+                lines.append(
+                    f"    - {delta.get('capsule_id')}: {delta.get('status')} (run_id={delta.get('run_id')})"
+                )
+                changed_files = delta.get("changed_files")
+                if isinstance(changed_files, list) and changed_files:
+                    lines.append("      changed files:")
+                    for item in changed_files:
+                        lines.append(f"      - {item}")
+
+    if certificates:
+        lines.append("certificates:")
+        for certificate in certificates:
+            if not isinstance(certificate, dict):
+                continue
+            lines.append(
+                f"- {certificate.get('id')} (capsule={certificate.get('capsule_id')}, status={certificate.get('status')})"
+            )
+            if certificate.get("path"):
+                lines.append(f"  path: {certificate['path']}")
+
+    if deltas:
+        lines.append("latest sync deltas:")
+        for delta in deltas:
+            if not isinstance(delta, dict):
+                continue
+            lines.append(
+                f"- {delta.get('capsule_id')}: {delta.get('status')} (run_id={delta.get('run_id')})"
+            )
+
+    if errors:
+        lines.append("errors:")
+        for error in errors:
+            if isinstance(error, str):
+                lines.append(f"- {error}")
+
     return "\n".join(lines) + "\n"
 
 def _write_json_file(path: str, payload: dict) -> None:
@@ -2797,11 +2916,17 @@ def parse_command_flags(
     allow_mode: bool,
     output_json: bool,
     allow_force_hooks_path: bool = False,
+    allow_capsule_filter: bool = False,
+    allow_ref_filter: bool = False,
+    allow_certificate_filter: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
     profile = None
     mode = None
     force_hooks_path = False
+    capsule_filters: list[str] = []
+    ref_filters: list[str] = []
+    certificate_filters: list[str] = []
 
     i = 0
     while i < len(args):
@@ -2888,6 +3013,54 @@ def parse_command_flags(
             mode = value
             i += 1
             continue
+        if arg == "--capsule":
+            if not allow_capsule_filter:
+                emit_error(f"{command} does not accept --capsule", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --capsule", command, EXIT_USAGE, output_json)
+            value = args[i + 1]
+            capsule_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 2
+            continue
+        if arg.startswith("--capsule="):
+            if not allow_capsule_filter:
+                emit_error(f"{command} does not accept --capsule", command, EXIT_USAGE, output_json)
+            value = arg.split("=", 1)[1]
+            capsule_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 1
+            continue
+        if arg == "--ref":
+            if not allow_ref_filter:
+                emit_error(f"{command} does not accept --ref", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --ref", command, EXIT_USAGE, output_json)
+            value = args[i + 1]
+            ref_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 2
+            continue
+        if arg.startswith("--ref="):
+            if not allow_ref_filter:
+                emit_error(f"{command} does not accept --ref", command, EXIT_USAGE, output_json)
+            value = arg.split("=", 1)[1]
+            ref_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 1
+            continue
+        if arg == "--certificate":
+            if not allow_certificate_filter:
+                emit_error(f"{command} does not accept --certificate", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --certificate", command, EXIT_USAGE, output_json)
+            value = args[i + 1]
+            certificate_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 2
+            continue
+        if arg.startswith("--certificate="):
+            if not allow_certificate_filter:
+                emit_error(f"{command} does not accept --certificate", command, EXIT_USAGE, output_json)
+            value = arg.split("=", 1)[1]
+            certificate_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            i += 1
+            continue
         if arg == "--force-hooks-path":
             if not allow_force_hooks_path:
                 emit_error(f"{command} does not accept --force-hooks-path", command, EXIT_USAGE, output_json)
@@ -2907,7 +3080,14 @@ def parse_command_flags(
             emit_error(f"unknown option '{arg}' for {command}", command, EXIT_USAGE, output_json)
         emit_error(f"unexpected argument '{arg}' for {command}", command, EXIT_USAGE, output_json)
 
-    return {"changed": changed, "profile": profile, "mode": mode, "force_hooks_path": force_hooks_path, "output_json": output_json}, []
+    options: dict[str, object] = {"changed": changed, "profile": profile, "mode": mode, "force_hooks_path": force_hooks_path, "output_json": output_json}
+    if capsule_filters:
+        options["capsule"] = capsule_filters
+    if ref_filters:
+        options["ref"] = ref_filters
+    if certificate_filters:
+        options["certificate"] = certificate_filters
+    return options, []
 
 
 def _normalize_path_list(raw: str) -> list[str]:
@@ -3136,15 +3316,175 @@ def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
             capsules.add(path.split("/", 1)[1].split(".")[0])
         elif path.startswith("claims/"):
             capsules.add(path.split("/", 1)[1].split(".")[0])
-        elif path.startswith("certificates/"):
-            capsules.add(path.split("/", 1)[1].split(".")[0])
-        elif path.startswith("refs/"):
-            capsules.add(path.split("/", 1)[1].split(".")[0])
-        elif path.startswith("materials.lock"):
-            capsules.add("materials")
-        else:
-            capsules.add("default")
+    elif path.startswith("certificates/"):
+        capsules.add(path.split("/", 1)[1].split(".")[0])
+    elif path.startswith("refs/"):
+        capsules.add(path.split("/", 1)[1].split(".")[0])
+    elif path.startswith("materials.lock"):
+        capsules.add("materials")
+    else:
+        capsules.add("default")
     return sorted(capsules)
+
+
+def _safe_string_list(raw: object) -> list[str]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return []
+    values: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        value = item.strip()
+        if value:
+            values.append(value)
+    return values
+
+
+def _safe_object_list(raw: object) -> list[dict[str, object]]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _normalize_artifact_id(payload: dict[str, object], path: str, fallback_key: str | None = None) -> str:
+    raw = payload.get(fallback_key or "id")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+def _normalize_reference_to_id(reference: object) -> str | None:
+    if not isinstance(reference, str):
+        return None
+    text = reference.strip()
+    if not text:
+        return None
+    return os.path.splitext(os.path.basename(text))[0]
+
+
+def _collect_artifact_payloads(repo_root: str, relative_dir: str) -> list[tuple[str, dict[str, object]]]:
+    root = os.path.join(repo_root, relative_dir)
+    if not os.path.isdir(root):
+        return []
+    payloads: list[tuple[str, dict[str, object]]] = []
+    for dirpath, _, filenames in os.walk(root):
+        for filename in sorted(filenames):
+            if filename.startswith("."):
+                continue
+            if not filename.endswith(".json"):
+                continue
+            full_path = os.path.join(dirpath, filename)
+            payload = _read_json_file(full_path)
+            if not isinstance(payload, dict):
+                continue
+            relative_path = os.path.relpath(full_path, repo_root).replace("\\", "/")
+            payloads.append((relative_path, payload))
+    return payloads
+
+
+def _collect_latest_sync_deltas(repo_root: str) -> tuple[list[dict[str, object]], dict[str, list[dict[str, object]]]:
+    latest_event, _ = _read_latest_sync_event(repo_root)
+    if not isinstance(latest_event, dict):
+        return [], {}
+    deltas: list[dict[str, object]] = []
+    by_capsule: dict[str, list[dict[str, object]]] = {}
+    for raw_step in latest_event.get("steps", []) if isinstance(latest_event.get("steps"), list) else []:
+        if not isinstance(raw_step, dict) or raw_step.get("name") != "distill":
+            continue
+        generated_deltas = raw_step.get("generated_deltas")
+        if not isinstance(generated_deltas, list):
+            continue
+        for raw_delta in generated_deltas:
+            if not isinstance(raw_delta, dict):
+                continue
+            capsule_id = str(raw_delta.get("capsule_id") or raw_delta.get("id") or "").strip()
+            entry: dict[str, object] = {
+                "capsule_id": capsule_id or "default",
+                "status": str(raw_delta.get("status") or raw_step.get("status") or "unknown"),
+                "decision_refs": _safe_string_list(raw_delta.get("decision_refs")),
+                "changed_files": _safe_string_list(raw_delta.get("changed_files")),
+                "claims": [],
+                "run_id": str(latest_event.get("run_id") or ""),
+                "step_status": str(raw_step.get("status") or ""),
+            }
+            if isinstance(raw_delta.get("claims"), list):
+                entry["claims"] = [str(item.get("id")) for item in raw_delta.get("claims") if isinstance(item, dict) and isinstance(item.get("id"), str)]
+            deltas.append(entry)
+            by_capsule.setdefault(entry["capsule_id"], []).append(entry)
+    return deltas, by_capsule
+
+
+def _collect_claim_records(repo_root: str) -> list[dict[str, object]]:
+    claims: list[dict[str, object]] = []
+    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/claims"):
+        claims.append(
+            {
+                "path": path,
+                "id": _normalize_artifact_id(payload, path, "id"),
+                "capsule_id": str(payload.get("capsule_id") or "default"),
+                "text": str(payload.get("text") or ""),
+                "category": str(payload.get("category") or "behavior"),
+                "origin": payload.get("origin"),
+                "run_id": str(payload.get("run_id") or ""),
+                "receipt_pointers": _safe_object_list(payload.get("receipt_pointers")),
+                "raw": payload,
+            }
+        )
+    return claims
+
+
+def _collect_certificate_records(repo_root: str) -> list[dict[str, object]]:
+    certificates: list[dict[str, object]] = []
+    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/certificates"):
+        certificates.append(
+            {
+                "path": path,
+                "id": _normalize_artifact_id(payload, path, "id"),
+                "capsule_id": str(payload.get("capsule_id") or "default"),
+                "claim_refs": _safe_string_list(payload.get("claim_refs")),
+                "receipt_pointers": _safe_object_list(payload.get("receipt_pointers")),
+                "status": str(payload.get("status") or "unknown"),
+                "run_id": str(payload.get("run_id") or ""),
+                "raw": payload,
+            }
+        )
+    return certificates
+
+
+def _collect_decision_records(repo_root: str) -> list[dict[str, object]]:
+    decisions: list[dict[str, object]] = []
+    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/decisions"):
+        decisions.append(
+            {
+                "path": path,
+                "id": _normalize_artifact_id(payload, path, "id"),
+                "capsule_id": str(payload.get("capsule_id") or "default"),
+                "claim_refs": _safe_string_list(payload.get("claim_refs")),
+                "evidence_refs": _safe_string_list(payload.get("evidence_refs")),
+                "statement": str(payload.get("statement") or ""),
+                "status": str(payload.get("status") or "unknown"),
+                "raw": payload,
+            }
+        )
+    return decisions
+
+
+def _collect_ref_records(repo_root: str) -> list[dict[str, object]]:
+    refs: list[dict[str, object]] = []
+    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/refs"):
+        refs.append(
+            {
+                "path": path,
+                "id": _normalize_artifact_id(payload, path, "id"),
+                "capsule_id": str(payload.get("capsule_id") or "default"),
+                "raw": payload,
+            }
+        )
+    return refs
 
 
 def _list_known_capsules(repo_root: str) -> list[str]:
@@ -3473,37 +3813,305 @@ def _run_explain_stage(
     profile: str,
     mode: str,
     run_id: str,
+    *,
+    capsule_filters: list[str] | None = None,
+    ref_filters: list[str] | None = None,
+    certificate_filters: list[str] | None = None,
 ) -> dict[str, object]:
-    capsule_ids = _list_known_capsules(repo_root)
-    if not capsule_ids:
-        capsule_ids = ["default"]
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-explain.json"
-    try:
-        input_payload = _build_explain_input(
-            run_id=run_id,
-            profile=profile,
-            mode=mode,
-            target_capsules=capsule_ids,
-        )
-        output, receipts = _run_codex_worker("explain", input_payload, repo_root, trace_path)
-        claim_set = _normalize_claim_set(output)
+    def normalize_identifier(value: object) -> str:
+        if not isinstance(value, str):
+            return ""
+        normalized = value.strip().lower()
+        if not normalized:
+            return ""
+        return os.path.splitext(os.path.basename(normalized))[0]
+
+    def format_certificate(cert: dict[str, object]) -> dict[str, object]:
         return {
-            "name": "explain",
-            "status": "ok",
-            "message": "Explain adapter returned claim set.",
-            "mode": mode,
-            "claims": claim_set.get("claims", []),
-            "adapter_receipts": receipts,
+            "id": cert.get("id"),
+            "path": cert.get("path"),
+            "capsule_id": cert.get("capsule_id"),
+            "status": cert.get("status"),
+            "run_id": cert.get("run_id"),
+            "claim_refs": cert.get("claim_refs"),
+            "receipt_pointers": cert.get("receipt_pointers"),
         }
-    except WorkerAdapterError as exc:
+
+    def format_decision(decision: dict[str, object]) -> dict[str, object]:
+        return {
+            "id": str(decision.get("id")),
+            "path": decision.get("path"),
+            "capsule_id": decision.get("capsule_id"),
+            "statement": decision.get("statement"),
+            "status": decision.get("status"),
+            "claim_refs": decision.get("claim_refs"),
+            "evidence_refs": decision.get("evidence_refs"),
+        }
+
+    claims = _collect_claim_records(repo_root)
+    certificates = _collect_certificate_records(repo_root)
+    decisions = _collect_decision_records(repo_root)
+    refs = _collect_ref_records(repo_root)
+    deltas, deltas_by_capsule = _collect_latest_sync_deltas(repo_root)
+
+    capsule_filters = [item.strip() for item in capsule_filters or [] if item.strip()]
+    ref_filters = [item.strip() for item in ref_filters or [] if item.strip()]
+    certificate_filters = [item.strip() for item in certificate_filters or [] if item.strip()]
+
+    requested_capsules = {normalize_identifier(item) for item in capsule_filters}
+    requested_capsules = {item for item in requested_capsules if item}
+    requested_refs = {normalize_identifier(item) for item in ref_filters}
+    requested_refs = {item for item in requested_refs if item}
+    requested_certificates = {normalize_identifier(item) for item in certificate_filters}
+    requested_certificates = {item for item in requested_certificates if item}
+
+    all_capsules: set[str] = set()
+    for claim in claims:
+        all_capsules.add(normalize_identifier(claim.get("capsule_id") or "default"))
+    for certificate in certificates:
+        all_capsules.add(normalize_identifier(certificate.get("capsule_id") or "default"))
+    for decision in decisions:
+        all_capsules.add(normalize_identifier(decision.get("capsule_id") or "default"))
+    for capsule_id in deltas_by_capsule:
+        all_capsules.add(normalize_identifier(capsule_id))
+
+    if not all_capsules:
+        all_capsules.add("default")
+
+    selected_ref_capsules: set[str] = set()
+    if requested_refs:
+        for raw_ref in refs:
+            if normalize_identifier(raw_ref.get("id")) in requested_refs or normalize_identifier(raw_ref.get("path")) in requested_refs:
+                selected_ref_capsules.add(normalize_identifier(raw_ref.get("capsule_id") or "default"))
+        if not selected_ref_capsules:
+            return {
+                "name": "explain",
+                "status": "error",
+                "message": "No refs found for --ref filter.",
+                "mode": mode,
+                "profile": profile,
+                "run_id": run_id,
+                "claims": [],
+                "certificates": [],
+                "decisions": [],
+                "deltas": [],
+                "errors": [f"--ref filter values were not found: {', '.join(sorted(requested_refs))}"],
+                "target_capsules": [],
+                "filters": {
+                    "capsule": capsule_filters,
+                    "ref": ref_filters,
+                    "certificate": certificate_filters,
+                },
+            }
+
+    if requested_certificates:
+        selected_certificates = [
+            cert for cert in certificates
+            if normalize_identifier(cert.get("id")) in requested_certificates
+            or normalize_identifier(cert.get("path")) in requested_certificates
+        ]
+        if not selected_certificates:
+            return {
+                "name": "explain",
+                "status": "error",
+                "message": "No certificates found for --certificate filter.",
+                "mode": mode,
+                "profile": profile,
+                "run_id": run_id,
+                "claims": [],
+                "certificates": [],
+                "decisions": [],
+                "deltas": [],
+                "errors": [
+                    f"--certificate filter values were not found: {', '.join(sorted(requested_certificates))}"
+                ],
+                "target_capsules": [],
+                "filters": {
+                    "capsule": capsule_filters,
+                    "ref": ref_filters,
+                    "certificate": certificate_filters,
+                },
+            }
+    else:
+        selected_certificates = certificates
+
+    selected_certificate_capsules = {
+        normalize_identifier(cert.get("capsule_id") or "default") for cert in selected_certificates
+    }
+
+    constraints: list[set[str]] = []
+    if requested_capsules:
+        constraints.append(requested_capsules)
+    if requested_refs:
+        constraints.append(selected_ref_capsules)
+    if requested_certificates:
+        constraints.append(selected_certificate_capsules)
+
+    if constraints:
+        target_capsules = set.intersection(*constraints)
+    else:
+        target_capsules = set(all_capsules)
+
+    if not target_capsules:
         return {
             "name": "explain",
             "status": "error",
-            "message": str(exc),
+            "message": "No explain records matched the requested filters.",
             "mode": mode,
+            "profile": profile,
+            "run_id": run_id,
             "claims": [],
-            "errors": [str(exc)],
+            "certificates": [],
+            "decisions": [],
+            "deltas": [],
+            "errors": [
+                "Filters were provided but no matching capsules were found in explain artifacts.",
+            ],
+            "target_capsules": [],
+            "filters": {
+                "capsule": capsule_filters,
+                "ref": ref_filters,
+                "certificate": certificate_filters,
+            },
         }
+
+    deltas_by_capsule_normalized: dict[str, list[dict[str, object]]] = {}
+    for raw_capsule_id, raw_steps in deltas_by_capsule.items():
+        normalized_capsule = normalize_identifier(raw_capsule_id)
+        if not normalized_capsule:
+            normalized_capsule = "default"
+        deltas_by_capsule_normalized.setdefault(normalized_capsule, []).extend(raw_steps)
+
+    decisions_by_claim: dict[str, list[dict[str, object]]] = {}
+    for decision in decisions:
+        decision_capsule = normalize_identifier(decision.get("capsule_id") or "default")
+        if decision_capsule not in target_capsules:
+            continue
+        for claim_ref in _safe_string_list(decision.get("claim_refs")):
+            claim_id = normalize_identifier(claim_ref)
+            if claim_id:
+                decisions_by_claim.setdefault(claim_id, []).append(decision)
+
+    certificates_by_claim: dict[str, list[dict[str, object]]] = {}
+    for certificate in selected_certificates:
+        certificate_capsule = normalize_identifier(certificate.get("capsule_id") or "default")
+        if certificate_capsule not in target_capsules:
+            continue
+        for claim_ref in _safe_string_list(certificate.get("claim_refs")):
+            claim_id = normalize_identifier(claim_ref)
+            if claim_id:
+                certificates_by_claim.setdefault(claim_id, []).append(certificate)
+
+    selected_claims: list[dict[str, object]] = []
+    for claim in claims:
+        claim_capsule = normalize_identifier(claim.get("capsule_id") or "default")
+        if claim_capsule not in target_capsules:
+            continue
+        claim_id = normalize_identifier(claim.get("id"))
+        if not claim_id:
+            continue
+        linked_decisions = [format_decision(item) for item in decisions_by_claim.get(claim_id, [])]
+        linked_certificates = [format_certificate(item) for item in certificates_by_claim.get(claim_id, [])]
+        if requested_certificates and not linked_certificates:
+            continue
+        selected_claims.append(
+            {
+                "id": claim.get("id"),
+                "path": claim.get("path"),
+                "capsule_id": claim.get("capsule_id") or "default",
+                "text": claim.get("text") or "",
+                "category": claim.get("category") or "behavior",
+                "receipt_pointers": claim.get("receipt_pointers") or [],
+                "linked_decisions": linked_decisions,
+                "linked_certificates": linked_certificates,
+                "deltas": deltas_by_capsule_normalized.get(claim_capsule, []),
+                "run_id": claim.get("run_id") or "",
+            }
+        )
+
+    selected_claims.sort(key=lambda item: (str(item.get("capsule_id") or ""), str(item.get("id") or "")))
+
+    selected_certificates_payload = [
+        format_certificate(certificate)
+        for certificate in selected_certificates
+        if normalize_identifier(certificate.get("capsule_id") or "default") in target_capsules
+    ]
+    filtered_deltas = [
+        delta for delta in deltas
+        if normalize_identifier(delta.get("capsule_id") or "default") in target_capsules
+    ]
+
+    selected_decisions: list[dict[str, object]] = []
+    seen_decision_ids: set[str] = set()
+    for decision in decisions:
+        decision_capsule = normalize_identifier(decision.get("capsule_id") or "default")
+        if decision_capsule not in target_capsules:
+            continue
+        decision_id = normalize_identifier(decision.get("id"))
+        if decision_id and decision_id not in seen_decision_ids:
+            seen_decision_ids.add(decision_id)
+            selected_decisions.append(format_decision(decision))
+
+    if not selected_claims and not selected_certificates_payload and not selected_decisions and not filtered_deltas:
+        if requested_capsules or requested_refs or requested_certificates:
+            return {
+                "name": "explain",
+                "status": "error",
+                "message": "No explain data found for requested filters.",
+                "mode": mode,
+                "profile": profile,
+                "run_id": run_id,
+                "claims": [],
+                "certificates": [],
+                "decisions": [],
+                "deltas": [],
+                "errors": ["No explain artifacts matched the requested filters."],
+                "target_capsules": sorted(target_capsules),
+                "filters": {
+                    "capsule": capsule_filters,
+                    "ref": ref_filters,
+                    "certificate": certificate_filters,
+                },
+            }
+        return {
+            "name": "explain",
+            "status": "ok",
+            "message": "No explain artifacts found.",
+            "mode": mode,
+            "profile": profile,
+            "run_id": run_id,
+            "claims": [],
+            "certificates": [],
+            "decisions": [],
+            "deltas": filtered_deltas,
+            "errors": [],
+            "target_capsules": sorted(target_capsules),
+            "filters": {
+                "capsule": capsule_filters,
+                "ref": ref_filters,
+                "certificate": certificate_filters,
+            },
+        }
+
+    return {
+        "name": "explain",
+        "status": "ok",
+        "message": "Explain trace assembled from claims, decisions, certificates, and delta evidence.",
+        "mode": mode,
+        "profile": profile,
+        "run_id": run_id,
+        "claims": selected_claims,
+        "certificates": selected_certificates_payload,
+        "decisions": selected_decisions,
+        "deltas": filtered_deltas,
+        "target_capsules": sorted(target_capsules),
+        "filters": {
+            "capsule": capsule_filters,
+            "ref": ref_filters,
+            "certificate": certificate_filters,
+        },
+        "errors": [],
+    }
 
 
 def _run_verify_stage(
@@ -3960,7 +4568,17 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_SUCCESS
 
     if command == "explain":
-        options, _ = parse_command_flags(rest, "explain", False, True, True, output_json)
+        options, _ = parse_command_flags(
+            rest,
+            "explain",
+            False,
+            True,
+            True,
+            output_json,
+            allow_capsule_filter=True,
+            allow_ref_filter=True,
+            allow_certificate_filter=True,
+        )
         repo_root = _git_root()
         profile = str(options.get("profile") or "analyze")
         mode = str(options.get("mode") or "observe")
@@ -3970,6 +4588,9 @@ def run_command(args: list[str], output_json: bool) -> int:
             profile=profile,
             mode=mode,
             run_id=run_id,
+            capsule_filters=options.get("capsule"),
+            ref_filters=options.get("ref"),
+            certificate_filters=options.get("certificate"),
         )
         payload = {
             "status": "ok" if explain.get("status") == "ok" else "error",
@@ -3978,8 +4599,15 @@ def run_command(args: list[str], output_json: bool) -> int:
             "run_id": run_id,
             "message": explain.get("message", "explain adapter completed"),
             "claims": explain.get("claims", []),
+            "certificates": explain.get("certificates", []),
+            "decisions": explain.get("decisions", []),
+            "deltas": explain.get("deltas", []),
+            "target_capsules": explain.get("target_capsules", []),
+            "filters": explain.get("filters", {}),
             "errors": explain.get("errors", []),
         }
+        if not output_json:
+            payload["message"] = _render_explain(payload)
         emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
