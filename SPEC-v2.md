@@ -236,19 +236,224 @@ Bulky evidence is stored in CAS (local or remote). Git tracks pointers and hashe
 
 ## 7) Canonical artifact model
 
-All top-level docs include `schema_version: 2`.
+All canonical ArtifactGraph payloads are schema-versioned records with `schema_version: 2`.
 
-Canonical artifacts:
+- Canonical locations:
+  - `capsules/<id>.yaml`
+  - `refs/<name>.yaml`
+  - `decisions/<id>.yaml`
+  - `certificates/<id>.yaml`
+  - `materials.lock`
+  - `claims/<id>.yaml`
+- Receipt pointers are embedded objects used by claims and certificates.
 
-- `capsule.yaml`: goal, scope, constraints, oracles, materials lock ref, lineage.
-- `refs/<name>.yaml`: mutable pointer to current capsule version.
-- `decisions/<id>.md|yaml`: decision records with artifact links.
-- `materials.lock`: canonical material digest set.
-- `certificate.yaml`: replay/verify summary with evidence pointers and hashes.
+Every canonical artifact must include:
+
+- `schema_version: 2`
+- `artifact_type`: one of `capsule`, `ref`, `decision`, `certificate`, `materials_lock`, `claim`
+- `id` (namespace-unique)
+- `created_at` and `updated_at` (ISO-8601 UTC when applicable)
+
+### 7.1 `capsules/<id>.yaml`
+
+Required fields:
+
+- `id`
+- `goal`
+- `scope`
+- `oracles`
+- `materials_lock_ref`
+- `status`
+
+Suggested schema:
+
+```yaml
+schema_version: 2
+artifact_type: capsule
+id: cap-frontend
+goal: "Reduce startup latency on cold boot."
+scope:
+  - "src/**/*.ts"
+constraints:
+  - "no dependency updates"
+oracles:
+  - name: "unit_startup"
+    command: "npm test -- startup"
+materials_lock_ref: ".outcomegraph/materials.lock"
+decision_refs:
+  - decisions/dec-001.yaml
+lineage:
+  parent_capsule_ids:
+    - cap-legacy
+status: active
+created_at: "2026-03-04T10:00:00Z"
+updated_at: "2026-03-04T10:00:00Z"
+```
+
+### 7.2 `refs/<name>.yaml`
+
+Required fields:
+
+- `id`
+- `capsule_id`
+- `updated_at`
+
+```yaml
+schema_version: 2
+artifact_type: ref
+id: main
+capsule_id: cap-frontend
+updated_at: "2026-03-04T10:00:00Z"
+```
+
+### 7.3 `decisions/<id>.yaml`
+
+Required fields:
+
+- `id`
+- `capsule_id`
+- `statement`
+- `rationale`
+- `claim_refs`
+- `status`
+- `evidence_refs`
+- `created_at`
+
+```yaml
+schema_version: 2
+artifact_type: decision
+id: dec-001
+capsule_id: cap-frontend
+statement: "Increase startup timeout from 5s to 8s."
+rationale: "Observed CI startup spikes in integration profile."
+claim_refs:
+  - claims/cl-001.yaml
+status: accepted
+evidence_refs:
+  - "#/materials.lock?entry=src/main.ts"
+created_at: "2026-03-04T10:00:00Z"
+```
+
+### 7.4 `materials.lock`
+
+Required fields:
+
+- `id`
+- `captured_at`
+- `entries`
+
+Each entry requires `path` and `digest`.
+
+```yaml
+schema_version: 2
+artifact_type: materials_lock
+id: materials-lock
+captured_at: "2026-03-04T10:00:00Z"
+entries:
+  - path: "src/main.ts"
+    digest: "sha256:6b..."
+    kind: file
+    size: 1024
+  - path: "package.json"
+    digest: "sha256:1a..."
+    kind: file
+    size: 320
+```
+
+### 7.5 `certificates/<id>.yaml`
+
+Required fields:
+
+- `id`
+- `capsule_id`
+- `run_id`
+- `status`
+- `adapter`
+- `claim_refs`
+- `receipt_pointers`
+
+```yaml
+schema_version: 2
+artifact_type: certificate
+id: cert-8899
+capsule_id: cap-frontend
+run_id: run-001
+status: success
+adapter:
+  name: codex
+  version: "v1"
+claim_refs:
+  - claims/cl-001.yaml
+receipt_pointers:
+  - { "schema_version": 2, "type": "cas", "target": "sha256:..." }
+created_at: "2026-03-04T10:00:00Z"
+updated_at: "2026-03-04T10:00:00Z"
+```
+
+### 7.6 `claims/<id>.yaml`
+
+Required fields:
+
+- `id`
+- `capsule_id`
+- `text`
+- `category`
+- `receipt_pointers`
+- `created_at`
+
+```yaml
+schema_version: 2
+artifact_type: claim
+id: cl-001
+capsule_id: cap-frontend
+text: "Startup timeout was increased to reduce CI flake risk."
+category: behavior
+receipt_pointers:
+  - { "schema_version": 2, "type": "file", "target": ".outcomegraph/traces/claim-001.ndjson", "hash": "sha256:9c..." }
+created_at: "2026-03-04T10:00:00Z"
+```
+
+### 7.7 Receipt pointer object
+
+Receipt pointers are small records embedded in claims/certificates.
+
+Required fields:
+
+- `schema_version: 2`
+- `type`: `file` or `cas`
+- `target`
+
+```yaml
+schema_version: 2
+type: file
+target: ".outcomegraph/traces/run-001.ndjson"
+hash: "sha256:9c..."
+media_type: "application/json"
+size: 17320
+```
+
+`type: file` targets git-stored or gitignored files by relative path.
+`type: cas` targets content-addressed blob stores by hash.
 
 Rule:
 
-- Every claim must resolve to a receipt pointer or a file pointer.
+- Every claim must resolve to at least one receipt pointer.
+
+### 7.8 Schema version checks and migration guardrails
+
+- All mutation commands must validate `schema_version` before writing:
+  - Missing `schema_version`
+  - `schema_version < 2`
+  - `schema_version > 2` not currently supported
+  - Any unexpected `artifact_type` for its path
+- On violation, the artifact is rejected with:
+  - file path
+  - detected version/type
+  - short remediation: migrate to v2 and rerun.
+- Legacy (`1`) artifacts are unsupported by default; no silent auto-upgrade.
+- Repository-level checks are strict:
+  - Mixed versions inside `.outcomegraph` are a hard error.
+  - Migration must be explicit and validated by rerunning schema checks.
 
 ## 8) Steward runtime contract
 

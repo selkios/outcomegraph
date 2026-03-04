@@ -39,8 +39,8 @@
       "id": "OG-SCHEMA-001",
       "title": "Define canonical OutcomeGraph v2 artifact schemas and migration/version checks",
       "priority": 1,
-      "status": "todo",
-      "details": "Implement canonical data models for capsules, refs, decisions, certificates, materials lock, claims, and receipt pointers with schema_version 2.",
+      "status": "done",
+      "details": "Defined canonical OutcomeGraph v2 artifact schemas and v2-only migration/version validation checks for capsules, refs, decisions, certificates, materials lock, claims, and receipt pointers.",
       "steps": [
         "Create schema definitions for all artifact types",
         "Add validation for schema_version and required core fields",
@@ -53,7 +53,8 @@
       "files": [
         "SPEC-v2.md",
         "README.md"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:05:42Z"
     },
     {
       "id": "OG-INIT-001",
@@ -139,12 +140,12 @@
         "concurrency"
       ],
       "files": [
-        "og",
-        "SPEC-v2.md",
         "ARCHITECTURE.md",
+        "SPEC-v2.md",
+        "og",
         "to-do.json"
       ],
-      "updated_at": "2026-03-04T10:05:19Z"
+      "updated_at": "2026-03-04T10:05:28Z"
     },
     {
       "id": "OG-CHANGES-001",

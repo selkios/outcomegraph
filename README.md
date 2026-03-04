@@ -41,6 +41,13 @@ Common options:
 - `--changed` (for changed-scope operations)
 - `--json` for machine-readable results and errors
 
+Schema versioning:
+
+- Canonical `.outcomegraph` artifacts are v2:
+  `schema_version: 2` plus `artifact_type` and required core fields.
+- Commands validate on read/write that artifact versions are supported.
+- Legacy versions (for example v1) and mixed-version directories are rejected with a clear migration hint.
+
 ## Exit codes
 
 - `0` success
