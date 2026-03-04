@@ -124,8 +124,10 @@
       "depends_on": [
         "OG-HOOK-001"
       ],
-      "updated_at": "2026-03-04T10:10:03Z",
+      "updated_at": "2026-03-04T10:10:06Z",
       "files": [
+        "/home/agent/outcomegraph/og",
+        "/home/agent/outcomegraph/to-do.json",
         "og",
         "to-do.json"
       ]
@@ -301,8 +303,8 @@
       "id": "OG-REPLAY-001",
       "title": "Implement replay loop for changed capsules in clean environments",
       "priority": 2,
-      "status": "todo",
-      "details": "Rebuild from materialized truth in fresh sandboxes and compare behavior equivalence outputs.",
+      "status": "done",
+      "details": "Added concrete changed-capsule replay contract: clean per-capsule worktrees, replay plan inputs, equivalence checks, and certificate provenance.",
       "steps": [
         "Create isolated worktree/sandbox for each replay unit",
         "Execute replay plan and capture oracle evidence",
@@ -319,7 +321,8 @@
       "files": [
         "SPEC-v2.md",
         "ARCHITECTURE.md"
-      ]
+      ],
+      "updated_at": "2026-03-04T10:10:38Z"
     },
     {
       "id": "OG-REPLAY-002",

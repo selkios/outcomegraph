@@ -371,6 +371,7 @@ Required fields:
 - `adapter`
 - `claim_refs`
 - `receipt_pointers`
+- `replay_context` (if produced by replay loop)
 
 ```yaml
 schema_version: 2
@@ -386,6 +387,17 @@ claim_refs:
   - claims/cl-001.yaml
 receipt_pointers:
   - { "schema_version": 2, "type": "cas", "target": "sha256:..." }
+replay_context:
+  run_id: run-001
+  adapter_profile: analyze
+  sandbox_root: ".outcomegraph/work/replay/run-001/cap-frontend"
+  source_ref: "HEAD"
+  materialized_paths:
+    - "src/frontend/main.ts"
+  equivalence:
+    baseline_hash: "sha256:..."
+    observed_hash: "sha256:..."
+    oracle_digest: "sha256:..."
 created_at: "2026-03-04T10:00:00Z"
 updated_at: "2026-03-04T10:00:00Z"
 ```
@@ -662,6 +674,7 @@ capsule_updates:
 interface_version: 1
 schema_version: 2
 run_id: "run-001"
+capsule_id: cap-frontend
 steps:
   - command: "npm test"
     expected_exit_code: 0
@@ -669,6 +682,21 @@ steps:
   - command: "pytest -q"
     expected_exit_code: 0
     timeout_s: 120
+```
+
+```yaml
+# ReplayInput
+interface_version: 1
+schema_version: 2
+run_id: "run-001"
+mode: observe|autonomous
+adapter_profile: analyze|propose|apply
+capsule_id: cap-frontend
+source_ref: "HEAD"
+materials_lock_ref: ".outcomegraph/materials.lock"
+changed_materials:
+  - path: "src/frontend/main.ts"
+    digest: "sha256:..."
 ```
 
 ```yaml
@@ -914,10 +942,17 @@ Fast loop:
 - Runs on meaningful change.
 - Executes affected oracles only.
 
-Replay loop:
+Replay loop (changed capsules only):
 
 - Runs on selected commits or idle windows.
-- Rebuilds changed capsules in fresh worktrees and validates equivalence by oracles.
+- Rebuilds changed capsules only.
+- For each replay unit:
+  - Creates an isolated clean sandbox/worktree at `.outcomegraph/work/replay/<run_id>/<capsule_id>/`.
+  - Materializes only the capsule-scoped files from `.outcomegraph/materials.lock` plus runtime toolchain metadata.
+  - Executes the capsule’s replay plan in the fresh environment.
+  - Compares oracle outputs against last-good evidence hash (`equivalence_hash`) for behavior equivalence.
+  - Writes replay certificates only when execution and oracle behavior are stable enough to certify.
+- Writes failure diagnostics when equivalence diverges or a sandbox/runtime error occurs.
 
 Resilience loop:
 

@@ -141,7 +141,7 @@ flowchart LR
   C --> D[Oracle receipts]
 
   E[Commit or idle window] --> F[Replay loop]
-  F --> G[Fresh worktree regeneration]
+  F --> G[Fresh per-capsule worktree regeneration]
   G --> H[Behavior equivalence checks]
   H --> I[Replay certificate]
 
@@ -149,6 +149,14 @@ flowchart LR
   K --> L[Sample older capsules]
   L --> M[Detect drift early]
 ```
+
+Replay run contract:
+
+- replay candidates are mapped from changed capsules produced by sync.
+- each candidate gets its own sandbox/worktree under `.outcomegraph/work/replay/<run_id>/<capsule_id>/`.
+- the sandbox is created from a clean baseline and populated from materialized lock inputs before replay plan execution.
+- oracle evidence and behavior hashes are compared against canonical baselines.
+- completed runs emit replay certificates with sandbox provenance and are then garbage-collected by policy.
 
 ## 6) Plugin architecture and portability
 
