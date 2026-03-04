@@ -594,8 +594,8 @@
       "id": "OG-RECOVERY-001",
       "title": "Add degraded-mode behavior and repair paths",
       "priority": 4,
-      "status": "todo",
-      "details": "Keep workflows unblocked when worker/oracle/storage components fail while surfacing recovery-needed state.",
+      "status": "done",
+      "details": "Preserved verification artifacts on oracle/storage/worker failures with repaired integrity recovery path.",
       "steps": [
         "Implement pending markers for unavailable worker runtime",
         "Preserve existing certificates on oracle failures and continue status/export",
@@ -609,6 +609,11 @@
         "OG-SYNC-001",
         "OG-VERIFY-001",
         "OG-INTG-001"
+      ],
+      "updated_at": "2026-03-04T10:35:38Z",
+      "files": [
+        "og",
+        "to-do.json"
       ]
     },
     {
@@ -630,13 +635,13 @@
         "OG-CLI-001",
         "OG-SYNC-001"
       ],
-      "updated_at": "2026-03-04T10:32:44Z",
+      "updated_at": "2026-03-04T10:33:15Z",
       "files": [
-        "og",
-        "README.md",
-        "SPEC-v2.md",
         "ARCHITECTURE.md",
         "QUICKSTART.md",
+        "README.md",
+        "SPEC-v2.md",
+        "og",
         "to-do.json"
       ]
     },

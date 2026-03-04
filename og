@@ -119,6 +119,7 @@ WORKER_ADAPTER_NAME = "codex"
 WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+WORKER_UNAVAILABLE_ERROR = "codex executable was not found"
 DAEMON_SERVICE_DIR = f"{OG_ROOT}/work/daemon"
 DAEMON_SERVICE_SCRIPT = f"{DAEMON_SERVICE_DIR}/run-ogd.sh"
 DAEMON_SERVICE_STATE = f"{DAEMON_SERVICE_DIR}/state.json"
@@ -1310,6 +1311,108 @@ def _read_latest_integrity_checkpoint(repo_root: str) -> tuple[dict[str, object]
     return payload, os.path.join(checkpoint_path, filename)
 
 
+def _collect_ledger_events_for_repair(repo_root: str) -> list[tuple[datetime.datetime | None, str, dict[str, object]]]:
+    events_path = os.path.join(repo_root, EVENTS_DIR)
+    if not os.path.isdir(events_path):
+        return []
+
+    records: list[tuple[datetime.datetime | None, str, dict[str, object]]] = []
+    for filename in sorted(os.listdir(events_path)):
+        if not filename.endswith(".json"):
+            continue
+        file_path = os.path.join(events_path, filename)
+        if not os.path.isfile(file_path):
+            continue
+        payload = _read_json_file(file_path)
+        if not isinstance(payload, dict):
+            continue
+        raw_created_at = payload.get("created_at")
+        created_at = _parse_utc_timestamp(raw_created_at) if isinstance(raw_created_at, str) else None
+        if created_at is None:
+            try:
+                created_at = datetime.datetime.fromtimestamp(
+                    os.path.getmtime(file_path),
+                    tz=datetime.timezone.utc,
+                )
+            except OSError:
+                created_at = None
+        artifact_type = payload.get("artifact_type")
+        if artifact_type in {"integrity_checkpoint", "integrity_state"}:
+            continue
+        if not payload.get("id"):
+            payload["id"] = os.path.splitext(filename)[0]
+        if not isinstance(payload.get("id"), str):
+            payload["id"] = os.path.splitext(filename)[0]
+        records.append((created_at, file_path, payload))
+    records.sort(key=lambda item: (item[0] or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc), item[1]))
+    return records
+
+
+def _clear_integrity_checkpoints(repo_root: str) -> None:
+    checkpoint_path = os.path.join(repo_root, INTEGRITY_CHECKPOINT_DIR)
+    if not os.path.isdir(checkpoint_path):
+        return
+    for filename in os.listdir(checkpoint_path):
+        if not filename.endswith(".json"):
+            continue
+        full_path = os.path.join(checkpoint_path, filename)
+        try:
+            os.remove(full_path)
+        except FileNotFoundError:
+            pass
+
+
+def _repair_integrity_index(repo_root: str) -> dict[str, object]:
+    records = _collect_ledger_events_for_repair(repo_root)
+    if not records:
+        _clear_integrity_checkpoints(repo_root)
+        _write_integrity_state(repo_root, _build_integrity_state_payload(_utc_timestamp(), None, None, 0))
+        return {
+            "status": "ok",
+            "message": "integrity state rebuilt from empty ledger",
+            "event_count": 0,
+            "event_sequence": 0,
+        }
+
+    previous_hash: str | None = None
+    latest_event_id = None
+    latest_event_hash = None
+    rebuilt = 0
+    _clear_integrity_checkpoints(repo_root)
+
+    for _, file_path, payload in records:
+        event_payload = dict(payload)
+        event_payload.pop("event_hash", None)
+        event_payload["event_sequence"] = rebuilt + 1
+        event_payload["previous_event_hash"] = previous_hash
+        event_payload["event_hash"] = _compute_payload_hash({k: v for k, v in event_payload.items() if k != "event_hash"})
+        _write_json_file(file_path, event_payload)
+        previous_hash = str(event_payload["event_hash"])
+        rebuilt += 1
+        latest_event_id = event_payload.get("id")
+        latest_event_hash = previous_hash
+
+        if rebuilt % INTEGRITY_CHECKPOINT_INTERVAL == 0 and latest_event_id is not None and latest_event_hash is not None:
+            _write_integrity_checkpoint(
+                repo_root,
+                rebuilt,
+                str(latest_event_id),
+                latest_event_hash,
+                event_payload.get("previous_event_hash"),
+            )
+
+    _write_integrity_state(
+        repo_root,
+        _build_integrity_state_payload(_utc_timestamp(), latest_event_id, latest_event_hash, rebuilt),
+    )
+    return {
+        "status": "ok",
+        "message": f"integrity index rebuilt from {rebuilt} ledger event(s)",
+        "event_count": rebuilt,
+        "event_sequence": rebuilt,
+    }
+
+
 def _sign_integrity_checkpoint(repo_root: str, payload: dict[str, object]) -> dict[str, object] | None:
     signer = os.environ.get(INTEGRITY_SIGNER_ENV)
     if not signer:
@@ -1573,6 +1676,11 @@ def _content_sha256(payload: bytes) -> str:
 
 def _short_hash(value: str, length: int = 10) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
+
+
+def _is_worker_unavailable_error(error: str) -> bool:
+    lowered = error.lower()
+    return WORKER_UNAVAILABLE_ERROR in lowered or "timed out" in lowered
 
 
 def _safe_slug(value: str) -> str:
@@ -4460,15 +4568,18 @@ def _run_distill_stage(
                 }
             )
     except WorkerAdapterError as exc:
+        error_message = str(exc)
+        if _is_worker_unavailable_error(error_message):
+            _set_pending_state(repo_root, f"worker runtime unavailable during distill: {error_message}")
         return {
             "name": "distill",
-            "status": "error",
-            "message": str(exc),
+            "status": "pending" if _is_worker_unavailable_error(error_message) else "error",
+            "message": error_message,
             "profile": profile,
             "mode": mode,
             "affected_capsules": changed_capsules,
             "generated_deltas": [],
-            "errors": [str(exc)],
+            "errors": [error_message],
         }
 
     return {
@@ -4684,12 +4795,14 @@ def _run_replay_stage(
             plans.append(plan)
         except WorkerAdapterError as exc:
             error_message = str(exc)
+            if _is_worker_unavailable_error(error_message):
+                _set_pending_state(repo_root, f"worker runtime unavailable during replay: {error_message}")
             errors.append(error_message)
             overall_failed = True
             replay_results.append(
                 {
                     "capsule_id": capsule,
-                    "status": "error",
+                    "status": "pending" if _is_worker_unavailable_error(error_message) else "error",
                     "plan_status": "error",
                     "certificate_id": None,
                     "trace": trace_path,
@@ -5384,6 +5497,8 @@ def _run_verify_stage(
     oracle_results: dict[str, list[dict[str, object]]] = {}
     certificate_refs: list[str] = []
     overall_failed = False
+    failed_capsules: list[str] = []
+    errors: list[str] = []
 
     for capsule in changed_capsules:
         capsule_oracles = _load_capsule_oracles(repo_root, capsule)
@@ -5413,54 +5528,78 @@ def _run_verify_stage(
             if status in {"fail", "error"}:
                 capsule_status = "failed"
                 overall_failed = True
+                failed_capsules.append(capsule)
                 break
 
         claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
         receipt_pointers = receipt_records
-        claim_text = f"Verification checkpoints for {capsule} on {len(checks)} oracle checks."
+        claim_text = (
+            f"Verification checkpoints for {capsule} on {len(checks)} oracle checks."
+            if capsule_status == "success"
+            else f"Verification failed for {capsule}; previous valid certificates preserved."
+        )
         claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
-        os.makedirs(os.path.dirname(claim_path), exist_ok=True)
-        claim_payload = _build_claim_payload(
-            claim_id,
-            capsule,
-            run_id,
-            "verify",
-            mode,
-            normalized_changed_paths,
-            receipt_pointers,
-            text=claim_text,
-        )
-        _write_json_file(claim_path, claim_payload)
-        claim_ref = f"{OG_ROOT}/claims/{claim_id}.json"
+        try:
+            os.makedirs(os.path.dirname(claim_path), exist_ok=True)
+            claim_payload = _build_claim_payload(
+                claim_id,
+                capsule,
+                run_id,
+                "verify",
+                mode,
+                normalized_changed_paths,
+                receipt_pointers,
+                text=claim_text,
+            )
+            _write_json_file(claim_path, claim_payload)
+        except Exception as exc:
+            error_message = f"Failed to write verify claim for {capsule}: {exc}"
+            errors.append(error_message)
+            overall_failed = True
+            failed_capsules.append(capsule)
+            continue
 
-        certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
-        cert_status = "failed" if capsule_status != "success" else "success"
-        cert_payload = _build_certificate_payload(
-            certificate_id,
-            capsule,
-            run_id,
-            [claim_ref],
-            "verify",
-            mode,
-            receipt_pointers,
-            status=cert_status,
-            source="oracle-loop",
-        )
-        cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
-        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
-        _write_json_file(cert_path, cert_payload)
-        certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+        claim_ref = f"{OG_ROOT}/claims/{claim_id}.json"
+        if capsule_status == "success":
+            certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
+            cert_payload = _build_certificate_payload(
+                certificate_id,
+                capsule,
+                run_id,
+                [claim_ref],
+                "verify",
+                mode,
+                receipt_pointers,
+                status="success",
+                source="oracle-loop",
+            )
+            cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
+            try:
+                os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+                _write_json_file(cert_path, cert_payload)
+                certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+            except Exception as exc:
+                error_message = f"Failed to write verify certificate for {capsule}: {exc}"
+                errors.append(error_message)
+                overall_failed = True
+                failed_capsules.append(capsule)
 
     return {
         "name": "verify",
-        "status": "error" if overall_failed else "ok",
-        "message": "Oracle-driven verify loop completed for affected capsules.",
+        "status": "warn" if overall_failed else "ok",
+        "message": (
+            "Oracle-driven verify loop completed with failures."
+            if overall_failed
+            else "Oracle-driven verify loop completed for affected capsules."
+        ),
         "mode": mode,
         "verified_capsules": changed_capsules,
         "oracle_count": sum(len(values) for values in oracle_results.values()) if oracle_results else 0,
         "certificate_refs": sorted(certificate_refs),
         "oracle_results": oracle_results,
         "receipt_pointers": receipts,
+        "failed_capsules": sorted(set(failed_capsules)),
+        "errors": errors,
     }
 
 
@@ -5760,21 +5899,26 @@ def run_command(args: list[str], output_json: bool) -> int:
         repo_root = _git_root()
         integrity = _validate_event_chain(repo_root)
         if integrity.get("status") != "ok":
-            _build_work_payload(
-                repo_root,
-                status="degraded",
-                last_message="integrity ledger validation failed",
-            )
-            payload = {
-                "status": "error",
-                "command": "sync",
-                "code": "INTEGRITY_CHECK_FAILED",
-                "options": options,
-                "integrity": integrity,
-                "message": f"integrity check failed: {integrity.get('message', 'ledger validation error')}",
-            }
-            emit_command_result(payload, output_json)
-            return EXIT_RUNTIME
+            repair = _repair_integrity_index(repo_root)
+            if repair.get("status") == "ok":
+                integrity = _validate_event_chain(repo_root)
+            if integrity.get("status") != "ok":
+                _build_work_payload(
+                    repo_root,
+                    status="degraded",
+                    last_message="integrity ledger validation failed",
+                )
+                payload = {
+                    "status": "error",
+                    "command": "sync",
+                    "code": "INTEGRITY_CHECK_FAILED",
+                    "options": options,
+                    "integrity": integrity,
+                    "repair": repair,
+                    "message": f"integrity check failed: {integrity.get('message', 'ledger validation error')}",
+                }
+                emit_command_result(payload, output_json)
+                return EXIT_RUNTIME
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
