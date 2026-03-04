@@ -1021,6 +1021,47 @@ def _render_status(payload: dict[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _render_verify(payload: dict[str, object]) -> str:
+    lines = [f"verify: {payload.get('status', 'unknown')}", ""]
+    changed_only = bool(payload.get("changed_only"))
+    lines.append(f"scope: {'changed files only' if changed_only else 'all capsules'}")
+
+    run_id = payload.get("run_id")
+    if isinstance(run_id, str):
+        lines.append(f"run_id: {run_id}")
+
+    verified_capsules = payload.get("verified_capsules", [])
+    if isinstance(verified_capsules, list):
+        if verified_capsules:
+            lines.append(f"verified capsules ({len(verified_capsules)}): {', '.join(sorted(verified_capsules))}")
+        else:
+            lines.append("verified capsules: none")
+
+    oracle_count = payload.get("oracle_count")
+    if isinstance(oracle_count, int):
+        lines.append(f"oracles checked: {oracle_count}")
+
+    certificate_refs = payload.get("certificate_refs", [])
+    if isinstance(certificate_refs, list):
+        lines.append(f"certificates written: {len(certificate_refs)}")
+
+    failed_capsules = payload.get("failed_capsules", [])
+    if isinstance(failed_capsules, list) and failed_capsules:
+        lines.append(f"failed capsules: {', '.join(sorted(failed_capsules))}")
+    else:
+        lines.append("failed capsules: none")
+
+    errors = payload.get("errors", [])
+    if errors:
+        lines.append("")
+        lines.append("errors:")
+        for item in errors:
+            if isinstance(item, str):
+                lines.append(f"- {item}")
+
+    return "\n".join(lines) + "\n"
+
+
 def _render_drift(payload: dict[str, object]) -> str:
     drift = payload.get("drift", {})
     checks = drift.get("checks", [])
@@ -4079,6 +4120,69 @@ def _run_replay_stage(
     }
 
 
+def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    changed_only = bool(options.get("changed"))
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    changed_files = snapshot.get("changed_files")
+    if not isinstance(changed_files, list):
+        changed_files = []
+    changed_files = [str(item) for item in changed_files]
+    if changed_only:
+        changed_capsules = _collect_affected_capsules(changed_files)
+    else:
+        changed_capsules = _list_known_capsules(repo_root)
+    if not changed_capsules and not changed_only:
+        changed_capsules = ["default"]
+
+    run_id = _build_run_id("verify", _short_hash(f"{profile}:{mode}:{'changed' if changed_only else 'all'}", 10))
+
+    start_at = time.perf_counter()
+    verify = _run_verify_stage(
+        repo_root=repo_root,
+        changed_capsules=changed_capsules,
+        changed_paths=changed_files if changed_only else [],
+        run_id=run_id,
+        mode=mode,
+    )
+
+    failed_capsules: list[str] = []
+    for capsule, checks in verify.get("oracle_results", {}).items():
+        for raw_result in checks:
+            status = str(raw_result.get("status", "skipped")).lower()
+            if status in {"fail", "error"}:
+                failed_capsules.append(capsule)
+                break
+
+    payload = {
+        "status": "ok" if verify.get("status") == "ok" else "error",
+        "command": "verify",
+        "options": options,
+        "run_id": run_id,
+        "snapshot": snapshot,
+        "steps": [verify],
+        "message": verify.get("message", "verify adapter completed"),
+        "changed_only": changed_only,
+        "changed_files": changed_files if changed_only else [],
+        "verified_capsules": verify.get("verified_capsules", []),
+        "oracle_count": verify.get("oracle_count", 0),
+        "certificate_refs": verify.get("certificate_refs", []),
+        "receipt_pointers": verify.get("receipt_pointers", {}),
+        "oracle_results": verify.get("oracle_results", {}),
+        "failed_capsules": sorted(set(failed_capsules)),
+    }
+
+    payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
+    payload["summary_event"] = _record_verify_summary_event(
+        repo_root,
+        payload,
+        payload["duration_ms"],
+        snapshot,
+    )
+    return payload
+
+
 def _run_explain_stage(
     repo_root: str,
     profile: str,
@@ -4554,6 +4658,24 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
     return path
 
 
+def _record_verify_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
+    event_payload = {
+        "schema_version": 2,
+        "artifact_type": "verify_summary",
+        "id": payload["run_id"],
+        "status": payload["status"],
+        "command": "verify",
+        "subcommand": None,
+        "duration_ms": total_ms,
+        "created_at": _utc_timestamp(),
+        "snapshot": snapshot,
+        "steps": payload.get("steps", []),
+    }
+    path = os.path.join(repo_root, EVENTS_DIR, f"{payload['run_id']}.json")
+    _write_json_file(path, event_payload)
+    return path
+
+
 def _build_drift_payload(repo_root: str, options: dict[str, object]) -> dict[str, object]:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     drift_state = _collect_drift_state(repo_root, now)
@@ -4796,7 +4918,11 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "verify":
         options, _ = parse_command_flags(rest, "verify", True, True, True, output_json)
-        emit_command_result(build_payload("verify", **options), output_json)
+        repo_root = _git_root()
+        payload = _run_verify_job(repo_root, options)
+        if not output_json:
+            payload["message"] = _render_verify(payload)
+        emit_command_result(payload, output_json)
         return EXIT_SUCCESS
 
     if command == "replay":

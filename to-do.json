@@ -285,7 +285,7 @@
       "id": "OG-VERIFY-002",
       "title": "Implement command `og verify --changed`",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Expose manual fast verification with changed-scope filtering and output formatting.",
       "steps": [
         "Compute minimal impacted set from git change input",
@@ -300,9 +300,11 @@
         "OG-VERIFY-001"
       ],
       "files": [
+        "QUICKSTART.md",
         "SPEC-v2.md",
-        "QUICKSTART.md"
-      ]
+        "og"
+      ],
+      "updated_at": "2026-03-04T10:27:36Z"
     },
     {
       "id": "OG-REPLAY-001",
