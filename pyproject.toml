@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "outcomegraph"
 version = "0.1.0"
@@ -9,3 +13,6 @@ dependencies = []
 [project.scripts]
 og = "og:og_cli"
 ogd = "og:ogd_cli"
+
+[tool.setuptools]
+py-modules = ["og"]
