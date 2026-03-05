@@ -1,0 +1,49 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "default",
+  "category": "behavior",
+  "created_at": "2026-03-05T13:36:35Z",
+  "id": "cl-default-51f900ed07",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/.gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/materials.lock",
+      ".outcomegraph/policy.yaml",
+      "README.md",
+      "__pycache__/og.cpython-312.pyc",
+      "__pycache__/og.cpython-314.pyc",
+      "og.py",
+      "skills/outcome-steward/SKILL.md",
+      "tests/__pycache__/conftest.cpython-314-pytest-9.0.2.pyc",
+      "tests/__pycache__/test_og_sync_verify_replay_hooks.cpython-314-pytest-9.0.2.pyc",
+      "tests/__pycache__/test_og_sync_verify_replay_hooks.cpython-314.pyc",
+      "to-do.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260305T133620Z-1010767f6b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:79ccd3f39828c25cdbb3608a788af6e3418b374da3eb47066a623a38fc37df46",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 800,
+      "target": ".outcomegraph/traces/default-sync-20260305t133620z-1010767f6b-default-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:79ccd3f39828c25cdbb3608a788af6e3418b374da3eb47066a623a38fc37df46",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 800,
+      "target": "sha256:79ccd3f39828c25cdbb3608a788af6e3418b374da3eb47066a623a38fc37df46",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for default on 1 oracle checks."
+}

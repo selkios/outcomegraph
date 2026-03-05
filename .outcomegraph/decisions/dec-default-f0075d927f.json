@@ -1,0 +1,18 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "default",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-default-453ade131e.json"
+  ],
+  "created_at": "2026-03-05T13:36:35Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260305t133620z-1010767f6b-distill.json",
+    "sha256:64c21f26cd67486328afb6b1f7fee1c0cf57d3524c65cd477e029651d5c1c301"
+  ],
+  "id": "dec-default-f0075d927f",
+  "rationale": "Computed from distill/apply stage evidence.",
+  "schema_version": 2,
+  "statement": "Decision for default derived from sync outcome.",
+  "status": "accepted",
+  "updated_at": "2026-03-05T13:36:35Z"
+}

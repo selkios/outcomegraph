@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "materials",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-materials-4e5b994683.json"
+  ],
+  "created_at": "2026-03-05T13:36:35Z",
+  "id": "cert-materials-4e5b994683",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:ea9b4a4d784f155487cc3354a4bff32572bdaabe85f6cf50208c6a6c5a0025fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 804,
+      "target": ".outcomegraph/traces/materials-sync-20260305t133620z-1010767f6b-materials-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ea9b4a4d784f155487cc3354a4bff32572bdaabe85f6cf50208c6a6c5a0025fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 804,
+      "target": "sha256:ea9b4a4d784f155487cc3354a4bff32572bdaabe85f6cf50208c6a6c5a0025fd",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260305T133620Z-1010767f6b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260305T133620Z-1010767f6b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-05T13:36:35Z"
+}

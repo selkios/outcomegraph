@@ -1,0 +1,4 @@
+interface:
+  display_name: "OG Quality Pass"
+  short_description: "Run ruff, ty, and pytest for OutcomeGraph."
+  default_prompt: "Use $og-quality-pass to run ruff, ty, and pytest for this OutcomeGraph repo and summarize failures."

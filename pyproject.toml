@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "OutcomeGraph CLI and artifact reconciliation workflow"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pydantic>=2,<3",
+    "typer>=0.24,<1",
+]
 
 [project.scripts]
 og = "og:og_cli"
@@ -16,3 +19,31 @@ ogd = "og:ogd_cli"
 
 [tool.setuptools]
 py-modules = ["og"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = [".venv", ".outcomegraph", "__pycache__"]
+
+[tool.ty.environment]
+root = ["."]
+
+[tool.ty.src]
+include = ["og.py", "tests/**/*.py"]
+exclude = [".venv/**", ".outcomegraph/**", "**/__pycache__/**"]
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+invalid-return-type = "error"
+unused-type-ignore-comment = "error"
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+no-matching-overload = "ignore"
+not-iterable = "ignore"
+not-subscriptable = "ignore"
+unresolved-attribute = "ignore"
+unsupported-operator = "ignore"

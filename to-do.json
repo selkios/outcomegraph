@@ -1342,19 +1342,20 @@
         "OG-AGENT-003"
       ],
       "files": [
-        "og.py",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
         "RUNBOOKS.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T17:17:38Z"
+      "updated_at": "2026-03-05T17:17:52Z"
     },
     {
       "id": "OG-AGENT-009",
       "title": "Expand recovery tooling (`validate`, `doctor`, retries, and timeout controls)",
       "priority": 2,
-      "status": "todo",
+      "status": "doing",
       "details": "Shift from best-effort execution to explicit validate-before-mutate and bounded auto-recovery controls. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1380,7 +1381,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:31:37Z"
     },
     {
       "id": "OG-AGENT-010",

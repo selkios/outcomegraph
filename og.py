@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 import json
 import fnmatch
 import math
@@ -18,6 +19,12 @@ import time
 import shlex
 import tempfile
 import string
+from typing import Any, TypedDict, cast
+
+import click
+import typer
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from typer.main import get_command as typer_get_command
 
 
 VERSION = "0.1.0-dev"
@@ -31,10 +38,12 @@ WORKER_RUNTIME_UNAVAILABLE_CODE = "WORKER_RUNTIME_UNAVAILABLE"
 INTEGRITY_CHECK_FAILED_CODE = "INTEGRITY_CHECK_FAILED"
 ADAPTER_MANIFEST_INVALID_CODE = "ADAPTER_MANIFEST_INVALID"
 ADAPTER_DUPLICATE_CODE = "ADAPTER_DUPLICATE"
+ADAPTER_INTERFACE_MISMATCH_CODE = "ADAPTER_INTERFACE_MISMATCH"
 POLICY_SCHEMA_VERSION = 2
 POLICY_DENIED_CODE = "POLICY_DENIED"
 POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
 AUTONOMOUS_WRITE_BLOCKED_CODE = "AUTONOMOUS_WRITE_BLOCKED"
+CONTROL_SURFACE_MISMATCH_CODE = "CONTROL_SURFACE_MISMATCH"
 ERROR_CLASS_USAGE = "usage"
 ERROR_CLASS_POLICY = "policy"
 ERROR_CLASS_INTEGRITY = "integrity"
@@ -214,7 +223,6 @@ MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
 MCP_CONTROL_TOOL_NAMES = tuple(item["name"] for item in MCP_CONTROL_TOOL_DEFS)
 MCP_CONTROL_RESOURCE_NAMES = tuple(MCP_CONTROL_RESOURCES)
 MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
-CONTROL_SURFACE_MISMATCH_CODE = "CONTROL_SURFACE_MISMATCH"
 CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
 WORK_LOCK_STALE_SECONDS = 300
 OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
@@ -225,6 +233,7 @@ STATUS_SCHEMA_VERSION = 1
 DRIFT_REPORT_SCHEMA_VERSION = 1
 COMMAND_RESULT_SCHEMA_VERSION = 1
 COMMAND_INTROSPECTION_SCHEMA_VERSION = 1
+COMMAND_RESULT_ALLOWED_STATUSES = frozenset({"ok", "warn", "error"})
 STATUS_SYNC_STALE_SECONDS = 3600
 STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
@@ -240,7 +249,6 @@ WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
 REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
 ADAPTER_SCHEMA_VERSION = 2
-ADAPTER_INTERFACE_MISMATCH_CODE = "ADAPTER_INTERFACE_MISMATCH"
 ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
 REQUIRED_ADAPTER_TYPES = {"worker", "store"}
 SUPPORTED_ADAPTER_TYPES = {"worker", "oracle", "sandbox", "store", "exporter"}
@@ -253,7 +261,16 @@ ADAPTER_REQUIRED_INTERFACE_VERSIONS: dict[str, int] = {
 }
 _ADAPTER_REGISTRY: dict[str, dict[str, dict[str, object]]] = {}
 _ADAPTER_DEFAULTS: dict[str, str] = {}
-_ADAPTER_BOOTSTRAP_STATE: dict[str, object] = {
+
+
+class _AdapterBootstrapState(TypedDict):
+    repo_root: str | None
+    initialized: bool
+    errors: list[dict[str, object]]
+    warnings: list[dict[str, object]]
+
+
+_ADAPTER_BOOTSTRAP_STATE: _AdapterBootstrapState = {
     "repo_root": None,
     "initialized": False,
     "errors": [],
@@ -778,9 +795,9 @@ def _discover_adapter_manifests(
 
 
 def _initialize_adapter_runtime(repo_root: str) -> list[dict[str, object]]:
-    if _ADAPTER_BOOTSTRAP_STATE.get("initialized") and _ADAPTER_BOOTSTRAP_STATE.get("repo_root") == repo_root:
-        if _ADAPTER_BOOTSTRAP_STATE.get("errors"):
-            return _ADAPTER_BOOTSTRAP_STATE["errors"]  # type: ignore[return-value]
+    if _ADAPTER_BOOTSTRAP_STATE["initialized"] and _ADAPTER_BOOTSTRAP_STATE["repo_root"] == repo_root:
+        if _ADAPTER_BOOTSTRAP_STATE["errors"]:
+            return list(_ADAPTER_BOOTSTRAP_STATE["errors"])
         return []
 
     _clear_adapter_state()
@@ -829,13 +846,13 @@ def _initialize_adapter_runtime(repo_root: str) -> list[dict[str, object]]:
     # Merge errors and warnings gathered during initialization.
     _ADAPTER_BOOTSTRAP_STATE["errors"].extend(errors)
     _ADAPTER_BOOTSTRAP_STATE["warnings"].extend(warnings)
-    initialized_errors = _ADAPTER_BOOTSTRAP_STATE["errors"][:]  # type: ignore[index]
+    initialized_errors = list(_ADAPTER_BOOTSTRAP_STATE["errors"])
     _set_adapter_bootstrap_result(
         repo_root,
         errors=_ADAPTER_BOOTSTRAP_STATE["errors"],
         warnings=_ADAPTER_BOOTSTRAP_STATE["warnings"],
     )
-    return initialized_errors  # type: ignore[return-value]
+    return initialized_errors
 
 
 def _build_store_manifest() -> dict[str, object]:
@@ -900,6 +917,91 @@ def _build_worker_manifest() -> dict[str, object]:
 
 class WorkerAdapterError(ValueError):
     """Raised when a worker adapter returns malformed structured output."""
+
+
+class _CommandResultErrorModel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    error_class: str
+    error_code: str
+    message: str
+    retryable: bool
+    hint: str
+
+    @field_validator("error_class", "error_code", "message", "hint")
+    @classmethod
+    def _normalize_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("must not be empty")
+        return normalized
+
+
+class _CommandResultEnvelopeModel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    schema_version: int
+    command: str
+    status: str
+    run_id: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+    errors: list[_CommandResultErrorModel] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    subcommand: str | None = None
+
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_schema_version(cls, value: int) -> int:
+        if value != COMMAND_RESULT_SCHEMA_VERSION:
+            raise ValueError(f"schema_version must be {COMMAND_RESULT_SCHEMA_VERSION}")
+        return value
+
+    @field_validator("command")
+    @classmethod
+    def _validate_command(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("command must not be empty")
+        return normalized
+
+    @field_validator("status")
+    @classmethod
+    def _normalize_status(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("status must not be empty")
+        if normalized not in COMMAND_RESULT_ALLOWED_STATUSES:
+            allowed = ", ".join(sorted(COMMAND_RESULT_ALLOWED_STATUSES))
+            raise ValueError(f"status must be one of: {allowed}")
+        return normalized
+
+    @field_validator("run_id", "subcommand")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("must not be empty when provided")
+        return normalized
+
+
+class _TyperCommandContext(TypedDict):
+    output_json: bool
+
+
+_ACTIVE_TYPER_COMMAND_CONTEXT: ContextVar[_TyperCommandContext | None] = ContextVar(
+    "_ACTIVE_TYPER_COMMAND_CONTEXT",
+    default=None,
+)
+
+
+def _current_typer_command_context() -> _TyperCommandContext:
+    context = _ACTIVE_TYPER_COMMAND_CONTEXT.get()
+    if context is None:
+        raise RuntimeError("typer command context is unavailable")
+    return context
 
 
 def emit_usage() -> str:
@@ -1206,6 +1308,106 @@ def _help_for_command(command: str) -> str:
             ["og describe sync", "og describe daemon status"],
         )
     return emit_usage() + "\nUse --help with a recognized command for details."
+
+
+def _render_command_schema_field(field: dict[str, object]) -> str:
+    name = str(field.get("name") or "<unknown>")
+    field_type = str(field.get("type") or "object")
+    details = [field_type]
+    if field.get("required") is True:
+        details.append("required")
+    if "default" in field:
+        details.append(f"default={field['default']!r}")
+    enum = field.get("enum")
+    if isinstance(enum, list):
+        enum_values = [str(item) for item in enum if str(item).strip()]
+        if enum_values:
+            details.append("enum=" + "|".join(enum_values))
+    description = str(field.get("description") or "").strip()
+    detail_text = ", ".join(details)
+    if description:
+        return f"  {name} ({detail_text}): {description}"
+    return f"  {name} ({detail_text})"
+
+
+def _render_command_signature(signature: dict[str, object]) -> str:
+    command = str(signature.get("command") or "unknown")
+    usage = str(signature.get("usage") or f"og {command}")
+    summary = str(signature.get("summary") or "").strip()
+    request = signature.get("request") if isinstance(signature.get("request"), dict) else {}
+    response = signature.get("response") if isinstance(signature.get("response"), dict) else {}
+    request_fields = request.get("fields") if isinstance(request.get("fields"), list) else []
+    response_fields = response.get("data_fields") if isinstance(response.get("data_fields"), list) else []
+    known_error_codes = [
+        str(item)
+        for item in signature.get("known_error_codes", [])
+        if isinstance(item, str) and item.strip()
+    ]
+    examples = [
+        str(item)
+        for item in signature.get("examples", [])
+        if isinstance(item, str) and item.strip()
+    ]
+    subcommands = [
+        str(item)
+        for item in signature.get("subcommands", [])
+        if isinstance(item, str) and item.strip()
+    ]
+    lines = [f"Command: {command}", f"Usage: {usage}"]
+    if summary:
+        lines.extend(["", summary])
+    lines.extend(["", "Request fields:"])
+    if request_fields:
+        for field in request_fields:
+            if isinstance(field, dict):
+                lines.append(_render_command_schema_field(cast(dict[str, object], field)))
+    else:
+        lines.append("  none")
+    if subcommands:
+        lines.extend(["", "Subcommands:"])
+        lines.extend(f"  {item}" for item in subcommands)
+    lines.extend(["", "Response fields:"])
+    if response_fields:
+        for field in response_fields:
+            if isinstance(field, dict):
+                lines.append(_render_command_schema_field(cast(dict[str, object], field)))
+    else:
+        lines.append("  none")
+    if known_error_codes:
+        lines.extend(["", "Known error codes:"])
+        lines.extend(f"  {item}" for item in known_error_codes)
+    if examples:
+        lines.extend(["", "Examples:"])
+        lines.extend(f"  {item}" for item in examples)
+    return "\n".join(lines)
+
+
+def _render_schema_overview(payload: dict[str, object]) -> str:
+    schema_version = payload.get("schema_version")
+    command_count = int(payload.get("command_count") or 0)
+    commands = payload.get("commands") if isinstance(payload.get("commands"), list) else []
+    lines = [
+        f"OutcomeGraph CLI schema v{schema_version}",
+        f"Envelope schema v{COMMAND_RESULT_SCHEMA_VERSION}",
+        f"Commands: {command_count}",
+        "",
+    ]
+    for entry in commands:
+        if not isinstance(entry, dict):
+            continue
+        usage = str(entry.get("usage") or f"og {entry.get('command') or 'unknown'}")
+        summary = str(entry.get("summary") or "").strip()
+        lines.append(usage)
+        if summary:
+            lines.append(f"  {summary}")
+    lines.extend(
+        [
+            "",
+            "Use `og describe <command>` for a detailed command contract.",
+            "Use `og schema --json` for machine-readable output.",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _command_schema_field(
@@ -1874,7 +2076,8 @@ def _build_command_result_envelope(
     if not command_id:
         command_id = "og"
 
-    status = str(payload.get("status") or "ok").lower()
+    raw_status = str(payload.get("status") or "ok").lower()
+    status = raw_status if raw_status in COMMAND_RESULT_ALLOWED_STATUSES else "error"
     run_id = payload.get("run_id")
     if not isinstance(run_id, str) or not run_id.strip():
         run_id = None
@@ -1914,7 +2117,46 @@ def _build_command_result_envelope(
     subcommand = payload.get("subcommand")
     if isinstance(subcommand, str):
         envelope["subcommand"] = subcommand
-    return envelope
+    return _validate_command_result_envelope(envelope)
+
+
+def _validate_command_result_envelope(envelope: dict[str, object]) -> dict[str, object]:
+    try:
+        validated = _CommandResultEnvelopeModel.model_validate(envelope)
+    except ValidationError as exc:
+        command_id = str(envelope.get("command") or "og").strip() or "og"
+        message = "command envelope validation failed"
+        fallback = _CommandResultEnvelopeModel(
+            schema_version=COMMAND_RESULT_SCHEMA_VERSION,
+            command=command_id,
+            status="error",
+            run_id=None,
+            data={
+                "status": "error",
+                "command": command_id,
+                "message": message,
+                "validation_errors": exc.errors(include_url=False),
+            },
+            errors=[
+                _CommandResultErrorModel(
+                    error_class=_error_class_for_code(RUNTIME_ERROR_CODE),
+                    error_code=RUNTIME_ERROR_CODE,
+                    message=message,
+                    retryable=_error_retryable_for_code(RUNTIME_ERROR_CODE),
+                    hint=_error_hint_for_code(RUNTIME_ERROR_CODE),
+                )
+            ],
+            warnings=[],
+            metrics={},
+        )
+        fallback_payload = cast(dict[str, object], fallback.model_dump(mode="python"))
+        if "subcommand" not in envelope and fallback_payload.get("subcommand") is None:
+            fallback_payload.pop("subcommand", None)
+        return fallback_payload
+    validated_payload = cast(dict[str, object], validated.model_dump(mode="python"))
+    if "subcommand" not in envelope and validated_payload.get("subcommand") is None:
+        validated_payload.pop("subcommand", None)
+    return validated_payload
 
 
 def _error_code_for_exit_code(exit_code: int) -> str:
@@ -2232,16 +2474,17 @@ def _iso_from_dt(value: datetime.datetime | None) -> str | None:
         return None
     return value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-def _read_json_file(path: str) -> dict | None:
+def _read_json_file(path: str) -> dict[str, object] | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return None
-    return data if isinstance(data, dict) else None
+    return cast(dict[str, object], data) if isinstance(data, dict) else None
 
 
-def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> dict | None:
+def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> dict[str, object] | None:
+    text = ""
     try:
         if path == "-":
             text = sys.stdin.read()
@@ -2252,9 +2495,11 @@ def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> 
         if path == "-":
             emit_error(f"failed reading params from stdin: {exc}", command, EXIT_USAGE, output_json)
         emit_error(f"failed reading params file '{path}': {exc}", command, EXIT_USAGE, output_json)
+        return None
 
     if not text.strip():
         emit_error("params payload is empty", command, EXIT_USAGE, output_json)
+        return None
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -2263,7 +2508,8 @@ def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> 
 
     if not isinstance(payload, dict):
         emit_error("params payload must be a JSON object", command, EXIT_USAGE, output_json)
-    return payload
+        return None
+    return cast(dict[str, object], payload)
 
 
 def _read_file_updated_at(repo_root: str, relative_path: str) -> datetime.datetime | None:
@@ -2860,7 +3106,7 @@ def _resolve_policy_for_repo(
 
     policy = payload.get("policy")
     if isinstance(policy, dict):
-        return policy, None
+        return cast(dict[str, object], policy), None
     return _default_policy(), None
 
 
@@ -3802,11 +4048,12 @@ def _append_ledger_event(repo_root: str, payload: dict[str, object]) -> tuple[st
     _write_integrity_state(repo_root, state_payload)
 
     if int(payload["event_sequence"]) % INTEGRITY_CHECKPOINT_INTERVAL == 0:
+        event_hash = str(payload["event_hash"])
         _write_integrity_checkpoint(
             repo_root,
             int(payload["event_sequence"]),
             event_id,
-            payload["event_hash"],  # type: ignore[arg-type]
+            event_hash,
             latest_hash,
         )
     return path, payload
@@ -6363,7 +6610,7 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
         if isinstance(process.stderr, str)
         else ""
     )
-    if not parse_error_output and raw_stdout.strip():
+    if not parse_error_output and raw_stdout.strip() and not parsed:
         parse_error_output = raw_stdout.strip()
 
     if process.returncode != 0:
@@ -6374,6 +6621,13 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
         message_value = parsed.get("message")
         if not isinstance(message_value, str) or not message_value.strip():
             parsed["message"] = message
+    status_value = str(parsed.get("status") or "").strip().lower()
+    if status_value not in {"ok", "warn", "error"}:
+        status_value = "error"
+        message_value = parsed.get("message")
+        if not isinstance(message_value, str) or not message_value.strip():
+            parsed["message"] = "sync subprocess returned invalid status payload"
+    parsed["status"] = status_value
     command_value = parsed.get("command")
     if not isinstance(command_value, str) or not command_value.strip():
         parsed["command"] = "sync"
@@ -6403,6 +6657,7 @@ def _daemon_start() -> dict[str, object]:
 
     script_path = _daemon_script_path(repo_root)
     log_path = _daemon_log_path(repo_root)
+    process: subprocess.Popen[bytes] | None = None
     try:
         with open(log_path, "a", encoding="utf-8") as _:
             pass
@@ -6417,6 +6672,8 @@ def _daemon_start() -> dict[str, object]:
         )
     except OSError as exc:
         emit_error(f"failed to start daemon: {exc}", "daemon", EXIT_RUNTIME, False)
+    if process is None:
+        raise RuntimeError("failed to start daemon process")
 
     state.update(
         {
@@ -8066,8 +8323,11 @@ def _run_replay_step(
     if os.path.isabs(normalized_cwd):
         normalized_cwd = "."
     sandbox_root_abs = os.path.abspath(os.path.join(repo_root, sandbox_root))
-    step_cwd = os.path.normpath(os.path.join(sandbox_root_abs, normalized_cwd))
-    if not step_cwd.startswith(sandbox_root_abs):
+    step_cwd = os.path.abspath(os.path.join(sandbox_root_abs, normalized_cwd))
+    try:
+        if os.path.commonpath([sandbox_root_abs, step_cwd]) != sandbox_root_abs:
+            step_cwd = sandbox_root_abs
+    except ValueError:
         step_cwd = sandbox_root_abs
 
     start_at = time.perf_counter()
@@ -8081,7 +8341,7 @@ def _run_replay_step(
         "expected_exit_code": expected_exit_code,
         "timeout_s": timeout_s,
         "requested_cwd": cwd,
-        "resolved_cwd": os.path.relpath(step_cwd, os.path.join(repo_root, sandbox_root)).replace("\\", "/"),
+        "resolved_cwd": os.path.relpath(step_cwd, sandbox_root_abs).replace("\\", "/"),
     }
 
     if not command:
@@ -8182,7 +8442,11 @@ def _safe_object_list(raw: object) -> list[dict[str, object]]:
         return []
     if not isinstance(raw, list):
         return []
-    return [item for item in raw if isinstance(item, dict)]
+    values: list[dict[str, object]] = []
+    for item in raw:
+        if isinstance(item, dict):
+            values.append(cast(dict[str, object], item))
+    return values
 
 
 def _normalize_artifact_id(payload: dict[str, object], path: str, fallback_key: str | None = None) -> str:
@@ -8473,10 +8737,11 @@ def _read_material_lock_records(repo_root: str) -> tuple[dict[str, dict[str, obj
         return {}, created_at
 
     existing_created_at = payload.get("created_at")
+    captured_at = payload.get("captured_at")
     if isinstance(existing_created_at, str):
         created_at = existing_created_at
-    elif isinstance(payload.get("captured_at"), str):
-        created_at = payload.get("captured_at")
+    elif isinstance(captured_at, str):
+        created_at = captured_at
 
     records: dict[str, dict[str, object]] = {}
     raw_entries = payload.get("entries") if isinstance(payload.get("entries"), list) else payload.get("material_paths")
@@ -11009,6 +11274,60 @@ def _command_exit_code(payload: dict[str, object]) -> int:
     return EXIT_RUNTIME
 
 
+def _schema_command_payload() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "command": "schema",
+        "schema_version": COMMAND_INTROSPECTION_SCHEMA_VERSION,
+        "cli_version": VERSION,
+        "command_count": len(_CLI_COMMAND_SIGNATURE_BY_NAME),
+        "commands": _CLI_COMMAND_SIGNATURES,
+    }
+
+
+_OG_TYPER_APP = typer.Typer(
+    add_completion=False,
+    no_args_is_help=False,
+    pretty_exceptions_enable=False,
+    rich_markup_mode=None,
+)
+
+
+@_OG_TYPER_APP.callback()
+def _og_typer_root() -> None:
+    return None
+
+
+@_OG_TYPER_APP.command("schema")
+def _schema_typer_command() -> None:
+    context = _current_typer_command_context()
+    payload = _schema_command_payload()
+    if not context["output_json"]:
+        payload["message"] = _render_schema_overview(payload)
+    emit_command_result(payload, bool(context["output_json"]))
+    raise typer.Exit(code=_command_exit_code(payload))
+
+
+_OG_TYPER_CLICK_COMMAND = typer_get_command(_OG_TYPER_APP)
+
+
+def _invoke_typer_command(command_path: list[str], *, output_json: bool) -> int:
+    token = _ACTIVE_TYPER_COMMAND_CONTEXT.set({"output_json": output_json})
+    try:
+        _OG_TYPER_CLICK_COMMAND.main(
+            args=command_path,
+            prog_name="og",
+            standalone_mode=False,
+        )
+    except click.exceptions.Exit as exc:
+        return int(exc.exit_code)
+    except click.exceptions.ClickException as exc:
+        emit_error(exc.format_message(), command_path[0] if command_path else None, EXIT_USAGE, output_json)
+    finally:
+        _ACTIVE_TYPER_COMMAND_CONTEXT.reset(token)
+    return EXIT_SUCCESS
+
+
 def run_command(
     args: list[str],
     output_json: bool,
@@ -11415,16 +11734,7 @@ def run_command(
 
     if command == "schema":
         parse_command_flags(rest, "schema", False, False, False, output_json, default_strict=strict)
-        payload = {
-            "status": "ok",
-            "command": "schema",
-            "schema_version": COMMAND_INTROSPECTION_SCHEMA_VERSION,
-            "cli_version": VERSION,
-            "command_count": len(_CLI_COMMAND_SIGNATURE_BY_NAME),
-            "commands": _CLI_COMMAND_SIGNATURES,
-        }
-        emit_command_result(payload, output_json)
-        return _command_exit_code(payload)
+        return _invoke_typer_command(["schema"], output_json=output_json)
 
     if command == "describe":
         if rest and rest[0] in {"-h", "--help"}:
@@ -11499,6 +11809,8 @@ def run_command(
             "requested_command": target_command,
             "signature": signature,
         }
+        if not output_json:
+            payload["message"] = _render_command_signature(signature)
         emit_command_result(payload, output_json)
         return _command_exit_code(payload)
 

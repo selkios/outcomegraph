@@ -35,7 +35,10 @@ class TestHelpContracts(TestCase):
     def _run_main(self, args: list[str]) -> tuple[int, str]:
         buffer = io.StringIO()
         with redirect_stdout(buffer):
-            code = og.main(args)
+            try:
+                code = og.main(args)
+            except SystemExit as exc:
+                code = int(exc.code) if isinstance(exc.code, int) else og.EXIT_RUNTIME
         return code, buffer.getvalue()
 
     def test_top_level_help_includes_global_contract(self) -> None:
@@ -104,6 +107,7 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(payload["schema_version"], 1)
         self.assertEqual(payload["command"], "schema")
         self.assertEqual(payload["status"], "ok")
+        self.assertNotIn("subcommand", payload)
         data = payload["data"]
         self.assertEqual(data["schema_version"], og.COMMAND_INTROSPECTION_SCHEMA_VERSION)
         self.assertEqual(data["command_count"], len(data["commands"]))
@@ -133,6 +137,17 @@ class TestCommandIntrospectionContracts(TestCase):
         }
         self.assertIn("--yes", autopilot_init_fields)
 
+    def test_schema_command_renders_human_summary(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["schema"])
+
+        self.assertEqual(code, 0)
+        text = buffer.getvalue()
+        self.assertIn("OutcomeGraph CLI schema v1", text)
+        self.assertIn("Commands:", text)
+        self.assertIn("og describe <command>", text)
+
     def test_describe_command_resolves_signature(self) -> None:
         buffer = io.StringIO()
         with redirect_stdout(buffer):
@@ -148,6 +163,17 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(signature["command"], "daemon status")
         self.assertIn("response", signature)
         self.assertIn("request", signature)
+
+    def test_describe_command_renders_human_signature(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["describe", "schema"])
+
+        self.assertEqual(code, 0)
+        text = buffer.getvalue()
+        self.assertIn("Command: schema", text)
+        self.assertIn("Usage: og schema", text)
+        self.assertIn("Response fields:", text)
 
     def test_describe_requires_known_command(self) -> None:
         buffer = io.StringIO()
@@ -193,6 +219,50 @@ class TestJsonEnvelopeContract(TestCase):
         self.assertIn("unknown global option", first_error.get("message", ""))
         self.assertEqual(first_error.get("error_class"), og.ERROR_CLASS_USAGE)
         self.assertFalse(first_error.get("retryable"))
+
+    def test_envelope_validation_falls_back_to_runtime_error_payload(self) -> None:
+        envelope = og._validate_command_result_envelope(
+            {
+                "schema_version": "not-an-integer",
+                "command": "schema",
+                "status": "ok",
+                "run_id": None,
+                "data": {},
+                "errors": [],
+                "warnings": [],
+                "metrics": {},
+            }
+        )
+
+        self.assertEqual(envelope["schema_version"], og.COMMAND_RESULT_SCHEMA_VERSION)
+        self.assertEqual(envelope["command"], "schema")
+        self.assertEqual(envelope["status"], "error")
+        self.assertEqual(envelope["errors"][0]["error_code"], og.RUNTIME_ERROR_CODE)
+        data = envelope["data"]
+        self.assertIsInstance(data, dict)
+        self.assertIn("command envelope validation failed", str(data.get("message", "")))
+        self.assertGreater(len(data.get("validation_errors", [])), 0)
+
+    def test_envelope_validation_rejects_invalid_status_values(self) -> None:
+        envelope = og._validate_command_result_envelope(
+            {
+                "schema_version": og.COMMAND_RESULT_SCHEMA_VERSION,
+                "command": "schema",
+                "status": "running",
+                "run_id": None,
+                "data": {},
+                "errors": [],
+                "warnings": [],
+                "metrics": {},
+            }
+        )
+
+        self.assertEqual(envelope["status"], "error")
+        data = envelope["data"]
+        self.assertIsInstance(data, dict)
+        validation_errors = data.get("validation_errors", [])
+        self.assertGreater(len(validation_errors), 0)
+        self.assertIn("status must be one of", str(validation_errors[0]))
 
 
 class TestHookLifecycle(_RepoTestCase):
@@ -273,14 +343,14 @@ class TestHookLifecycle(_RepoTestCase):
                         with redirect_stdout(buffer):
                             with patch.object(og.sys.stdin, "isatty", return_value=tty):
                                 with patch("builtins.input", side_effect=AssertionError("unexpected prompt")):
-                                    with self.assertRaises(SystemExit):
-                                        code = og.main(args)
-                        self.assertEqual(code, 64)
+                                    with self.assertRaises(SystemExit) as context:
+                                        og.main(args)
+                        self.assertEqual(context.exception.code, og.EXIT_USAGE)
                         payload = json.loads(buffer.getvalue())
-                            self.assertEqual(payload["status"], "error")
-                            self.assertEqual(payload["command"], "autopilot")
-                            self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
-                            self.assertIn("autopilot init requires --yes", payload["errors"][0]["message"])
+                        self.assertEqual(payload["status"], "error")
+                        self.assertEqual(payload["command"], "autopilot")
+                        self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
+                        self.assertIn("autopilot init requires --yes", payload["errors"][0]["message"])
 
     def test_autopilot_init_force_path_with_yes_is_accepted(self) -> None:
         hooks_dir = self.repo / "existing-hooks"
@@ -344,6 +414,26 @@ class TestDaemonLifecycle(_RepoTestCase):
                 self.assertFalse(status_after_stop["runtime"]["running"])
             finally:
                 og._daemon_stop()
+
+    def test_daemon_run_sync_rejects_invalid_status_payload(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["og", "sync", "--json"],
+            returncode=0,
+            stdout=json.dumps({"status": "invalid-state", "command": "sync"}),
+            stderr="",
+        )
+        with patch.object(og.shutil, "which", return_value="/usr/bin/og"), patch.object(
+            og.subprocess,
+            "run",
+            return_value=completed,
+        ):
+            payload = og._daemon_run_sync(str(self.repo))
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["command"], "sync")
+        self.assertEqual(payload["message"], "sync subprocess returned invalid status payload")
+        self.assertNotIn("{\"status\"", payload["message"])
+        self.assertEqual(payload["runtime"]["daemon_sync_exit_code"], 0)
 
 
 class TestSyncWorkflows(_RepoTestCase):
@@ -496,7 +586,7 @@ class TestSyncWorkflows(_RepoTestCase):
 
     def test_parse_command_flags_supports_command_level_strict(self) -> None:
         options, _ = og.parse_command_flags(
-            ["--strict", "--profile", "observe", "--mode", "autonomous"],
+            ["--strict", "--profile", "analyze", "--mode", "autonomous"],
             "sync",
             False,
             True,
@@ -506,12 +596,12 @@ class TestSyncWorkflows(_RepoTestCase):
             allow_force_full_sync=True,
         )
         self.assertTrue(options["strict"])
-        self.assertEqual(options["profile"], "observe")
+        self.assertEqual(options["profile"], "analyze")
         self.assertEqual(options["mode"], "autonomous")
 
     def test_parse_command_flags_strict_flag_can_be_negated_from_default(self) -> None:
         options, _ = og.parse_command_flags(
-            ["--strict=false", "--profile", "observe", "--mode", "autonomous"],
+            ["--strict=false", "--profile", "analyze", "--mode", "autonomous"],
             "sync",
             False,
             True,
@@ -549,7 +639,7 @@ class TestSyncWorkflows(_RepoTestCase):
                         True,
                         True,
                         True,
-                        False,
+                        True,
                         allow_output_controls=True,
                     )
             self.assertEqual(context.exception.code, og.EXIT_USAGE)
@@ -774,7 +864,7 @@ class TestSyncWorkflows(_RepoTestCase):
                     og._parse_optimize_prompts_flags(["--params", missing_payload_path], True, default_strict=True)
             self.assertEqual(context.exception.code, 64)
             payload = json.loads(buffer.getvalue() or "{}")
-            self.assertIn("strict mode requires --min-improvement", payload["errors"][0]["message"])
+            self.assertIn("strict mode requires --metric", payload["errors"][0]["message"])
         finally:
             Path(missing_payload_path).unlink()
 
@@ -783,6 +873,7 @@ class TestSyncWorkflows(_RepoTestCase):
             "dataset": "datasets/base.json",
             "candidate": "candidate.txt",
             "baseline": "baseline.txt",
+            "metric": "contains",
             "min_improvement": "12.5",
             "approve": "true",
         }
@@ -1073,6 +1164,39 @@ class TestVerifyWorkflows(_RepoTestCase):
 
 
 class TestReplayWorkflows(_RepoTestCase):
+    def test_run_replay_step_rejects_prefix_based_cwd_escape(self) -> None:
+        sandbox_root = f"{og.OG_ROOT}/work/replay/run-1/default"
+        observed: dict[str, str] = {}
+
+        def fake_subprocess_run(command, shell, cwd, capture_output, text, timeout):
+            observed["cwd"] = cwd
+            return subprocess.CompletedProcess(
+                args=command,
+                returncode=0,
+                stdout="ok\n",
+                stderr="",
+            )
+
+        step = {
+            "command": "echo ok",
+            "cwd": "nested/../../default-escape",
+            "expected_exit_code": 0,
+        }
+        with patch.object(og.subprocess, "run", side_effect=fake_subprocess_run):
+            payload = og._run_replay_step(
+                repo_root=str(self.repo),
+                sandbox_root=sandbox_root,
+                run_id="run-1",
+                capsule_id="default",
+                step_index=0,
+                step=step,
+            )
+
+        expected_cwd = str((self.repo / sandbox_root).resolve())
+        self.assertEqual(observed["cwd"], expected_cwd)
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["resolved_cwd"], ".")
+
     def test_run_replay_stage_defaults_to_default_capsule_when_no_targets(self) -> None:
         snapshot = {"changed_files": []}
         replay_plan = {

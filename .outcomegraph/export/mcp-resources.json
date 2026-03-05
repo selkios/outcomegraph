@@ -1,0 +1,127 @@
+{
+  "artifact_counts": {
+    "capsules": 2,
+    "certificates": 4,
+    "claims": 4,
+    "constitution": 1,
+    "decisions": 2,
+    "materials.lock": 1,
+    "refs": 2
+  },
+  "artifact_type": "mcp_resource_export",
+  "generated_at": "2026-03-05T13:36:35Z",
+  "id": "mcp-export",
+  "prompts": [
+    "bootstrap",
+    "replay",
+    "repair"
+  ],
+  "resources": [
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for capsules scope.",
+      "name": "capsules",
+      "paths": [
+        ".outcomegraph/capsules/default.json",
+        ".outcomegraph/capsules/materials.json"
+      ],
+      "uri": "outcomegraph://capsules"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for certificates scope.",
+      "name": "certificates",
+      "paths": [
+        ".outcomegraph/certificates/cert-default-51f900ed07.json",
+        ".outcomegraph/certificates/cert-default-b0d1c60f0b.json",
+        ".outcomegraph/certificates/cert-materials-4e5b994683.json",
+        ".outcomegraph/certificates/cert-materials-702562c57a.json"
+      ],
+      "uri": "outcomegraph://certificates"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for claims scope.",
+      "name": "claims",
+      "paths": [
+        ".outcomegraph/claims/cl-default-453ade131e.json",
+        ".outcomegraph/claims/cl-default-51f900ed07.json",
+        ".outcomegraph/claims/cl-materials-4e5b994683.json",
+        ".outcomegraph/claims/cl-materials-4e6ba117de.json"
+      ],
+      "uri": "outcomegraph://claims"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for constitution scope.",
+      "name": "constitution",
+      "paths": [
+        ".outcomegraph/constitution/default.yaml"
+      ],
+      "uri": "outcomegraph://constitution"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for decisions scope.",
+      "name": "decisions",
+      "paths": [
+        ".outcomegraph/decisions/dec-default-f0075d927f.json",
+        ".outcomegraph/decisions/dec-materials-a9de85ee1c.json"
+      ],
+      "uri": "outcomegraph://decisions"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for materials.lock scope.",
+      "name": "materials.lock",
+      "paths": [
+        ".outcomegraph/materials.lock"
+      ],
+      "uri": "outcomegraph://materials.lock"
+    },
+    {
+      "category": "artifact",
+      "description": "Canonical artifact projection for refs scope.",
+      "name": "refs",
+      "paths": [
+        ".outcomegraph/refs/default.json",
+        ".outcomegraph/refs/materials.json"
+      ],
+      "uri": "outcomegraph://refs"
+    }
+  ],
+  "schema_version": 2,
+  "status": "ok",
+  "tools": [
+    {
+      "category": "tool",
+      "description": "Explain claims and provenance pointers.",
+      "name": "explain",
+      "uri": "outcomegraph://tools/explain"
+    },
+    {
+      "category": "tool",
+      "description": "Run replay checks against canonical artifacts.",
+      "name": "replay",
+      "uri": "outcomegraph://tools/replay"
+    },
+    {
+      "category": "tool",
+      "description": "Read runtime and freshness summary.",
+      "name": "status",
+      "uri": "outcomegraph://tools/status"
+    },
+    {
+      "category": "tool",
+      "description": "Run autonomous reconcile pipeline.",
+      "name": "sync",
+      "uri": "outcomegraph://tools/sync"
+    },
+    {
+      "category": "tool",
+      "description": "Run fast verification on impacted capsules.",
+      "name": "verify",
+      "uri": "outcomegraph://tools/verify"
+    }
+  ]
+}
