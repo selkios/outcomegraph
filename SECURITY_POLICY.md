@@ -63,6 +63,7 @@ deny:
 - explicit deny always wins
 - explicit allow enables action in active mode
 - missing allow entries block by default with `POLICY_DENIED`
+- `AUTONOMOUS_WRITE_BLOCKED` is returned when writes are requested in `autonomous` mode while policy is degraded or integrity cannot be validated.
 
 ## 4) Error and remediation
 
@@ -74,6 +75,8 @@ When denied, `og` must emit error payload with:
 - `target` and remediation suggestions
 
 For policy schema violations or unreadable policy files, use usage-like exit code `64`.
+
+Autonomous writes are also suspended when the integrity ledger is not in `ok` health until a repair action restores trust.
 
 ## 5) Policy extension and updates
 

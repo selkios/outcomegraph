@@ -1003,6 +1003,7 @@ Provenance fields in certificates:
 - artifact hashes used during run
 
 Integrity failure places repo in `degraded` state and blocks autonomous writes until repaired.
+- In `autonomous` mode, all evidence-writing commands (`sync`, `verify`, `replay`, `apply`, `export`) are hard-blocked when policy checks or integrity are degraded, returning clear remediation suggestions.
 
 ## 16) Degraded mode and failure behavior
 
@@ -1015,13 +1016,14 @@ If worker runtime is unavailable:
 If oracle runtime fails:
 
 - Record failed attempt and reason.
-- Preserve previous valid certificates.
+- Preserve previous valid certificates and continue to expose the last successful evidence set.
 - Surface stale/unknown verification state in `og status`.
 
 If storage/index is corrupted:
 
 - Keep canonical artifacts immutable.
 - rebuild derived index from canonical ledger.
+- If integrity mode is degraded, autonomous write loops pause and require repair before further writes.
 
 ## 17) Standards triad contract
 

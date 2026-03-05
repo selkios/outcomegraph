@@ -27,6 +27,7 @@ EXIT_RUNTIME = 1
 POLICY_SCHEMA_VERSION = 2
 POLICY_DENIED_CODE = "POLICY_DENIED"
 POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
+AUTONOMOUS_WRITE_BLOCKED_CODE = "AUTONOMOUS_WRITE_BLOCKED"
 POLICY_ALLOW_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations"}
 POLICY_DENY_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations", "network", "dependencies", "deployment"}
 
@@ -1535,6 +1536,53 @@ def _resolve_policy_for_repo(
     return _default_policy(), None
 
 
+def _build_autonomous_write_block_payload(
+    repo_root: str,
+    mode: str,
+    *,
+    name: str,
+    command: str,
+) -> dict[str, object] | None:
+    if str(mode or "").lower() != "autonomous":
+        return None
+
+    policy_checks = _collect_policy_checks(repo_root)
+    policy_status = str(policy_checks.get("status") or "error").lower()
+    integrity = _collect_integrity_state(repo_root)
+    integrity_state = str(integrity.get("state") or "").lower()
+
+    if policy_status == "ok" and integrity_state == "ok":
+        return None
+
+    reasons: list[str] = []
+    remediation: list[str] = []
+    if policy_status != "ok":
+        reasons.append(f"policy state is {policy_status}")
+        for raw_check in policy_checks.get("checks", []):
+            if not isinstance(raw_check, dict):
+                continue
+            for item in raw_check.get("remediation", []):
+                if isinstance(item, str):
+                    remediation.append(item)
+    if integrity_state != "ok":
+        reasons.append("integrity ledger is degraded")
+        remediation.append("Repair integrity index before running autonomous writes.")
+    message = f"Autonomous writes blocked because {' and '.join(reasons)}."
+
+    return {
+        "name": name,
+        "status": "error",
+        "code": AUTONOMOUS_WRITE_BLOCKED_CODE,
+        "command": command,
+        "mode": mode,
+        "message": message,
+        "errors": [message],
+        "remediation": sorted(set(remediation)),
+        "policy": policy_checks,
+        "integrity": integrity,
+    }
+
+
 def _ensure_policy_action_allowed(
     action_policy: dict[str, object],
     command: str,
@@ -1548,8 +1596,26 @@ def _ensure_policy_action_allowed(
 def _collect_drift_state(repo_root: str, now: datetime.datetime, include_ledger: bool = True) -> dict[str, object]:
     certificates = _collect_certificate_freshness(repo_root, now)
     policy = _collect_policy_checks(repo_root)
+    integrity = _collect_integrity_state(repo_root)
     checks: list[dict[str, object]] = []
     remediation: list[str] = []
+
+    if str(integrity.get("state") or "ok") != "ok":
+        integrity_check = {
+            "type": "integrity_ledger",
+            "status": "error",
+            "message": str(integrity.get("message") or "integrity ledger is degraded"),
+            "remediation": [
+                "Repair integrity index before running further writes and sync verification.",
+            ],
+            "details": {
+                "state": integrity.get("state"),
+                "status": integrity.get("status"),
+                "event_count": integrity.get("event_count"),
+            },
+        }
+        checks.append(integrity_check)
+        remediation.extend(integrity_check["remediation"])
 
     if certificates["state"] in {"unknown", "stale"}:
         check_status = "error" if certificates["state"] == "unknown" else "warn"
@@ -1733,6 +1799,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         "drift": drift,
         "integrity": integrity,
         "verification": verification,
+        "remediation": drift.get("remediation", []),
         "runtime": {
             "status": state.get("status"),
             "pending": has_pending,
@@ -3022,6 +3089,42 @@ def _normalize_receipt_pointer(raw: object, *, field: str) -> dict[str, object]:
     return normalized
 
 
+def _normalize_receipt_pointer_signature(pointer: dict[str, object]) -> str:
+    normalized = {
+        "schema_version": pointer.get("schema_version"),
+        "type": pointer.get("type"),
+        "target": pointer.get("target"),
+        "hash": pointer.get("hash"),
+        "media_type": pointer.get("media_type"),
+        "size": pointer.get("size"),
+    }
+    return json.dumps(normalized, sort_keys=True, default=str)
+
+
+def _deduplicate_receipt_pointers(receipt_pointers: list[dict[str, object]]) -> list[dict[str, object]]:
+    seen: set[str] = set()
+    seen_receipts: list[dict[str, object]] = []
+    for pointer in sorted(receipt_pointers, key=lambda item: json.dumps(item, sort_keys=True, default=str)):
+        if not isinstance(pointer, dict):
+            continue
+        signature = _normalize_receipt_pointer_signature(pointer)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        seen_receipts.append(pointer)
+    return seen_receipts
+
+
+def _build_claim_fallback_receipt_pointer(claim_id: str) -> dict[str, object]:
+    safe_claim_id = _safe_slug(claim_id)
+    target = f"{OG_ROOT}/claims/{safe_claim_id}.json"
+    return {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "type": TRACKED_EVIDENCE_TAG,
+        "target": target,
+    }
+
+
 def _normalize_receipt_pointers(raw: object, *, field: str, required: bool = False) -> list[dict[str, object]]:
     if raw is None:
         if required:
@@ -3029,7 +3132,9 @@ def _normalize_receipt_pointers(raw: object, *, field: str, required: bool = Fal
         return []
     if not isinstance(raw, list):
         raise WorkerAdapterError(f"{field} must be a list")
-    pointers = [_normalize_receipt_pointer(pointer, field=f"{field}[{index}]") for index, pointer in enumerate(raw)]
+    pointers = _deduplicate_receipt_pointers(
+        [_normalize_receipt_pointer(pointer, field=f"{field}[{index}]") for index, pointer in enumerate(raw)]
+    )
     if required and not pointers:
         raise WorkerAdapterError(f"{field} must include at least one pointer")
     return pointers
@@ -3239,6 +3344,16 @@ def _build_explain_input(
     }
 
 
+def _build_claim_receipt_pointers(
+    claim_id: str,
+    receipt_pointers: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    normalized = _deduplicate_receipt_pointers(receipt_pointers)
+    if normalized:
+        return normalized
+    return [_build_claim_fallback_receipt_pointer(claim_id)]
+
+
 def _build_claim_payload(
     claim_id: str,
     capsule_id: str,
@@ -3259,7 +3374,7 @@ def _build_claim_payload(
         "capsule_id": capsule_id,
         "text": claim_text,
         "category": category or "behavior",
-        "receipt_pointers": receipt_pointers,
+        "receipt_pointers": _build_claim_receipt_pointers(claim_id, receipt_pointers),
         "origin": {
             "run_id": run_id,
             "profile": profile,
@@ -6070,6 +6185,40 @@ def _collect_certificate_records(repo_root: str) -> list[dict[str, object]]:
     return certificates
 
 
+def _collect_successful_certificate_refs_by_capsule(repo_root: str) -> dict[str, list[str]]:
+    default_timestamp = datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc)
+    certificates = _collect_certificate_records(repo_root)
+    grouped: dict[str, list[tuple[datetime.datetime, str]]] = {}
+    for raw in certificates:
+        if str(raw.get("status") or "").lower() != "success":
+            continue
+        path = str(raw.get("path") or "").strip()
+        if not path:
+            continue
+        capsule_id = _safe_slug(str(raw.get("capsule_id") or "default"))
+        raw_payload = raw.get("raw") if isinstance(raw.get("raw"), dict) else None
+        updated_at_raw = ""
+        if isinstance(raw_payload, dict):
+            raw_updated_at = raw_payload.get("updated_at")
+            if isinstance(raw_updated_at, str):
+                updated_at_raw = raw_updated_at
+        updated_at = _parse_utc_timestamp(updated_at_raw) or default_timestamp
+        grouped.setdefault(capsule_id, []).append((updated_at, path))
+    success_refs: dict[str, list[str]] = {}
+    for capsule_id, refs in grouped.items():
+        refs = sorted(refs, key=lambda item: (item[0], item[1]), reverse=True)
+        seen_paths: set[str] = set()
+        ordered_paths: list[str] = []
+        for _, path in refs:
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            ordered_paths.append(path)
+        if ordered_paths:
+            success_refs[capsule_id] = ordered_paths
+    return success_refs
+
+
 def _collect_decision_records(repo_root: str) -> list[dict[str, object]]:
     decisions: list[dict[str, object]] = []
     for path, payload in _collect_artifact_payloads(
@@ -6572,6 +6721,24 @@ def _run_apply_stage(
             "errors": [policy_error.get("message", "policy configuration is invalid")],
         }
 
+    autonomous_block = _build_autonomous_write_block_payload(
+        repo_root,
+        mode,
+        name="apply",
+        command="apply",
+    )
+    if autonomous_block is not None:
+        autonomous_block = {
+            **autonomous_block,
+            "applied_changes": 0,
+            "applied_claims": [],
+            "applied_certificates": [],
+            "applied_capsules": [],
+            "applied_refs": [],
+            "applied_decisions": [],
+        }
+        return autonomous_block
+
     deny_payload = _evaluate_policy_writes(
         policy_payload,
         command="sync",
@@ -6937,6 +7104,28 @@ def _run_replay_stage(
     changed_only: bool = True,
     policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    def _preserve_certificate_refs(capsule_ids: list[str] | None = None) -> list[str]:
+        try:
+            successful_certificate_refs = _collect_successful_certificate_refs_by_capsule(repo_root)
+        except Exception:
+            successful_certificate_refs = {}
+        preserved: list[str] = []
+        seen: set[str] = set()
+        if capsule_ids is None:
+            for refs in successful_certificate_refs.values():
+                for ref in refs:
+                    if ref not in seen:
+                        seen.add(ref)
+                        preserved.append(ref)
+            return sorted(preserved)
+        for raw_capsule_id in capsule_ids:
+            normalized_capsule = _safe_slug(str(raw_capsule_id))
+            for ref in successful_certificate_refs.get(normalized_capsule, []):
+                if ref not in seen:
+                    seen.add(ref)
+                    preserved.append(ref)
+        return sorted(preserved)
+
     adapter_errors = _initialize_adapter_runtime(repo_root)
     if adapter_errors:
         first_error = adapter_errors[0]
@@ -6949,7 +7138,7 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(first_error.get("message") or "adapter initialization failed")],
             **({"remediation": first_error.get("remediation", [])} if isinstance(first_error.get("remediation"), list) else {}),
         }
@@ -6966,7 +7155,7 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(exc)],
         }
 
@@ -6981,8 +7170,23 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [policy_error.get("message", "policy configuration is invalid")],
+        }
+
+    autonomous_block = _build_autonomous_write_block_payload(
+        repo_root,
+        mode,
+        name="replay",
+        command="replay",
+    )
+    if autonomous_block is not None:
+        return {
+            **autonomous_block,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": _preserve_certificate_refs(),
         }
 
     sandbox_check = _ensure_policy_action_allowed(
@@ -7009,7 +7213,7 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(sandbox_check.get("message", "policy denied sandbox operation"))],
             **sandbox_check,
         }
@@ -7029,7 +7233,7 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(write_check.get("message", "policy denied write"))],
             **write_check,
         }
@@ -7045,7 +7249,7 @@ def _run_replay_stage(
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
-            "certificate_refs": [],
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [f"Canonical artifact validation failed: {exc}"],
         }
 
@@ -7056,6 +7260,10 @@ def _run_replay_stage(
             "message": "Invalid snapshot payload",
             "mode": mode,
             "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": _preserve_certificate_refs(),
+            "errors": ["Invalid snapshot payload"],
         }
     changed_files = snapshot.get("changed_files")
     if not isinstance(changed_files, list):
@@ -7071,6 +7279,7 @@ def _run_replay_stage(
     replay_results: list[dict[str, object]] = []
     certificate_ids: list[str] = []
     certificate_refs: list[str] = []
+    failed_capsules: list[str] = []
     errors: list[str] = []
     overall_failed = False
 
@@ -7100,6 +7309,7 @@ def _run_replay_stage(
                 _set_pending_state(repo_root, f"worker runtime unavailable during replay: {error_message}")
             errors.append(error_message)
             overall_failed = True
+            failed_capsules.append(capsule)
             replay_results.append(
                 {
                     "capsule_id": capsule,
@@ -7215,6 +7425,7 @@ def _run_replay_stage(
         except Exception as exc:
             errors.append(f"Failed to write replay claim for {capsule}: {exc}")
             overall_failed = True
+            failed_capsules.append(capsule)
             replay_result["status"] = "error"
             replay_failures.append(f"claim persistence failed: {exc}")
             replay_result["failures"] = replay_failures
@@ -7260,10 +7471,19 @@ def _run_replay_stage(
         except Exception as exc:
             errors.append(f"Failed to write replay certificate for {capsule}: {exc}")
             overall_failed = True
+            failed_capsules.append(capsule)
             replay_result["status"] = "error"
             replay_failures.append(f"certificate persistence failed: {exc}")
             replay_result["failures"] = replay_failures
         replay_results.append(replay_result)
+
+        if replay_status != "success" and capsule not in failed_capsules:
+            failed_capsules.append(capsule)
+
+    final_certificate_refs = set(certificate_refs)
+    if overall_failed:
+        for ref in _preserve_certificate_refs(failed_capsules):
+            final_certificate_refs.add(ref)
 
     return {
         "name": "replay",
@@ -7273,7 +7493,8 @@ def _run_replay_stage(
         "replay_plans": plans,
         "replay_results": replay_results,
         "certificate_ids": certificate_ids,
-        "certificate_refs": certificate_refs,
+        "certificate_refs": sorted(final_certificate_refs),
+        "failed_capsules": sorted(set(failed_capsules)),
         "errors": errors,
     }
 
@@ -7852,6 +8073,29 @@ def _run_verify_stage(
     mode: str,
     policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    def _preserve_certificate_refs(capsule_ids: list[str] | None = None) -> list[str]:
+        try:
+            successful_certificate_refs = _collect_successful_certificate_refs_by_capsule(repo_root)
+        except Exception:
+            successful_certificate_refs = {}
+        preserved: list[str] = []
+        seen: set[str] = set()
+        if capsule_ids is None:
+            for refs in successful_certificate_refs.values():
+                for ref in refs:
+                    if ref not in seen:
+                        seen.add(ref)
+                        preserved.append(ref)
+            return sorted(preserved)
+
+        for raw_capsule_id in capsule_ids:
+            normalized_capsule = _safe_slug(str(raw_capsule_id))
+            for ref in successful_certificate_refs.get(normalized_capsule, []):
+                if ref not in seen:
+                    seen.add(ref)
+                    preserved.append(ref)
+        return sorted(preserved)
+
     policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
     if policy_error:
         return {
@@ -7862,8 +8106,24 @@ def _run_verify_stage(
             "verified_capsules": [],
             "receipt_pointers": {},
             "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [policy_error.get("message", "policy configuration is invalid")],
             "policy": policy_error,
+        }
+
+    autonomous_block = _build_autonomous_write_block_payload(
+        repo_root,
+        mode,
+        name="verify",
+        command="verify",
+    )
+    if autonomous_block is not None:
+        return {
+            **autonomous_block,
+            "verified_capsules": [],
+            "receipt_pointers": {},
+            "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
         }
 
     sandbox_check = _ensure_policy_action_allowed(
@@ -7881,6 +8141,7 @@ def _run_verify_stage(
             "verified_capsules": [],
             "receipt_pointers": {},
             "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(sandbox_check.get("message", "policy denied sandbox operation"))],
             **sandbox_check,
         }
@@ -7900,6 +8161,7 @@ def _run_verify_stage(
             "verified_capsules": [],
             "receipt_pointers": {},
             "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [str(write_check.get("message", "policy denied file write"))],
             **write_check,
         }
@@ -7915,6 +8177,7 @@ def _run_verify_stage(
             "verified_capsules": [],
             "receipt_pointers": {},
             "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
             "errors": [f"Canonical artifact validation failed: {exc}"],
         }
 
@@ -7927,6 +8190,7 @@ def _run_verify_stage(
             "verified_capsules": [],
             "receipt_pointers": {},
             "oracle_results": {},
+            "certificate_refs": _preserve_certificate_refs(),
         }
 
     changed_paths = changed_paths if isinstance(changed_paths, list) else []
@@ -8040,6 +8304,11 @@ def _run_verify_stage(
                 overall_failed = True
                 failed_capsules.append(capsule)
 
+    final_certificate_refs = set(certificate_refs)
+    if overall_failed:
+        for ref in _preserve_certificate_refs(failed_capsules):
+            final_certificate_refs.add(ref)
+
     policy_denied = False
     policy_denied_messages: list[str] = []
     for check_group in oracle_results.values():
@@ -8072,7 +8341,7 @@ def _run_verify_stage(
         "mode": mode,
         "verified_capsules": changed_capsules,
         "oracle_count": sum(len(values) for values in oracle_results.values()) if oracle_results else 0,
-        "certificate_refs": sorted(certificate_refs),
+        "certificate_refs": sorted(final_certificate_refs),
         "oracle_results": oracle_results,
         "receipt_pointers": receipts,
         "failed_capsules": sorted(set(failed_capsules)),
@@ -8096,6 +8365,19 @@ def _run_export_stage(
             "updated_exports": [],
             "unchanged_exports": [],
             "errors": [policy_error.get("message", "policy configuration is invalid")],
+        }
+
+    autonomous_block = _build_autonomous_write_block_payload(
+        repo_root,
+        mode,
+        name="export",
+        command="export",
+    )
+    if autonomous_block is not None:
+        return {
+            **autonomous_block,
+            "updated_exports": [],
+            "unchanged_exports": [],
         }
 
     write_check = _evaluate_policy_writes(
@@ -8205,6 +8487,7 @@ def _build_drift_payload(repo_root: str, options: dict[str, object]) -> dict[str
         "command": "drift",
         "options": options,
         "generated_at": _utc_timestamp(),
+        "remediation": drift_state.get("remediation", []),
         "message": "drift detection completed",
         "checks": drift_state["checks"],
         "drift": drift_state,

@@ -59,7 +59,19 @@ Recovery:
 - Add explicit allowlist entry in `.outcomegraph/policy.yaml` where safe.
 - Re-run using required autonomy mode if policy requires it.
 
-### 2.3 Worker unavailable
+### 2.3 Autonomous writes blocked by degraded state
+
+Symptom: command fails in `autonomous` mode with `code: AUTONOMOUS_WRITE_BLOCKED`.
+
+Recovery:
+
+- Inspect `og status --json` and resolve:
+  - policy checks (`og status` drift/integrity entries)
+  - integrity ledger health (`status.integrity`).
+- Repair policy configuration or integrity index.
+- Re-run the write command in `autonomous` mode after remediation.
+
+### 2.4 Worker unavailable
 
 Symptom: distill failures and no new claims/decisions.
 
@@ -69,7 +81,7 @@ Recovery:
 - Do not block local coding.
 - Continue with `og status` and rerun sync on next loop.
 
-### 2.4 Oracle unavailable or failing
+### 2.5 Oracle unavailable or failing
 
 Symptom: verification state becomes stale/unknown with failed certificates.
 
@@ -79,7 +91,7 @@ Recovery:
 - Re-run `og verify --changed`.
 - For persistent failures, run `og replay --changed` to confirm behavioral evidence separately.
 
-### 2.5 Adapter/interface mismatch
+### 2.6 Adapter/interface mismatch
 
 Symptom: startup error with `ADAPTER_INTERFACE_MISMATCH`.
 
@@ -89,7 +101,7 @@ Recovery:
 - Restart command entrypoint.
 - Validate diagnostics with the plugin list output.
 
-### 2.6 Storage/index corruption
+### 2.7 Storage/index corruption
 
 Symptom: inability to read existing objects or manifests.
 
