@@ -130,6 +130,7 @@ EXPORTER_ADAPTER_NAME = "canonical"
 WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
 ADAPTER_SCHEMA_VERSION = 2
 ADAPTER_INTERFACE_MISMATCH_CODE = "ADAPTER_INTERFACE_MISMATCH"
 ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
@@ -5684,6 +5685,217 @@ def _run_oracle_check(
     return result_payload
 
 
+def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str | None:
+    certificates = _collect_certificate_records(repo_root)
+    if not certificates:
+        return None
+
+    normalized_target = _safe_slug(capsule_id)
+    latest_updated_at: datetime.datetime | None = None
+    baseline_hash: str | None = None
+
+    for certificate in certificates:
+        if _safe_slug(str(certificate.get("capsule_id") or "default")) != normalized_target:
+            continue
+        if str(certificate.get("status") or "").lower() != "success":
+            continue
+        raw = certificate.get("raw")
+        if not isinstance(raw, dict):
+            continue
+        replay_context = raw.get("replay_context")
+        if not isinstance(replay_context, dict):
+            continue
+        equivalence = replay_context.get("equivalence")
+        if not isinstance(equivalence, dict):
+            continue
+        candidate_hash = equivalence.get("observed_hash")
+        if not isinstance(candidate_hash, str) or not candidate_hash:
+            continue
+
+        updated_at_raw = raw.get("updated_at")
+        if isinstance(updated_at_raw, str):
+            candidate_updated_at = _parse_utc_timestamp(updated_at_raw)
+        else:
+            candidate_updated_at = None
+
+        if latest_updated_at is not None and candidate_updated_at is not None and candidate_updated_at <= latest_updated_at:
+            continue
+        latest_updated_at = candidate_updated_at or latest_updated_at
+        baseline_hash = candidate_hash
+
+    return baseline_hash
+
+
+def _collect_replay_sandbox_paths(repo_root: str, changed_materials: list[dict[str, object]]) -> list[str]:
+    material_records, _ = _read_material_lock_records(repo_root)
+    paths: set[str] = set()
+
+    selected_changed_paths = [str(item.get("path") or "") for item in changed_materials if isinstance(item, dict)]
+
+    for raw_path in list(material_records.keys()) + selected_changed_paths:
+        normalized = _normalize_repo_relative_path(str(raw_path)).replace("\\", "/")
+        normalized = os.path.normpath(normalized)
+        if not normalized or normalized == ".":
+            continue
+        if os.path.isabs(normalized) or normalized.startswith("../"):
+            continue
+        if normalized.startswith(f"{OG_ROOT}/work") or normalized.startswith(f"{OG_ROOT}/events") or normalized.startswith(
+            f"{OG_ROOT}/traces"
+        ):
+            continue
+        if normalized.startswith(".git"):
+            continue
+        paths.add(normalized.replace("\\", "/"))
+
+    runtime_metadata = (
+        f"{OG_ROOT}/materials.lock",
+        f"{OG_ROOT}/policy.yaml",
+        f"{OG_ROOT}/constitution/default.yaml",
+    )
+    for metadata_path in runtime_metadata:
+        absolute = os.path.join(repo_root, metadata_path)
+        if os.path.exists(absolute):
+            paths.add(metadata_path)
+
+    return sorted(paths)
+
+
+def _materialize_replay_sandbox(repo_root: str, sandbox_root: str, changed_materials: list[dict[str, object]]) -> list[str]:
+    os.makedirs(os.path.join(repo_root, sandbox_root), exist_ok=True)
+    selected_paths = _collect_replay_sandbox_paths(repo_root, changed_materials)
+    sandbox_root_abs = os.path.join(repo_root, sandbox_root)
+    missing_paths: list[str] = []
+
+    for relative_path in selected_paths:
+        source = os.path.join(repo_root, relative_path)
+        if not os.path.isfile(source):
+            if os.path.exists(source):
+                continue
+            missing_paths.append(relative_path)
+            continue
+        destination = os.path.join(sandbox_root_abs, relative_path)
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        try:
+            shutil.copy2(source, destination)
+        except OSError:
+            missing_paths.append(relative_path)
+
+    return missing_paths
+
+
+def _compute_replay_observed_hash(step_results: list[dict[str, object]]) -> str:
+    observed: list[dict[str, object]] = []
+    for raw_result in step_results:
+        observed.append(
+            {
+                "step": str(raw_result.get("step") or ""),
+                "command": str(raw_result.get("command") or ""),
+                "status": str(raw_result.get("status") or ""),
+                "expected_exit_code": raw_result.get("expected_exit_code"),
+                "observed_exit_code": raw_result.get("observed_exit_code"),
+                "stdout": _safe_string_list(raw_result.get("stdout")),
+                "stderr": _safe_string_list(raw_result.get("stderr")),
+            }
+        )
+    rendered = json.dumps(observed, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return _content_sha256(rendered.encode("utf-8"))
+
+
+def _run_replay_step(
+    repo_root: str,
+    sandbox_root: str,
+    run_id: str,
+    capsule_id: str,
+    step_index: int,
+    step: dict[str, object],
+) -> dict[str, object]:
+    command = str(step.get("command") or "").strip()
+    expected_exit_code = step.get("expected_exit_code")
+    if not isinstance(expected_exit_code, int):
+        expected_exit_code = 0
+    timeout_s = step.get("timeout_s")
+    if not isinstance(timeout_s, int) or timeout_s <= 0:
+        timeout_s = REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS
+    raw_cwd = step.get("cwd")
+    cwd = str(raw_cwd).strip() if isinstance(raw_cwd, str) else "."
+    if not cwd:
+        cwd = "."
+    normalized_cwd = os.path.normpath(_normalize_repo_relative_path(cwd).replace("\\", "/").strip("./"))
+    if not normalized_cwd or normalized_cwd == ".":
+        normalized_cwd = "."
+    if os.path.isabs(normalized_cwd):
+        normalized_cwd = "."
+    sandbox_root_abs = os.path.abspath(os.path.join(repo_root, sandbox_root))
+    step_cwd = os.path.normpath(os.path.join(sandbox_root_abs, normalized_cwd))
+    if not step_cwd.startswith(sandbox_root_abs):
+        step_cwd = sandbox_root_abs
+
+    start_at = time.perf_counter()
+    result_payload: dict[str, object] = {
+        "schema_version": WORKER_SCHEMA_VERSION,
+        "role": "replay",
+        "run_id": run_id,
+        "capsule_id": capsule_id,
+        "step": step_index,
+        "command": command,
+        "expected_exit_code": expected_exit_code,
+        "timeout_s": timeout_s,
+        "requested_cwd": cwd,
+        "resolved_cwd": os.path.relpath(step_cwd, os.path.join(repo_root, sandbox_root)).replace("\\", "/"),
+    }
+
+    if not command:
+        result_payload["status"] = "fail"
+        result_payload["observed_exit_code"] = 1
+        result_payload["message"] = "Replay step has no command."
+        result_payload["failures"] = ["Replay step has no command."]
+    else:
+        try:
+            executed = subprocess.run(
+                command,
+                shell=True,
+                cwd=step_cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+            )
+            observed_exit_code = executed.returncode
+            result_payload["observed_exit_code"] = observed_exit_code
+            result_payload["status"] = "pass" if observed_exit_code == expected_exit_code else "fail"
+            result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
+            result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
+            result_payload["message"] = "replay step executed."
+            if result_payload["status"] != "pass":
+                result_payload["failures"] = [
+                    f"Replay step {step_index} failed with code {observed_exit_code}, expected {expected_exit_code}."
+                ]
+            else:
+                result_payload["failures"] = []
+        except subprocess.TimeoutExpired as exc:
+            result_payload["status"] = "fail"
+            result_payload["observed_exit_code"] = -1
+            result_payload["message"] = f"Replay step timed out after {timeout_s}s"
+            result_payload["failures"] = [f"Replay step {step_index} timed out after {timeout_s}s"]
+            result_payload["timeout_error"] = str(exc)
+        except Exception as exc:
+            result_payload["status"] = "fail"
+            result_payload["observed_exit_code"] = 1
+            result_payload["message"] = "Replay step failed to execute"
+            result_payload["failures"] = [f"Replay step {step_index} failed: {exc}"]
+
+    result_payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-{_safe_slug(capsule_id)}-replay-step-{step_index}.json"
+    trace_payload_bytes = json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    full_trace_path = os.path.join(repo_root, trace_path)
+    _write_text_payload(full_trace_path, trace_payload_bytes.decode("utf-8"))
+    result_payload["trace"] = trace_path
+    result_payload["receipt_pointers"] = [
+        _build_file_pointer(trace_path, trace_payload_bytes, "application/json"),
+        _store_put(repo_root, trace_payload_bytes, "application/json"),
+    ]
+    return result_payload
+
+
 def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
     if not changed_files:
         return []
@@ -6904,26 +7116,83 @@ def _run_replay_stage(
         step_status = str(plan.get("status") or "ok")
         lower_status = step_status.lower()
         replay_status = "success"
+        replay_failures = _safe_string_list(plan.get("failures"))
+        replay_steps: list[dict[str, object]] = []
+        replay_receipts: list[dict[str, object]] = _safe_object_list(plan.get("adapter_receipts"))
+        materialized_paths = _collect_replay_sandbox_paths(repo_root, changed_materials)
+        sandbox_root = f"{OG_ROOT}/work/replay/{_safe_slug(run_id)}/{_safe_slug(capsule)}"
+        replay_result: dict[str, object] = {
+            "capsule_id": capsule,
+            "status": replay_status,
+            "plan_status": step_status,
+            "certificate_id": None,
+            "trace": trace_path,
+            "failures": replay_failures,
+            "parity_results": plan.get("parity_results"),
+            "replay_steps": replay_steps,
+            "equivalence": None,
+            "materialized_paths": materialized_paths,
+        }
+
         if lower_status in {"error", "failed", "fail", "warn"}:
             replay_status = "failed"
             overall_failed = True
+            replay_failures.append(f"Replay plan rejected with status '{step_status}'.")
 
         certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
         claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
 
-        replay_results.append(
-            {
-                "capsule_id": capsule,
-                "status": replay_status,
-                "plan_status": step_status,
-                "certificate_id": certificate_id,
-                "trace": trace_path,
-                "failures": _safe_string_list(plan.get("failures")),
-                "parity_results": plan.get("parity_results"),
-            }
-        )
-        certificate_ids.append(certificate_id)
-        certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+        if replay_status == "success":
+            missing_paths = _materialize_replay_sandbox(repo_root, sandbox_root, changed_materials)
+            if missing_paths:
+                replay_status = "failed"
+                overall_failed = True
+                replay_failures.append(
+                    "Replay sandbox materialization missing required paths: " + ", ".join(missing_paths)
+                )
+            else:
+                sandbox_steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+                for step_index, raw_step in enumerate(sandbox_steps):
+                    if not isinstance(raw_step, dict):
+                        replay_status = "failed"
+                        overall_failed = True
+                        replay_failures.append(f"Replay step {step_index} was not a valid object.")
+                        break
+                    step_result = _run_replay_step(
+                        repo_root=repo_root,
+                        sandbox_root=sandbox_root,
+                        run_id=run_id,
+                        capsule_id=capsule,
+                        step_index=step_index,
+                        step=raw_step,
+                    )
+                    replay_steps.append(step_result)
+                    replay_result["replay_steps"] = replay_steps
+                    replay_receipts.extend(_safe_object_list(step_result.get("receipt_pointers")))
+                    if str(step_result.get("status") or "") != "pass":
+                        replay_status = "failed"
+                        overall_failed = True
+                        replay_failures.extend(_safe_string_list(step_result.get("failures")))
+                        break
+
+                baseline_hash = _collect_replay_equivalence_baseline(repo_root, capsule)
+                observed_hash = _compute_replay_observed_hash(replay_steps)
+                equivalence = {
+                    "baseline_hash": baseline_hash,
+                    "observed_hash": observed_hash,
+                    "oracle_digest": observed_hash,
+                    "match": baseline_hash is None or baseline_hash == observed_hash,
+                    "materialized_path_count": len(materialized_paths),
+                    "trace_count": len(replay_steps),
+                }
+                replay_result["equivalence"] = equivalence
+                if baseline_hash is not None and not equivalence["match"]:
+                    replay_status = "failed"
+                    overall_failed = True
+                    replay_failures.append("Replay output did not match baseline equivalence hash.")
+
+        replay_result["status"] = replay_status
+        replay_result["failures"] = replay_failures
 
         try:
             claim_payload = _build_claim_payload(
@@ -6933,10 +7202,7 @@ def _run_replay_stage(
                 "replay",
                 mode,
                 changed_files if changed_only else [],
-                _normalize_receipt_pointers(
-                    plan.get("adapter_receipts", []),
-                    field=f"replay_plans[{len(replay_results)-1}].adapter_receipts",
-                ),
+                _normalize_receipt_pointers(replay_receipts, field=f"replay_plans[{len(replay_results)}].receipts"),
                 text=f"Replay stage for {capsule} completed with plan status '{step_status}'.",
             )
             claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
@@ -6949,8 +7215,14 @@ def _run_replay_stage(
         except Exception as exc:
             errors.append(f"Failed to write replay claim for {capsule}: {exc}")
             overall_failed = True
-            replay_results[-1]["status"] = "error"
-            replay_results[-1]["failures"].append(f"claim persistence failed: {exc}")
+            replay_result["status"] = "error"
+            replay_failures.append(f"claim persistence failed: {exc}")
+            replay_result["failures"] = replay_failures
+            replay_results.append(replay_result)
+            continue
+
+        if replay_status != "success":
+            replay_results.append(replay_result)
             continue
 
         try:
@@ -6961,17 +7233,19 @@ def _run_replay_stage(
                 [f"{OG_ROOT}/claims/{claim_id}.json"],
                 "replay",
                 mode,
-                [p for p in plan.get("adapter_receipts", []) if isinstance(p, dict)],
-                status="success" if replay_status == "success" else "failed",
+                replay_receipts,
+                status="success",
                 source="replay",
                 adapter_name=str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
             )
             cert_payload["replay_context"] = {
                 "run_id": run_id,
                 "adapter_profile": profile,
-                "sandbox_root": f"{OG_ROOT}/work/replay/{run_id}/{_safe_slug(capsule)}",
+                "source_ref": "HEAD",
+                "sandbox_root": sandbox_root,
                 "changed_materials": changed_materials,
-                "equivalence": plan.get("parity_results"),
+                "materialized_paths": materialized_paths,
+                "equivalence": replay_result.get("equivalence"),
             }
             certificate_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
             os.makedirs(os.path.dirname(certificate_path), exist_ok=True)
@@ -6980,17 +7254,16 @@ def _run_replay_stage(
                 f"{OG_ROOT}/certificates/{certificate_id}.json",
                 cert_payload,
             )
+            certificate_ids.append(certificate_id)
+            certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
+            replay_result["certificate_id"] = certificate_id
         except Exception as exc:
             errors.append(f"Failed to write replay certificate for {capsule}: {exc}")
             overall_failed = True
-            replay_results[-1]["status"] = "error"
-            replay_results[-1]["certificate_id"] = None
-            replay_results[-1]["failures"].append(f"certificate persistence failed: {exc}")
-            replay_results[-1]["plan_status"] = "error"
-            if certificate_id in certificate_ids:
-                certificate_ids.remove(certificate_id)
-            if f"{OG_ROOT}/certificates/{certificate_id}.json" in certificate_refs:
-                certificate_refs.remove(f"{OG_ROOT}/certificates/{certificate_id}.json")
+            replay_result["status"] = "error"
+            replay_failures.append(f"certificate persistence failed: {exc}")
+            replay_result["failures"] = replay_failures
+        replay_results.append(replay_result)
 
     return {
         "name": "replay",

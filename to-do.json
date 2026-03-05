@@ -912,7 +912,7 @@
       "id": "OG-SPEC-007",
       "title": "Execute replay plans in isolated sandboxes with equivalence verification",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Upgrade replay from plan normalization to actual command execution in isolated environments and certifiable equivalence outputs.",
       "steps": [
         "Materialize replay sandbox/worktree under .outcomegraph/work/replay/<run>/<capsule>",
@@ -936,7 +936,7 @@
         "OG-SPEC-002",
         "OG-SPEC-006"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:11:40Z"
     },
     {
       "id": "OG-SPEC-008",

@@ -522,6 +522,25 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
 
         self.assertEqual(str(context.exception), "worker interface version mismatch")
 
+    def test_run_codex_worker_rejects_incompatible_manifest_schema(self) -> None:
+        with self.git_root_patch(), patch.object(
+            og,
+            "_build_worker_manifest",
+            return_value={
+                "schema_version": 1,
+                "type": "worker",
+                "name": "codex",
+                "implementation_version": "1.0.0",
+                "interface_version": 1,
+                "capabilities": ["distill", "replay", "explain"],
+                "entrypoint": "codex://v1",
+            },
+        ):
+            with self.assertRaises(og.WorkerAdapterError) as context:
+                og._run_codex_worker("distill", {"run_id": "run-1"}, str(self.repo), "trace.json")
+
+        self.assertEqual(str(context.exception), "worker manifest schema mismatch")
+
     def test_parse_worker_output_extracts_contract_from_event_stream(self) -> None:
         payload = {
             "schema_version": 2,
@@ -705,3 +724,329 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["code"], og.POLICY_DENIED_CODE)
         self.assertEqual(payload["category"], "file_writes")
+
+
+class TestSpecComplianceGates(_RepoTestCase):
+    def test_validate_canonical_artifacts_enforces_schema_and_path_mapping(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            base = self.repo / ".outcomegraph"
+            valid_snapshot = "2026-03-05T00:00:00Z"
+
+            (base / "capsules" / "default.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "capsule",
+                        "id": "default",
+                        "status": "active",
+                        "scope": ["**/*"],
+                        "created_at": valid_snapshot,
+                        "updated_at": valid_snapshot,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            (base / "refs" / "main.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "ref",
+                        "id": "main",
+                        "capsule_id": "default",
+                        "updated_at": valid_snapshot,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            (base / "decisions" / "dec-1.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "decision",
+                        "id": "dec-1",
+                        "capsule_id": "default",
+                        "updated_at": valid_snapshot,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            (base / "claims" / "cl-1.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "claim",
+                        "id": "cl-1",
+                        "capsule_id": "default",
+                        "text": "validation smoke test claim",
+                        "receipt_pointers": [
+                            {
+                                "schema_version": 2,
+                                "type": "file",
+                                "target": ".outcomegraph/traces/sample.json",
+                            },
+                        ],
+                        "created_at": valid_snapshot,
+                        "origin": {"run_id": "run-1", "profile": "analyze", "mode": "observe", "changed_files": []},
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            (base / "certificates" / "cert-1.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "certificate",
+                        "id": "cert-1",
+                        "capsule_id": "default",
+                        "run_id": "run-1",
+                        "status": "success",
+                        "receipt_pointers": [
+                            {
+                                "schema_version": 2,
+                                "type": "file",
+                                "target": ".outcomegraph/traces/sample.json",
+                            },
+                        ],
+                        "claim_refs": [".outcomegraph/claims/cl-1.json"],
+                        "created_at": valid_snapshot,
+                        "updated_at": valid_snapshot,
+                        "replay_context": {"run_id": "run-1"},
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+            # Canonical payloads are schema-valid and path-consistent.
+            og._validate_canonical_artifact_records(str(self.repo))
+
+            # A path/type mismatch must be rejected as a conformance failure.
+            (base / "capsules" / "bad-type.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "artifact_type": "ref",
+                        "id": "bad-type",
+                        "status": "active",
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError) as context:
+                og._validate_canonical_artifact_records(str(self.repo))
+
+        self.assertIn("artifact_type 'ref' does not match expected 'capsule'", str(context.exception))
+
+    def test_validate_canonical_artifacts_rejects_non_version_two_schema(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            base = self.repo / ".outcomegraph"
+            (base / "refs" / "legacy.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "artifact_type": "ref",
+                        "id": "legacy",
+                        "capsule_id": "default",
+                        "updated_at": "2026-03-05T00:00:00Z",
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError) as context:
+                og._validate_canonical_artifact_records(str(self.repo))
+
+        self.assertIn("schema_version must be 2", str(context.exception))
+
+    def test_run_verify_stage_returns_policy_configuration_error(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            "schema_version: 1\nmode: observe\n",
+            encoding="utf-8",
+        )
+
+        payload = og._run_verify_stage(
+            str(self.repo),
+            ["default"],
+            ["capsules/default.yaml"],
+            "run-verify",
+            "observe",
+        )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.POLICY_CONFIG_ERROR_CODE)
+
+    def test_run_replay_stage_persists_equivalence_and_receipts(self) -> None:
+        with self.git_root_patch():
+            snapshot = {"changed_files": ["capsules/default.yaml"]}
+            receipts = [
+                {"schema_version": 2, "type": "file", "target": ".outcomegraph/traces/replay-run.json"},
+            ]
+            replay_plan = {
+                "schema_version": 2,
+                "interface_version": 1,
+                "run_id": "run-replay-gates",
+                "capsule_id": "default",
+                "steps": [{"command": "echo ok"}],
+                "status": "ok",
+                "parity_results": {"match": True, "details": "equivalence output checksum identical"},
+            }
+
+            with patch.object(
+                og, "_collect_affected_capsules", return_value=["default"]
+            ), patch.object(
+                og,
+                "_collect_changed_materials",
+                return_value=[],
+            ), patch.object(
+                og,
+                "_run_codex_worker",
+                return_value=(replay_plan, receipts),
+            ):
+                payload = og._run_replay_stage(
+                    str(self.repo),
+                    snapshot,
+                    "run-1",
+                    "analyze",
+                    "observe",
+                    changed_only=True,
+                )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["replay_results"][0]["status"], "success")
+        self.assertTrue(payload["certificate_ids"])
+        self.assertEqual(len(payload["certificate_refs"]), 1)
+
+        certificate_path = self.repo / payload["certificate_refs"][0]
+        certificate_payload = json.loads(certificate_path.read_text(encoding="utf-8"))
+        replay_result = payload["replay_results"][0]
+        result_equivalence = replay_result.get("equivalence")
+        self.assertIsInstance(result_equivalence, dict)
+        self.assertIn("equivalence", certificate_payload["replay_context"])
+        self.assertEqual(
+            certificate_payload["replay_context"]["equivalence"],
+            result_equivalence,
+        )
+        self.assertEqual(result_equivalence.get("baseline_hash"), None)
+        self.assertTrue(result_equivalence.get("match"))
+
+        claim_payload = json.loads((self.repo / certificate_payload["claim_refs"][0]).read_text(encoding="utf-8"))
+        self.assertTrue(len(claim_payload["receipt_pointers"]) >= 2)
+        self.assertTrue(any(item.get("target") == ".outcomegraph/traces/run-1-default-replay-step-0.json" for item in claim_payload["receipt_pointers"]))
+        self.assertTrue(any(item in receipts for item in claim_payload["receipt_pointers"]))
+        self.assertTrue(any(item.get("type") for item in claim_payload["receipt_pointers"]))
+
+    def test_run_replay_stage_skips_certificate_on_equivalence_mismatch(self) -> None:
+        with self.git_root_patch():
+            snapshot = {"changed_files": ["capsules/default.yaml"]}
+            baseline_claim_payload = og._build_claim_payload(
+                "cl-default-replay-baseline",
+                "default",
+                "run-baseline",
+                "replay",
+                "observe",
+                [],
+                [],
+                text="Replay baseline claim for equivalence gate test.",
+            )
+            og._write_canonical_artifact(
+                str(self.repo),
+                f"{og.OG_ROOT}/claims/cl-default-replay-baseline.json",
+                baseline_claim_payload,
+            )
+            baseline_certificate = og._build_certificate_payload(
+                "cert-default-replay-baseline",
+                "default",
+                "run-baseline",
+                [f"{og.OG_ROOT}/claims/cl-default-replay-baseline.json"],
+                "replay",
+                "observe",
+                [],
+                status="success",
+                source="replay",
+            )
+            baseline_certificate["replay_context"] = {
+                "run_id": "run-baseline",
+                "adapter_profile": "analyze",
+                "source_ref": "HEAD",
+                "sandbox_root": ".outcomegraph/work/replay/run-baseline/default",
+                "changed_materials": [],
+                "equivalence": {
+                    "baseline_hash": "sha256:baseline-equivalence-hash",
+                    "observed_hash": "sha256:baseline-equivalence-hash",
+                    "oracle_digest": "sha256:baseline-equivalence-hash",
+                    "match": True,
+                },
+            }
+            og._write_canonical_artifact(
+                str(self.repo),
+                f"{og.OG_ROOT}/certificates/cert-default-replay-baseline.json",
+                baseline_certificate,
+            )
+
+            replay_plan = {
+                "schema_version": 2,
+                "interface_version": 1,
+                "run_id": "run-replay-gates",
+                "capsule_id": "default",
+                "steps": [{"command": "echo ok"}],
+                "status": "ok",
+            }
+
+            with patch.object(
+                og, "_collect_affected_capsules", return_value=["default"]
+            ), patch.object(
+                og,
+                "_collect_changed_materials",
+                return_value=[],
+            ), patch.object(
+                og,
+                "_run_codex_worker",
+                return_value=(replay_plan, []),
+            ):
+                payload = og._run_replay_stage(
+                    str(self.repo),
+                    snapshot,
+                    "run-mismatch",
+                    "analyze",
+                    "observe",
+                    changed_only=True,
+                )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["replay_results"][0]["status"], "failed")
+        self.assertEqual(payload["replay_results"][0]["equivalence"]["match"], False)
+        self.assertEqual(
+            payload["replay_results"][0]["equivalence"]["baseline_hash"],
+            "sha256:baseline-equivalence-hash",
+        )
+        self.assertEqual(payload["certificate_ids"], [])
+        self.assertEqual(payload["certificate_refs"], [])
+
+    def test_build_status_payload_marks_runtime_degraded_state(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            state_path = self.repo / ".outcomegraph" / "work" / "state.json"
+            work_state = json.loads(state_path.read_text(encoding="utf-8"))
+            work_state["status"] = "degraded"
+            work_state["last_message"] = "worker runtime unavailable during conformance test"
+            state_path.write_text(json.dumps(work_state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            status_payload = og._build_status_payload(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+
+        self.assertEqual(status_payload["status"], "error")
+        self.assertEqual(status_payload["runtime"]["status"], "degraded")
+        self.assertEqual(status_payload["runtime"]["message"], "work state is degraded")
+        issue_types = {issue.get("type") for issue in status_payload.get("issues", [])}
+        self.assertIn("degraded", issue_types)
