@@ -385,6 +385,64 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(payload["message"], "sync workflow failed")
 
 
+class TestIntegrityValidation(_RepoTestCase):
+    def _build_verified_events(self) -> None:
+        og._init_outcomegraph()
+        for index in range(1, 13):
+            og._append_ledger_event(
+                str(self.repo),
+                {
+                    "schema_version": 2,
+                    "artifact_type": "verify",
+                    "id": f"event-{index:02d}",
+                    "status": "ok",
+                    "created_at": f"2026-03-05T00:{index:02d}:00Z",
+                },
+            )
+
+    def _build_checkpoint_at_sequence(self, sequence: int) -> None:
+        target_path = self.repo / ".outcomegraph" / "events" / f"event-{sequence:02d}.json"
+        payload = json.loads(target_path.read_text(encoding="utf-8"))
+        og._write_integrity_checkpoint(
+            str(self.repo),
+            sequence,
+            str(payload["id"]),
+            str(payload["event_hash"]),
+            str(payload["previous_event_hash"]),
+        )
+
+    def test_validate_event_chain_skips_events_covered_by_latest_checkpoint(self) -> None:
+        with self.git_root_patch():
+            self._build_verified_events()
+            self._build_checkpoint_at_sequence(10)
+
+            bad_payload = json.loads((self.repo / ".outcomegraph" / "events" / "event-05.json").read_text(encoding="utf-8"))
+            bad_payload["event_hash"] = "sha256:invalid"
+            og._write_json_file(str(self.repo / ".outcomegraph" / "events" / "event-05.json"), bad_payload)
+
+            result = og._validate_event_chain(str(self.repo))
+            newest_event = json.loads((self.repo / ".outcomegraph" / "events" / "event-12.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["event_sequence"], 12)
+        self.assertEqual(result["event_hash"], str(newest_event["event_hash"]))
+
+    def test_validate_event_chain_uses_checkpoint_previous_event_hash(self) -> None:
+        with self.git_root_patch():
+            self._build_verified_events()
+            self._build_checkpoint_at_sequence(10)
+
+            broken_payload = json.loads((self.repo / ".outcomegraph" / "events" / "event-11.json").read_text(encoding="utf-8"))
+            broken_payload["previous_event_hash"] = "sha256:invalid-previous"
+            og._write_json_file(str(self.repo / ".outcomegraph" / "events" / "event-11.json"), broken_payload)
+
+            result = og._validate_event_chain(str(self.repo))
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertIn("integrity link break at event #11", result["message"])
+        self.assertEqual(result["event_count"], 10)
+
+
 class TestVerifyWorkflows(_RepoTestCase):
     def test_run_verify_stage_reports_failed_oracle(self) -> None:
         with self.git_root_patch():

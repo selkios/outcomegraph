@@ -2504,23 +2504,26 @@ def _validate_event_chain(repo_root: str) -> dict[str, object]:
 
     checkpoint, _ = _read_latest_integrity_checkpoint(repo_root)
     expected_sequence = int(checkpoint.get("end_sequence", 0) if isinstance(checkpoint, dict) else 0)
+    checkpoint_available = isinstance(checkpoint, dict)
     previous_hash = checkpoint.get("end_event_hash") if isinstance(checkpoint, dict) else None
     previous_hash = previous_hash if isinstance(previous_hash, str) else None
 
     expected_next = expected_sequence + 1
-    total = 0
+    total = expected_sequence
     for raw_sequence, _, _, event in events:
         event_sequence = raw_sequence
         if event_sequence == 0:
             continue
         if event_sequence <= expected_sequence:
-            return {
-                "status": "degraded",
-                "state": "degraded",
-                "valid": False,
-                "message": f"integrity duplicate/ordered event sequence #{event_sequence}",
-                "event_count": total,
-            }
+            if not checkpoint_available:
+                return {
+                    "status": "degraded",
+                    "state": "degraded",
+                    "valid": False,
+                    "message": f"integrity duplicate/ordered event sequence #{event_sequence}",
+                    "event_count": total,
+                }
+            continue
         if event_sequence != expected_next:
             return {
                 "status": "degraded",
