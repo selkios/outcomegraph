@@ -1,0 +1,11 @@
+[project]
+name = "outcomegraph"
+version = "0.1.0"
+description = "OutcomeGraph CLI and artifact reconciliation workflow"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+og = "og:og_cli"
+ogd = "og:ogd_cli"

@@ -15,20 +15,18 @@ boundary for humans, agents, CI, and MCP clients.
 ## Quick start
 
 ```bash
-python -m pip install ... # if packaging is added, otherwise use repository checkout
-
 git init .
-og init
-og status --json
-og sync --json
+uv run og init
+uv run og status --json
+uv run og sync --json
 ```
 
 Typical CI/automation loop:
 
 ```bash
-og status --json          # guard: if status != ok -> fail fast
-og sync --json            # performs deterministic reconciliation
-og verify --changed --json # checks changed capsules only
+uv run og status --json           # guard: if status != ok -> fail fast
+uv run og sync --json             # performs deterministic reconciliation
+uv run og verify --changed --json  # checks changed capsules only
 ```
 
 ## Core command contract
@@ -54,6 +52,12 @@ Common flags:
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
 - `--changed` (for focused sync/verify/replay behavior)
+
+If you are running from source, prefer:
+
+```bash
+uv run og <command>
+```
 
 Return contract:
 
