@@ -39,6 +39,8 @@ og --help
 og sync --help
 og daemon --help
 og daemon run --help
+og schema
+og describe sync
 ```
 
 ## 2b) Experimental prompt optimization

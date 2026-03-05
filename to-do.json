@@ -1197,8 +1197,8 @@
       "id": "OG-AGENT-004",
       "title": "Add machine introspection commands (`schema` and `describe`)",
       "priority": 1,
-      "status": "todo",
-      "details": "Provide runtime-discoverable command signatures and request/response schemas so agents do not need prompt-embedded docs. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Implemented OG-AGENT-004: added `og schema` and `og describe <command>` introspection surfaces, response/request signature catalog, and docs/tests. Updated CLI review evidence accordingly.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Implement `og schema` and `og describe <command>` returning JSON-only introspection payloads",
@@ -1221,9 +1221,11 @@
         "QUICKSTART.md",
         "SPEC-v2.md",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:03:17Z",
+      "blockers": []
     },
     {
       "id": "OG-AGENT-005",

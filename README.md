@@ -113,11 +113,21 @@ og verify --changed --json  # checks changed capsules only
 - `optimize prompts`
 - `autopilot init|disable`
 - `daemon install|start|stop|status|run`
+- `schema`
+- `describe <command>`
 
 Every top-level command supports `--help` as a stable contract surface:
 
 - `og <command> --help` prints command-specific usage and accepted options.
 - `og daemon --help` and `og daemon run --help` are valid contract entrypoints.
+
+Machine bootstrap for agents:
+
+```bash
+og schema
+og describe sync
+og describe daemon status
+```
 
 Common flags:
 

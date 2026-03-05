@@ -16,7 +16,7 @@ Scope: `/home/agent/outcomegraph`
 1. `--help` contract is command-complete for top-level and nested commands.
 2. JSON output uses a single, versioned, command-level envelope for all command results and failures.
 3. Error payloads are now typed with `error_class`, `error_code`, and bounded `retryable`/`hint` metadata.
-4. No first-class agent introspection (`schema`/`describe`) or field/pagination/stream controls.
+4. Runtime introspection is now first-class via `schema` and `describe`, with request/response metadata discoverable for each command.
 5. Path inputs for `optimize prompts` are not constrained to repo root.
 
 ## Checklist Results
@@ -27,7 +27,7 @@ Scope: `/home/agent/outcomegraph`
 | 2) Structured output + unambiguous success | Done | [`og.py`](./og.py) | `--json` now emits a single contract envelope with `schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, and `metrics` for command/help/error paths across all commands. |
 | 3) Error model + exit codes | Done | [`og.py:1169`](./og.py#L1169), [`README.md:135`](./README.md#L135), [`SPEC-v2.md:198`](./SPEC-v2.md#L198), [`tests/test_og_sync_verify_replay_hooks.py:670`](./tests/test_og_sync_verify_replay_hooks.py#L670) | Error payload now includes stable typed metadata (`error_class`, `error_code`, `retryable`, `hint`), envelope rendering normalizes `errors` to object records, and exit mapping uses `error_class` semantics. |
 | 4) Agent-oriented input design | Fail | [`og.py:5197`](./og.py#L5197), [`og.py:5583`](./og.py#L5583) | No raw request-body input path (`--params`/input JSON contract) and no CLI `--strict`. |
-| 5) Runtime introspection | Fail | [`og.py:826`](./og.py#L826), [`og.py:9231`](./og.py#L9231), [`og.py:4036`](./og.py#L4036) | No `schema`/`describe` command that emits machine-readable request/response signatures. |
+| 5) Runtime introspection | Done | [`og.py:899`](./og.py#L899), [`og.py:10643`](./og.py#L10643), [`og.py:10716`](./og.py#L10716), [`og.py:11270`](./og.py#L11270) | `schema` and `describe` now provide machine-readable command signatures for discovery and per-command introspection. |
 | 6) Context/window + payload controls | Fail | [`og.py:5197`](./og.py#L5197) | No `--fields`, pagination controls, or streaming list output mode. |
 | 7) Interaction traps | Partial | [`og.py:4629`](./og.py#L4629), [`og.py:4644`](./og.py#L4644) | Most commands are non-interactive; `autopilot init --force-hooks-path` can prompt and there is no global `--non-interactive`. |
 | 8) Recovery tooling | Partial | [`og.py:5405`](./og.py#L5405), [`og.py:8926`](./og.py#L8926), [`og.py:9052`](./og.py#L9052), [`og.py:4870`](./og.py#L4870) | `clean --dry-run` and sync idempotency exist; `replay` exists. Missing general `--dry-run`/`validate` split for mutating commands, `doctor` command, and CLI retry knobs (`--max-retries`, timeout flags). |

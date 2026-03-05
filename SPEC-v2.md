@@ -161,6 +161,8 @@ og daemon install
 og daemon start
 og daemon stop
 og daemon status
+og schema
+og describe <command>
 
 ogd install
 ogd start
@@ -174,6 +176,11 @@ Core parsing rules:
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
 - Unknown options or subcommands are treated as usage errors.
+
+Machine introspection is supported:
+
+- `og schema` emits all supported command signatures, request fields, response envelope shape, and known error codes in machine-readable form.
+- `og describe <command>` emits the signature for one command, including nested command names like `daemon status`.
 
 `og optimize prompts` accepts:
 

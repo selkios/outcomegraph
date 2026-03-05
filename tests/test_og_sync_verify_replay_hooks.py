@@ -68,6 +68,8 @@ class TestHelpContracts(TestCase):
             (["daemon", "stop", "--help"], "Usage: og daemon stop"),
             (["daemon", "status", "--help"], "Usage: og daemon status"),
             (["daemon", "run", "--help"], "Usage: og daemon run"),
+            (["schema", "--help"], "Usage: og schema"),
+            (["describe", "--help"], "Usage: og describe"),
         ]
 
         for args, expected_usage in test_cases:
@@ -77,6 +79,59 @@ class TestHelpContracts(TestCase):
             self.assertIn("Accepted options:", text, msg=f"missing options block for {args}")
             self.assertIn("Output modes:", text, msg=f"missing output modes block for {args}")
             self.assertIn("Exit codes:", text, msg=f"missing exit codes block for {args}")
+
+
+class TestCommandIntrospectionContracts(TestCase):
+    def test_schema_command_documents_cli_signatures(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["--json", "schema"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "schema")
+        self.assertEqual(payload["status"], "ok")
+        data = payload["data"]
+        self.assertEqual(data["schema_version"], og.COMMAND_INTROSPECTION_SCHEMA_VERSION)
+        self.assertEqual(data["command_count"], len(data["commands"]))
+        signatures = {entry["command"]: entry for entry in data["commands"]}
+        for command_name in {"schema", "describe", "sync", "daemon status", "optimize prompts"}:
+            self.assertIn(command_name, signatures, msg=f"missing signature for {command_name}")
+            signature = signatures[command_name]
+            self.assertIn("usage", signature)
+            self.assertIn("request", signature)
+            self.assertIn("response", signature)
+            self.assertIn("known_error_codes", signature)
+            self.assertIn("envelope_schema_version", signature["response"])
+
+    def test_describe_command_resolves_signature(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["--json", "describe", "daemon", "status"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "describe")
+        data = payload["data"]
+        self.assertEqual(data["requested_command"], "daemon status")
+        signature = data["signature"]
+        self.assertEqual(signature["command"], "daemon status")
+        self.assertIn("response", signature)
+        self.assertIn("request", signature)
+
+    def test_describe_requires_known_command(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            with self.assertRaises(SystemExit) as context:
+                og.main(["--json", "describe", "does-not-exist"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(context.exception.code, 64)
+        self.assertEqual(payload["command"], "describe")
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
 
 
 class TestJsonEnvelopeContract(TestCase):

@@ -218,6 +218,7 @@ LOCK_STATUS_UNLOCKED = "unlocked"
 STATUS_SCHEMA_VERSION = 1
 DRIFT_REPORT_SCHEMA_VERSION = 1
 COMMAND_RESULT_SCHEMA_VERSION = 1
+COMMAND_INTROSPECTION_SCHEMA_VERSION = 1
 STATUS_SYNC_STALE_SECONDS = 3600
 STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
@@ -907,6 +908,8 @@ Core commands:
   og export
   og clean [--scope runtime|generated|all] [--dry-run] [--yes]
   og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]]
+  og schema
+  og describe <command>
   og drift
   og mcp-server
   og optimize prompts
@@ -1142,7 +1145,464 @@ def _help_for_command(command: str) -> str:
                 "This command blocks while polling repository changes; no JSON payload is emitted.",
             ],
         )
+    if normalized == "schema":
+        return _command_help(
+            "og schema",
+            "Emit machine-readable command signatures and request/response schemas.",
+            ["--json"],
+            ["og schema", "og schema --json"],
+        )
+    if normalized == "describe":
+        return _command_help(
+            "og describe <command>",
+            "Describe the request/response signature for a known CLI command.",
+            ["--json"],
+            ["og describe sync", "og describe daemon status"],
+        )
     return emit_usage() + "\nUse --help with a recognized command for details."
+
+
+def _command_schema_field(
+    name: str,
+    field_type: str,
+    description: str,
+    *,
+    required: bool = False,
+    default: object | None = None,
+    enum: list[str] | None = None,
+) -> dict[str, object]:
+    field: dict[str, object] = {
+        "name": name,
+        "type": field_type,
+        "description": description,
+        "required": required,
+    }
+    if default is not None:
+        field["default"] = default
+    if enum is not None:
+        field["enum"] = enum
+    return field
+
+
+def _command_signature_entry(
+    command: str,
+    usage: str,
+    summary: str,
+    request_fields: list[dict[str, object]],
+    response_fields: list[dict[str, object]],
+    known_error_codes: list[str],
+    *,
+    examples: list[str] | None = None,
+    subcommands: list[str] | None = None,
+) -> dict[str, object]:
+    response_schema = {
+        "envelope_schema_version": COMMAND_RESULT_SCHEMA_VERSION,
+        "data_fields": response_fields,
+    }
+    required_request = [entry["name"] for entry in request_fields if entry.get("required")]
+    signature: dict[str, object] = {
+        "command": command,
+        "usage": usage,
+        "summary": summary,
+        "request": {
+            "fields": request_fields,
+            "required_fields": required_request,
+        },
+        "response": response_schema,
+        "known_error_codes": known_error_codes,
+        "examples": examples or [],
+    }
+    if subcommands:
+        signature["subcommands"] = subcommands
+    return signature
+
+
+def _build_cli_command_signatures() -> list[dict[str, object]]:
+    command_signatures: list[dict[str, object]] = [
+        _command_signature_entry(
+            "init",
+            "og init",
+            "Initialize .outcomegraph state and default policy files.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("options", "object", "Parsed command options."),
+                _command_schema_field("updated_dirs", "array", "Directories initialized for the repo."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og init", "og init --json"],
+        ),
+        _command_signature_entry(
+            "sync",
+            "og sync",
+            "Collect changes, distill/categorize them, apply artifacts, verify, and export outputs.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--changed", "boolean", "Limit processing to changed scope.", default=False),
+                _command_schema_field(
+                    "--profile",
+                    "string",
+                    "Worker profile selection.",
+                    enum=sorted(PROFILE_VALUES),
+                ),
+                _command_schema_field(
+                    "--mode",
+                    "string",
+                    "Operational mode.",
+                    enum=sorted(MODE_VALUES),
+                ),
+                _command_schema_field("--force-full-sync", "boolean", "Skip runtime-only change short-circuiting.", default=False),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok`, `error`, or `warn`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("options", "object", "Parsed command options."),
+                _command_schema_field("steps", "array", "Pipeline stage results."),
+                _command_schema_field("summary_event", "string", "Summary event path."),
+                _command_schema_field("errors", "array", "Typed error records when status is error."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, INTEGRITY_CHECK_FAILED_CODE, WORKER_RUNTIME_UNAVAILABLE_CODE],
+            examples=["og sync", "og sync --profile propose", "og sync --force-full-sync"],
+        ),
+        _command_signature_entry(
+            "verify",
+            "og verify",
+            "Run verification for known or changed capsules and emit verification artifacts.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--changed", "boolean", "Verify only changed capsules.", default=False),
+                _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
+                _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("options", "object", "Parsed command options."),
+                _command_schema_field("results", "array", "Verification results for each stage."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og verify --changed", "og verify --json"],
+        ),
+        _command_signature_entry(
+            "replay",
+            "og replay",
+            "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--changed", "boolean", "Replay only changed capsules.", default=False),
+                _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
+                _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("options", "object", "Parsed command options."),
+                _command_schema_field("replay_plans", "array", "Replay plan artifacts produced."),
+                _command_schema_field("replay_results", "array", "Replay execution results."),
+                _command_schema_field("certificate_ids", "array", "Replay certificates issued."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, WORKER_RUNTIME_UNAVAILABLE_CODE],
+            examples=["og replay --changed", "og replay --json"],
+        ),
+        _command_signature_entry(
+            "status",
+            "og status",
+            "Show freshness, lock, verification, and daemon/autopilot state.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
+                _command_schema_field("schema_version", "integer", "Status schema version."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og status", "og status --json"],
+        ),
+        _command_signature_entry(
+            "export",
+            "og export",
+            "Render configured export surfaces from canonical artifacts.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("updated_exports", "array", "Exports updated by the command."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og export", "og export --json"],
+        ),
+        _command_signature_entry(
+            "clean",
+            "og clean",
+            "Remove runtime and/or generated outcomegraph state.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--scope", "string", "Target cleanup scope (`runtime`, `generated`, `all`).", enum=sorted(CLEAN_SCOPES)),
+                _command_schema_field("--dry-run", "boolean", "Calculate cleanup plan without deleting.", default=False),
+                _command_schema_field("--yes", "boolean", "Confirm destructive cleanup.", default=False),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("options", "object", "Parsed command options."),
+                _command_schema_field("removed_paths", "array", "Paths removed by clean job."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og clean --scope runtime", "og clean --scope all --dry-run --json"],
+        ),
+        _command_signature_entry(
+            "explain",
+            "og explain",
+            "Explain artifact provenance and proof chain for selected capsules, refs, and certificates.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--capsule", "array", "One or more capsule IDs to filter by."),
+                _command_schema_field("--ref", "array", "One or more ref IDs to filter by."),
+                _command_schema_field("--certificate", "array", "One or more certificate IDs to filter by."),
+                _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
+                _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("claims", "array", "Explained claim artifacts."),
+                _command_schema_field("certificates", "array", "Explained certificate artifacts."),
+                _command_schema_field("decisions", "array", "Decision artifacts for the explain run."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og explain --capsule default", "og explain --json --certificate cert-1"],
+        ),
+        _command_signature_entry(
+            "drift",
+            "og drift",
+            "Run canonical drift checks for policy and certificate health.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("drift_state", "string", "Drift state summary."),
+                _command_schema_field("checks", "array", "Executed drift check results."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, INTEGRITY_CHECK_FAILED_CODE],
+            examples=["og drift", "og drift --json"],
+        ),
+        _command_signature_entry(
+            "mcp-server",
+            "og mcp-server",
+            "Render MCP server control surface definitions (tools/resources/prompts).",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("tools", "array", "Discovered MCP tools."),
+                _command_schema_field("resources", "array", "Discovered MCP resources."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, CONTROL_SURFACE_MISMATCH_CODE],
+            examples=["og mcp-server", "og mcp-server --json"],
+        ),
+        _command_signature_entry(
+            "optimize",
+            "og optimize",
+            "Command group for optimization workflows.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            subcommands=["prompts"],
+            examples=["og optimize", "og optimize --help"],
+        ),
+        _command_signature_entry(
+            "optimize prompts",
+            "og optimize prompts",
+            "Run dataset-based prompt optimization and optionally activate a candidate when it passes thresholds.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--dataset", "string", "Path to eval_dataset artifact.", required=True),
+                _command_schema_field("--candidate", "string", "Path to candidate prompt artifact text.", required=True),
+                _command_schema_field("--baseline", "string", "Path to baseline prompt artifact text.", required=True),
+                _command_schema_field(
+                    "--metric",
+                    "string",
+                    "Metric for prompt comparison.",
+                    enum=["contains", "exact"],
+                ),
+                _command_schema_field("--min-improvement", "number", "Minimum improvement required before promotion."),
+                _command_schema_field("--approve", "boolean", "Persist qualifying prompt pack as active.", default=False),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("evaluation", "object", "Evaluation summary for optimization run."),
+                _command_schema_field("result_path", "string", "Path to generated prompt-pack artifact."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og optimize prompts --dataset ds.json --candidate next.txt --baseline base.txt"],
+        ),
+        _command_signature_entry(
+            "autopilot",
+            "og autopilot",
+            "Command group for hook bootstrap/teardown.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            subcommands=["init", "disable"],
+            examples=["og autopilot --help", "og autopilot init --json"],
+        ),
+        _command_signature_entry(
+            "autopilot init",
+            "og autopilot init",
+            "Install outcomegraph-managed git hooks for lifecycle integration.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--force-hooks-path", "boolean", "Allow hook path override when hooks are already configured."),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("installed_hooks", "array", "Hooks managed during install."),
+            ],
+            [USAGE_ERROR_CODE, POLICY_DENIED_CODE, RUNTIME_ERROR_CODE],
+            examples=["og autopilot init", "og autopilot init --force-hooks-path --json"],
+        ),
+        _command_signature_entry(
+            "autopilot disable",
+            "og autopilot disable",
+            "Remove outcomegraph-managed hooks and restore prior hook state.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("state_present", "boolean", "Whether disable state was found."),
+            ],
+            [USAGE_ERROR_CODE, POLICY_DENIED_CODE, RUNTIME_ERROR_CODE],
+            examples=["og autopilot disable", "og autopilot disable --json"],
+        ),
+        _command_signature_entry(
+            "daemon",
+            "og daemon",
+            "Command group for watcher lifecycle.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            subcommands=["install", "start", "stop", "status", "run"],
+            examples=["og daemon --help", "og daemon status --json"],
+        ),
+        _command_signature_entry(
+            "daemon install",
+            "og daemon install",
+            "Install the long-running watcher process.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon install", "og daemon install --json"],
+        ),
+        _command_signature_entry(
+            "daemon start",
+            "og daemon start",
+            "Start the managed watcher process and persist runtime status.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon start", "og daemon start --json"],
+        ),
+        _command_signature_entry(
+            "daemon stop",
+            "og daemon stop",
+            "Stop the managed watcher process.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon stop", "og daemon stop --json"],
+        ),
+        _command_signature_entry(
+            "daemon status",
+            "og daemon status",
+            "Read watcher install/runtime and last-sync status.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
+                _command_schema_field("install", "object", "Installation details for daemon wrapper."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon status", "og daemon status --json"],
+        ),
+        _command_signature_entry(
+            "daemon run",
+            "og daemon run",
+            "Internal run loop entrypoint for watcher wrappers.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("message", "string", "Human-facing lifecycle output."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon run"],
+        ),
+        _command_signature_entry(
+            "schema",
+            "og schema",
+            "Emit machine-readable CLI command signatures and request/response schema.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("schema_version", "integer", "Schema payload schema version."),
+                _command_schema_field("commands", "array", "All known command signatures."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og schema", "og schema --json"],
+        ),
+        _command_signature_entry(
+            "describe",
+            "og describe <command>",
+            "Describe the request/response signature for a known CLI command.",
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("command", "string", "Target command name or nested command path (e.g. `daemon status`).", required=True),
+            ],
+            [
+                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("schema_version", "integer", "Schema payload schema version."),
+                _command_schema_field("requested_command", "string", "Requested command string."),
+                _command_schema_field("signature", "object", "Resolved command signature."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            examples=["og describe sync", "og describe daemon status"],
+        ),
+    ]
+    return command_signatures
+
+
+_CLI_COMMAND_SIGNATURES = _build_cli_command_signatures()
+_CLI_COMMAND_SIGNATURE_BY_NAME = {entry["command"]: entry for entry in _CLI_COMMAND_SIGNATURES}
+
+
+def _normalize_command_signature_target(raw_target: str) -> str:
+    return " ".join(raw_target.split())
+
 
 
 def _ensure_text_list(raw: object) -> list[str]:
@@ -10177,6 +10637,87 @@ def run_command(args: list[str], output_json: bool) -> int:
         options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json)
         payload = _daemon_status()
         payload["options"] = options
+        emit_command_result(payload, output_json)
+        return _command_exit_code(payload)
+
+    if command == "schema":
+        parse_command_flags(rest, "schema", False, False, False, output_json)
+        payload = {
+            "status": "ok",
+            "command": "schema",
+            "schema_version": COMMAND_INTROSPECTION_SCHEMA_VERSION,
+            "cli_version": VERSION,
+            "command_count": len(_CLI_COMMAND_SIGNATURE_BY_NAME),
+            "commands": _CLI_COMMAND_SIGNATURES,
+        }
+        emit_command_result(payload, output_json)
+        return _command_exit_code(payload)
+
+    if command == "describe":
+        if rest and rest[0] in {"-h", "--help"}:
+            emit_command_result(
+                {
+                    "command": "describe",
+                    "status": "ok",
+                    "message": _help_for_command("describe"),
+                },
+                output_json,
+                "describe",
+            )
+            return EXIT_SUCCESS
+
+        if not rest:
+            emit_error(
+                "missing command argument; usage: og describe <command>\n\nAvailable commands: "
+                + ", ".join(sorted(_CLI_COMMAND_SIGNATURE_BY_NAME)),
+                "describe",
+                EXIT_USAGE,
+                output_json,
+            )
+
+        normalized_rest: list[str] = []
+        for arg in rest:
+            if arg == "--json":
+                output_json = True
+                continue
+            if arg.startswith("--json="):
+                try:
+                    output_json = parse_bool_option(arg.split("=", 1)[1])
+                except ValueError as exc:
+                    emit_error(f"invalid --json value for describe: {exc}", "describe", EXIT_USAGE, output_json)
+                continue
+            if arg.startswith("-"):
+                emit_error(
+                    f"describe does not accept option '{arg}'",
+                    "describe",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            normalized_rest.append(arg)
+        if not normalized_rest:
+            emit_error(
+                "missing command argument; usage: og describe <command>\n\nAvailable commands: "
+                + ", ".join(sorted(_CLI_COMMAND_SIGNATURE_BY_NAME)),
+                "describe",
+                EXIT_USAGE,
+                output_json,
+            )
+        target_command = _normalize_command_signature_target(" ".join(normalized_rest))
+        signature = _CLI_COMMAND_SIGNATURE_BY_NAME.get(target_command)
+        if not signature:
+            emit_error(
+                f"unknown command '{target_command}'\n\nAvailable commands: " + ", ".join(sorted(_CLI_COMMAND_SIGNATURE_BY_NAME)),
+                "describe",
+                EXIT_USAGE,
+                output_json,
+            )
+        payload = {
+            "status": "ok",
+            "command": "describe",
+            "schema_version": COMMAND_INTROSPECTION_SCHEMA_VERSION,
+            "requested_command": target_command,
+            "signature": signature,
+        }
         emit_command_result(payload, output_json)
         return _command_exit_code(payload)
 
