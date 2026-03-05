@@ -3436,18 +3436,15 @@ def _daemon_running(pid: object) -> bool:
 
 
 def _daemon_build_script(repo_root: str) -> str:
-    # Use the currently executing entrypoint path; tmp repos may not contain an `og` file.
-    og_script = os.path.abspath(__file__)
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "\n"
         f'REPO_ROOT="{repo_root}"\n'
-        f'OG_SCRIPT="{og_script}"\n'
         "\n"
         "cd \"$REPO_ROOT\"\n"
         'export OG_AUTOPILOT="1"\n'
-        f'exec "{sys.executable}" "$OG_SCRIPT" daemon run\n'
+        "exec uv run og daemon run \"$@\"\n"
     )
 
 
@@ -3626,7 +3623,7 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
     started = time.perf_counter()
     env = os.environ.copy()
     env["OG_AUTOPILOT"] = "1"
-    cmd = [sys.executable, os.path.abspath(__file__), "sync", "--json"]
+    cmd = ["uv", "run", "--directory", repo_root, "og", "sync", "--json"]
     try:
         process = subprocess.run(
             cmd,
