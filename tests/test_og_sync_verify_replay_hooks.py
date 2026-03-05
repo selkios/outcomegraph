@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
+import warnings
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
@@ -88,6 +89,38 @@ class TestHookLifecycle(_RepoTestCase):
             )
 
 
+class TestDaemonLifecycle(_RepoTestCase):
+    def test_daemon_start_stop_round_trip(self) -> None:
+        with self.git_root_patch(), patch.object(
+            og,
+            "_daemon_build_script",
+            return_value="#!/usr/bin/env bash\nexec sleep 30\n",
+        ):
+            og._init_outcomegraph()
+            install_payload = og._daemon_install()
+            self.assertEqual(install_payload["status"], "ok")
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", ResourceWarning)
+                start_payload = og._daemon_start()
+            self.assertEqual(start_payload["status"], "ok")
+            self.assertTrue(start_payload["runtime"]["running"])
+            try:
+                status_payload = og._daemon_status()
+                self.assertEqual(status_payload["status"], "ok")
+                self.assertTrue(status_payload["runtime"]["running"])
+
+                stop_payload = og._daemon_stop()
+                self.assertFalse(stop_payload["runtime"]["running"])
+                self.assertIn(stop_payload["status"], {"ok", "error"})
+
+                status_after_stop = og._daemon_status()
+                self.assertEqual(status_after_stop["status"], "ok")
+                self.assertFalse(status_after_stop["runtime"]["running"])
+            finally:
+                og._daemon_stop()
+
+
 class TestSyncWorkflows(_RepoTestCase):
     def test_sync_snapshot_falls_back_when_git_baseline_is_unavailable(self) -> None:
         with self.git_root_patch():
@@ -147,6 +180,79 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(payload["status"], "pending")
         self.assertEqual(payload["errors"], ["codex executable was not found"])
         set_pending.assert_called_once()
+
+    def test_run_sync_job_sets_failed_message_when_any_stage_errors(self) -> None:
+        snapshot = {
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_files": ["capsules/default.yaml"],
+            "changed_count": 1,
+            "has_changes": True,
+            "profile": "analyze",
+            "mode": "observe",
+            "captured_at": "2026-03-04T00:00:00Z",
+        }
+        distill_result = {
+            "name": "distill",
+            "status": "error",
+            "message": "distill failed",
+            "affected_capsules": [],
+            "generated_deltas": [],
+        }
+        apply_result = {"name": "apply", "status": "skipped", "message": "apply skipped"}
+        verify_result = {
+            "name": "verify",
+            "status": "skipped",
+            "message": "verify skipped",
+            "verified_capsules": [],
+            "failed_capsules": [],
+            "errors": [],
+            "oracle_results": {},
+            "receipt_pointers": {},
+        }
+        export_result = {
+            "name": "export",
+            "status": "ok",
+            "message": "export ok",
+            "updated_exports": [],
+            "unchanged_exports": [],
+            "artifact_counts": {},
+            "artifact_total": 0,
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
+            og,
+            "_compute_idempotency_key",
+            return_value="sync-key",
+        ), patch.object(og, "_read_work_state", return_value={}), patch.object(
+            og,
+            "_consume_pending",
+            return_value=False,
+        ), patch.object(
+            og,
+            "_run_distill_stage",
+            return_value=distill_result,
+        ), patch.object(
+            og,
+            "_run_apply_stage",
+            return_value=apply_result,
+        ), patch.object(
+            og,
+            "_run_verify_stage",
+            return_value=verify_result,
+        ), patch.object(
+            og,
+            "_run_export_stage",
+            return_value=export_result,
+        ), patch.object(
+            og,
+            "_record_sync_summary_event",
+            return_value="events/sync-2.json",
+        ):
+            payload = og._run_sync_job(str(self.repo), {"changed": False, "profile": "analyze", "mode": "observe"})
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], "sync workflow failed")
 
 
 class TestVerifyWorkflows(_RepoTestCase):
@@ -285,6 +391,84 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
                 og._run_codex_worker("distill", {}, str(self.repo), "trace.json")
 
         self.assertEqual(str(context.exception), "worker interface version mismatch")
+
+    def test_parse_worker_output_extracts_contract_from_event_stream(self) -> None:
+        payload = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-1",
+            "capsule_updates": [
+                {
+                    "id": "default",
+                    "status": "success",
+                    "claims": [],
+                    "decision_refs": [],
+                    "errors": [],
+                    "receipts": [],
+                    "changed_files": ["capsules/default.yaml"],
+                }
+            ],
+        }
+        event_lines = [
+            json.dumps({"type": "thread.started", "thread_id": "abc"}),
+            json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(payload)}}),
+            json.dumps({"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}),
+        ]
+        parsed = og._parse_worker_output("distill", "\n".join(event_lines))
+        self.assertEqual(parsed["schema_version"], 2)
+        self.assertEqual(parsed["run_id"], "run-1")
+        self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
+
+    def test_run_codex_worker_prefers_output_last_message_contract(self) -> None:
+        input_payload = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-2",
+            "adapter_profile": "analyze",
+            "mode": "observe",
+            "target_capsules": [{"id": "default"}],
+            "changed_paths": ["capsules/default.yaml"],
+            "policy_ref": ".outcomegraph/policy.yaml",
+        }
+        output_payload = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-2",
+            "capsule_updates": [
+                {
+                    "id": "default",
+                    "status": "success",
+                    "claims": [],
+                    "decision_refs": [],
+                    "errors": [],
+                    "receipts": [],
+                    "changed_files": ["capsules/default.yaml"],
+                }
+            ],
+        }
+
+        def fake_subprocess_run(command, input, text, capture_output, cwd, timeout):
+            self.assertTrue(text)
+            self.assertTrue(capture_output)
+            self.assertEqual(cwd, str(self.repo))
+            self.assertTrue(timeout > 0)
+            if "--output-last-message" in command:
+                path = command[command.index("--output-last-message") + 1]
+                Path(path).write_text(json.dumps(output_payload), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=command,
+                returncode=0,
+                stdout='{"type":"turn.completed"}\n',
+                stderr="",
+            )
+
+        with self.git_root_patch(), patch.object(og.subprocess, "run", side_effect=fake_subprocess_run):
+            parsed, receipts = og._run_codex_worker("distill", input_payload, str(self.repo), "trace.json")
+
+        self.assertEqual(parsed["run_id"], "run-2")
+        self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
+        self.assertEqual(len(receipts), 2)
+        self.assertTrue((self.repo / "trace.json").exists())
 
     def test_collect_policy_checks_flags_schema_errors(self) -> None:
         (self.repo / ".outcomegraph").mkdir()

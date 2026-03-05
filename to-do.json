@@ -732,10 +732,23 @@
         "spec-alignment"
       ],
       "files": [
-        "SPEC-v2.md",
-        "ARCHITECTURE.md"
+        "/home/agent/outcomegraph/ARCHITECTURE.md",
+        "/home/agent/outcomegraph/SPEC-v2.md",
+        "/home/agent/outcomegraph/to-do.json",
+        "ARCHITECTURE.md",
+        "SPEC-v2.md"
       ],
-      "updated_at": "2026-03-04T10:38:56Z"
+      "updated_at": "2026-03-04T10:39:05Z"
+    },
+    {
+      "id": "PROJECT-DONE",
+      "title": "Project done: no new tasks",
+      "priority": 5,
+      "status": "done",
+      "details": "Review completed; no new tasks were identified from the latest codebase pass.",
+      "tags": [
+        "project-done"
+      ]
     }
   ]
 }
