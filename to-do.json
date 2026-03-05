@@ -854,7 +854,7 @@
       "id": "OG-SPEC-005",
       "title": "Implement strict policy enforcement with POLICY_DENIED contract",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Move from policy diagnostics to hard enforcement for autonomous actions with explicit denial payloads and exit semantics.",
       "steps": [
         "Load effective policy (built-in defaults or .outcomegraph/policy.yaml) and validate schema",
@@ -877,7 +877,7 @@
       "depends_on": [
         "OG-SPEC-002"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:03:42Z"
     },
     {
       "id": "OG-SPEC-006",

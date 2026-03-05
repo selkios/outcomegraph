@@ -24,6 +24,11 @@ VERSION = "0.1.0-dev"
 EXIT_SUCCESS = 0
 EXIT_USAGE = 64
 EXIT_RUNTIME = 1
+POLICY_SCHEMA_VERSION = 2
+POLICY_DENIED_CODE = "POLICY_DENIED"
+POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
+POLICY_ALLOW_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations"}
+POLICY_DENY_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations", "network", "dependencies", "deployment"}
 
 PROFILE_VALUES = {"analyze", "propose", "apply"}
 MODE_VALUES = {"observe", "autonomous"}
@@ -155,6 +160,153 @@ DAEMON_WATCH_IGNORE_PREFIXES = (
     ".outcomegraph/objects/",
 )
 _DAEMON_STOP_REQUESTED = False
+
+
+def _default_policy() -> dict[str, object]:
+    return {
+        "schema_version": POLICY_SCHEMA_VERSION,
+        "mode": "observe",
+        "policy_id": "observe-default-v1",
+        "allow": {
+            "file_writes": [
+                ".outcomegraph/**",
+                "export/**",
+                "skills/outcome-steward/**",
+            ],
+            "verify_commands": [
+                "npm test --listTests",
+                "npm test",
+                "go test ./...",
+                "pytest -q",
+            ],
+            "sandbox_operations": [
+                "create_isolated_worktree",
+                "read_repo_state",
+                "read_artifacts",
+            ],
+        },
+        "deny": {
+            "file_writes": [
+                "src/**",
+                "lib/**",
+                "app/**",
+                "packages/**",
+            ],
+            "network": ["unrestricted"],
+            "dependencies": [
+                "npm install",
+                "pip install",
+                "cargo add",
+                "go mod tidy",
+            ],
+            "deployment": ["push", "git commit --amend", "github pr create", "gha workflow_dispatch"],
+        },
+    }
+
+
+def _policy_string_list(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    values: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        value = item.strip()
+        if value:
+            values.append(value)
+    return values
+
+
+def _policy_merge_lists(base: list[str], incoming: list[str]) -> list[str]:
+    values: list[str] = list(base)
+    for item in incoming:
+        if item not in values:
+            values.append(item)
+    return values
+
+
+def _policy_pattern_matches(pattern: str, target: str) -> bool:
+    if not pattern:
+        return False
+    return fnmatch.fnmatch(target, pattern) or target == pattern
+
+
+def _build_policy_deny_payload(command: str, mode: str, category: str, target: str) -> dict[str, object]:
+    normalized_mode = str(mode or "observe")
+    normalized_category = category
+    normalized_target = str(target or "").strip()
+
+    if normalized_category == "verify_commands":
+        message = (
+            f"{normalized_mode} mode forbids oracle verification commands that are not explicitly allowlisted."
+            if normalized_target
+            else f"{normalized_mode} mode forbids an unconfigured oracle verification command."
+        )
+        remediation = [
+            "Run with --mode autonomous only for this explicit action.",
+            "Add the command to allowlist.verify_commands in `.outcomegraph/policy.yaml`.",
+        ]
+    elif normalized_category == "sandbox_operations":
+        message = (
+            f"{normalized_mode} mode does not allow sandbox operation '{normalized_target}'."
+            if normalized_target
+            else f"{normalized_mode} mode does not allow this sandbox operation."
+        )
+        remediation = [
+            "Run with --mode autonomous only for this explicit action.",
+            "Add the operation to allowlist.sandbox_operations in `.outcomegraph/policy.yaml`.",
+        ]
+    else:
+        message = (
+            f"{normalized_mode} mode forbids file writes to '{normalized_target}' without explicit allowlist."
+            if normalized_target
+            else f"{normalized_mode} mode forbids file writes without explicit allowlist."
+        )
+        remediation = [
+            "Run with --mode autonomous only for this explicit action.",
+            "Add the path to allowlist.file_writes in `.outcomegraph/policy.yaml`.",
+        ]
+
+    return {
+        "status": "error",
+        "code": POLICY_DENIED_CODE,
+        "command": command,
+        "mode": normalized_mode,
+        "category": normalized_category,
+        "target": normalized_target,
+        "message": message,
+        "remediation": remediation,
+    }
+
+
+def _enforce_policy_action(
+    policy: dict[str, object],
+    command: str,
+    category: str,
+    target: str,
+    mode: str,
+) -> dict[str, object] | None:
+    rules = policy.get("allow") if isinstance(policy.get("allow"), dict) else {}
+    deny_rules = policy.get("deny") if isinstance(policy.get("deny"), dict) else {}
+    normalized_target = _normalize_repo_relative_path(str(target))
+
+    for deny in _policy_string_list(deny_rules.get(category)) if isinstance(deny_rules, dict) else []:
+        if _policy_pattern_matches(deny, normalized_target):
+            return _build_policy_deny_payload(command, mode, category, normalized_target)
+
+    for allow in _policy_string_list(rules.get(category)) if isinstance(rules, dict) else []:
+        if _policy_pattern_matches(allow, normalized_target):
+            return None
+
+    return _build_policy_deny_payload(command, mode, category, normalized_target)
+
+
+def _evaluate_policy_writes(policy: dict[str, object], command: str, mode: str, targets: list[str]) -> dict[str, object] | None:
+    for target in targets:
+        denied = _enforce_policy_action(policy, command, "file_writes", target, mode)
+        if denied is not None:
+            return denied
+    return None
 
 
 def _build_worker_manifest() -> dict[str, object]:
@@ -673,30 +825,77 @@ def _collect_sync_freshness(sync_event: dict | None, now: datetime.datetime) -> 
 
 
 def _parse_yaml_style_fields(raw: str) -> dict[str, object]:
+    lines = raw.splitlines()
+
+    def _normalize_scalar(raw_value: str) -> str:
+        value = raw_value.strip()
+        if (value.startswith("\"") and value.endswith("\"")) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            return value[1:-1]
+        return value
+
     parsed: dict[str, object] = {}
-    current_list: str | None = None
-    for raw_line in raw.splitlines():
+    containers: list[object] = [parsed]
+    indent_levels: list[int] = [-1]
+
+    def _next_significant_line(index: int) -> str | None:
+        next_index = index + 1
+        while next_index < len(lines):
+            candidate = lines[next_index].strip()
+            if candidate and not candidate.lstrip().startswith("#"):
+                return candidate
+            next_index += 1
+        return None
+
+    for line_index, raw_line in enumerate(lines):
         line = raw_line.rstrip()
         if not line or line.lstrip().startswith("#"):
             continue
         indent = len(line) - len(line.lstrip(" "))
-        if ":" in line and indent == 0:
-            key, _, value = line.partition(":")
-            key = key.strip()
-            value = value.strip()
-            if value:
-                parsed[key] = value.strip("'\"")
-                current_list = None
-            else:
-                parsed[key] = []
-                current_list = key
+        stripped = line.strip()
+        while indent <= indent_levels[-1] and len(containers) > 1:
+            containers.pop()
+            indent_levels.pop()
+
+        container = containers[-1]
+
+        if stripped.startswith("-"):
+            value = stripped[1:].strip()
+            if isinstance(container, list):
+                container.append(_normalize_scalar(value))
             continue
-        if current_list and line.strip().startswith("-") and indent > 0:
-            if isinstance(parsed.get(current_list), list):
-                parsed[current_list].append(line.strip()[1:].strip())
+
+        if ":" not in line:
             continue
-        if indent == 0:
-            current_list = None
+
+        key, _, value = stripped.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if value:
+            if isinstance(container, dict):
+                container[key] = _normalize_scalar(value)
+            continue
+
+        next_line = _next_significant_line(line_index)
+        if next_line is None or next_line.startswith("-"):
+            if isinstance(container, dict):
+                child = []
+                container[key] = child
+                containers.append(child)
+                indent_levels.append(indent)
+            continue
+
+        if not isinstance(container, dict):
+            continue
+
+        if next_line and ":" in next_line and not next_line.startswith("-"):
+            child: object = {}
+        else:
+            child = []
+        container[key] = child
+        containers.append(child)
+        indent_levels.append(indent)
 
     return parsed
 
@@ -709,6 +908,8 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
         "status": "ok",
         "message": "policy file is not explicit; built-in defaults apply",
         "checks": [],
+        "policy": _default_policy(),
+        "status_counts": {"error": 0, "warn": 0},
         "parsed": {},
     }
     if not os.path.exists(policy_path):
@@ -735,6 +936,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
     parsed = _parse_yaml_style_fields(raw)
     payload["parsed"] = parsed
 
+    policy: dict[str, object] = _default_policy()
     checks: list[dict[str, object]] = []
     errors = 0
     warnings = 0
@@ -775,7 +977,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                     }
                 )
 
-    mode = str(parsed.get("mode") or "")
+    mode = str(parsed.get("mode") or policy.get("mode") or "observe")
     if mode and mode not in MODE_VALUES:
         warnings += 1
         checks.append(
@@ -786,21 +988,55 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                 "remediation": ["Use `observe` or `autonomous` for `mode` in policy file."],
             }
         )
+        mode = "observe"
+    policy["mode"] = mode
 
-    forbidden_actions = parsed.get("forbidden_actions")
-    if not isinstance(forbidden_actions, list) or not forbidden_actions:
-        warnings += 1
+    allow_raw = parsed.get("allow")
+    deny_raw = parsed.get("deny")
+    if allow_raw is not None and not isinstance(allow_raw, dict):
+        errors += 1
         checks.append(
             {
-                "type": "policy_forbidden_actions",
-                "status": "warn",
-                "message": "policy file does not define `forbidden_actions`",
-                "remediation": [
-                    "Add `forbidden_actions` list (for example: `- modify_application_code`) to policy."
-                ],
+                "type": "policy_allow",
+                "status": "error",
+                "message": "policy field `allow` must be an object",
+                "remediation": ["Use YAML map syntax for `allow` in `.outcomegraph/policy.yaml`."],
             }
         )
 
+    if deny_raw is not None and not isinstance(deny_raw, dict):
+        errors += 1
+        checks.append(
+            {
+                "type": "policy_deny",
+                "status": "error",
+                "message": "policy field `deny` must be an object",
+                "remediation": ["Use YAML map syntax for `deny` in `.outcomegraph/policy.yaml`."],
+            }
+        )
+
+    allow = allow_raw if isinstance(allow_raw, dict) else {}
+    deny = deny_raw if isinstance(deny_raw, dict) else {}
+    if errors == 0:
+        allow_rules = policy.setdefault("allow", {})
+        deny_rules = policy.setdefault("deny", {})
+        if isinstance(allow_rules, dict):
+            for category in POLICY_ALLOW_CATEGORIES:
+                if category in allow:
+                    allow_rules[category] = _policy_merge_lists(
+                        _policy_string_list(allow_rules.get(category)),
+                        _policy_string_list(allow.get(category)),
+                    )
+        if isinstance(deny_rules, dict):
+            for category in POLICY_DENY_CATEGORIES:
+                if category in deny:
+                    deny_rules[category] = _policy_merge_lists(
+                        _policy_string_list(deny_rules.get(category)),
+                        _policy_string_list(deny.get(category)),
+                    )
+        policy["mode"] = mode
+
+    payload["policy"] = policy
     if errors:
         payload["status"] = "error"
         payload["message"] = "policy checks failed"
@@ -813,6 +1049,37 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
     payload["checks"] = checks
     payload["status_counts"] = {"error": errors, "warn": warnings}
     return payload
+
+
+def _resolve_policy_for_repo(
+    repo_root: str,
+    policy_payload: dict[str, object] | None = None,
+) -> tuple[dict[str, object], dict[str, object] | None]:
+    payload = policy_payload or _collect_policy_checks(repo_root)
+    status = str(payload.get("status") or "error").lower() if isinstance(payload, dict) else "error"
+    if status == "error":
+        return _default_policy(), {
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "command": "policy",
+            "message": "policy configuration is invalid",
+            "policy": payload,
+        }
+
+    policy = payload.get("policy")
+    if isinstance(policy, dict):
+        return policy, None
+    return _default_policy(), None
+
+
+def _ensure_policy_action_allowed(
+    action_policy: dict[str, object],
+    command: str,
+    category: str,
+    target: str,
+    mode: str,
+) -> dict[str, object] | None:
+    return _enforce_policy_action(action_policy, command, category, target, mode)
 
 
 def _collect_drift_state(repo_root: str, now: datetime.datetime, include_ledger: bool = True) -> dict[str, object]:
@@ -3032,15 +3299,39 @@ def _build_policy_payload(created_at: str) -> str:
 created_at: "{created_at}"
 name: observe-policy
 mode: observe
-allowed_paths:
-  - ".outcomegraph/**"
-  - "export/**"
-  - "AGENTS.md"
-forbidden_actions:
-  - modify_application_code
-  - install_dependencies
-  - deploy
-  - push_branches
+allow:
+  file_writes:
+    - ".outcomegraph/**"
+    - "export/**"
+    - "skills/outcome-steward/**"
+    - "AGENTS.md"
+  verify_commands:
+    - "npm test --listTests"
+    - "npm test"
+    - "go test ./..."
+    - "pytest -q"
+  sandbox_operations:
+    - create_isolated_worktree
+    - read_repo_state
+    - read_artifacts
+deny:
+  file_writes:
+    - "src/**"
+    - "lib/**"
+    - "app/**"
+    - "packages/**"
+  network:
+    - unrestricted
+  dependencies:
+    - "npm install"
+    - "pip install"
+    - "cargo add"
+    - "go mod tidy"
+  deployment:
+    - push
+    - git commit --amend
+    - github pr create
+    - gha workflow_dispatch
 """
 
 
@@ -4800,10 +5091,34 @@ def _run_oracle_check(
     changed_paths: list[str],
     run_id: str,
     mode: str,
+    policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
     oracle_name = str(oracle.get("name", "unknown-oracle"))
     command = oracle.get("command")
     command_text = command.strip() if isinstance(command, str) else None
+    resolved_policy = policy or _default_policy()
+    if command_text:
+        denied = _ensure_policy_action_allowed(
+            resolved_policy,
+            command="verify",
+            category="verify_commands",
+            target=command_text,
+            mode=mode,
+        )
+        if denied is not None:
+            return {
+                **denied,
+                "schema_version": 2,
+                "oracle_name": oracle_name,
+                "capsule_id": capsule_id,
+                "run_id": run_id,
+                "mode": mode,
+                "status": "error",
+                "checked_at": _utc_timestamp(),
+                "changed_paths": changed_paths,
+                "command": command_text,
+                "message": denied.get("message"),
+            }
 
     start = time.perf_counter()
     result_payload: dict[str, object] = {
@@ -5488,7 +5803,57 @@ def _run_distill_stage(
     }
 
 
-def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: str, mode: str) -> dict[str, object]:
+def _run_apply_stage(
+    repo_root: str,
+    distill_result: dict[str, object],
+    run_id: str,
+    mode: str,
+    policy: dict[str, object] | None = None,
+) -> dict[str, object]:
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
+    if policy_error:
+        return {
+            "name": "apply",
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "mode": mode,
+            "applied_changes": 0,
+            "applied_claims": [],
+            "applied_certificates": [],
+            "applied_capsules": [],
+            "applied_refs": [],
+            "applied_decisions": [],
+            "errors": [policy_error.get("message", "policy configuration is invalid")],
+        }
+
+    deny_payload = _evaluate_policy_writes(
+        policy_payload,
+        command="sync",
+        mode=mode,
+        targets=[
+            f"{OG_ROOT}/capsules",
+            f"{OG_ROOT}/refs",
+            f"{OG_ROOT}/decisions",
+            f"{OG_ROOT}/claims",
+            f"{OG_ROOT}/certificates",
+        ],
+    )
+    if deny_payload is not None:
+        deny_payload = {
+            **deny_payload,
+            "name": "apply",
+            "mode": mode,
+            "applied_changes": 0,
+            "applied_claims": [],
+            "applied_certificates": [],
+            "applied_capsules": [],
+            "applied_refs": [],
+            "applied_decisions": [],
+            "errors": [str(deny_payload.get("message", "policy denied write"))],
+            "message": str(deny_payload.get("message", "policy denied apply action")),
+        }
+        return deny_payload
+
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
@@ -5824,7 +6189,72 @@ def _run_replay_stage(
     profile: str,
     mode: str,
     changed_only: bool = True,
+    policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
+    if policy_error:
+        return {
+            "name": "replay",
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "message": policy_error.get("message", "policy configuration is invalid"),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [policy_error.get("message", "policy configuration is invalid")],
+        }
+
+    sandbox_check = _ensure_policy_action_allowed(
+        policy_payload,
+        command="replay",
+        category="sandbox_operations",
+        target="create_isolated_worktree",
+        mode=mode,
+    )
+    if sandbox_check is None:
+        sandbox_check = _ensure_policy_action_allowed(
+            policy_payload,
+            command="replay",
+            category="sandbox_operations",
+            target="read_artifacts",
+            mode=mode,
+        )
+    if sandbox_check is not None:
+        return {
+            "name": "replay",
+            "status": "error",
+            "message": str(sandbox_check.get("message", "policy denied sandbox operation")),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [str(sandbox_check.get("message", "policy denied sandbox operation"))],
+            **sandbox_check,
+        }
+
+    write_check = _evaluate_policy_writes(
+        policy_payload,
+        command="replay",
+        mode=mode,
+        targets=[f"{OG_ROOT}/claims", f"{OG_ROOT}/certificates"],
+    )
+    if write_check is not None:
+        return {
+            "name": "replay",
+            "status": "error",
+            "message": str(write_check.get("message", "policy denied write")),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [str(write_check.get("message", "policy denied write"))],
+            **write_check,
+        }
+
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
@@ -6574,7 +7004,60 @@ def _run_verify_stage(
     changed_paths: list[str],
     run_id: str,
     mode: str,
+    policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
+    if policy_error:
+        return {
+            "name": "verify",
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "mode": mode,
+            "verified_capsules": [],
+            "receipt_pointers": {},
+            "oracle_results": {},
+            "errors": [policy_error.get("message", "policy configuration is invalid")],
+            "policy": policy_error,
+        }
+
+    sandbox_check = _ensure_policy_action_allowed(
+        policy_payload,
+        command="verify",
+        category="sandbox_operations",
+        target="read_artifacts",
+        mode=mode,
+    )
+    if sandbox_check is not None:
+        return {
+            "name": "verify",
+            "status": "error",
+            "mode": mode,
+            "verified_capsules": [],
+            "receipt_pointers": {},
+            "oracle_results": {},
+            "errors": [str(sandbox_check.get("message", "policy denied sandbox operation"))],
+            **sandbox_check,
+        }
+
+    write_check = _ensure_policy_action_allowed(
+        policy_payload,
+        command="verify",
+        category="file_writes",
+        target=f"{OG_ROOT}/claims",
+        mode=mode,
+    )
+    if write_check is not None:
+        return {
+            "name": "verify",
+            "status": "error",
+            "mode": mode,
+            "verified_capsules": [],
+            "receipt_pointers": {},
+            "oracle_results": {},
+            "errors": [str(write_check.get("message", "policy denied file write"))],
+            **write_check,
+        }
+
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
@@ -6621,7 +7104,17 @@ def _run_verify_stage(
 
         checks = []
         for oracle in impacted_oracles:
-            checks.append(_run_oracle_check(repo_root, capsule, oracle, normalized_changed_paths, run_id, mode))
+            checks.append(
+                _run_oracle_check(
+                    repo_root,
+                    capsule,
+                    oracle,
+                    normalized_changed_paths,
+                    run_id,
+                    mode,
+                    policy_payload,
+                )
+            )
 
         receipt_records: list[dict[str, object]] = []
         for check in checks:
@@ -6701,11 +7194,32 @@ def _run_verify_stage(
                 overall_failed = True
                 failed_capsules.append(capsule)
 
+    policy_denied = False
+    policy_denied_messages: list[str] = []
+    for check_group in oracle_results.values():
+        for raw_result in check_group:
+            if str(raw_result.get("code") or "") == POLICY_DENIED_CODE:
+                policy_denied = True
+                message = str(raw_result.get("message") or "").strip()
+                if message and message not in policy_denied_messages:
+                    policy_denied_messages.append(message)
+                break
+        if policy_denied:
+            break
+
+    status = "warn" if overall_failed else "ok"
+    if policy_denied:
+        status = "error"
+    if policy_denied and not errors and policy_denied_messages:
+        errors.extend(policy_denied_messages)
+
     return {
         "name": "verify",
-        "status": "warn" if overall_failed else "ok",
+        "status": status,
         "message": (
-            "Oracle-driven verify loop completed with failures."
+            "Oracle-driven verify loop blocked by policy."
+            if policy_denied
+            else "Oracle-driven verify loop completed with failures."
             if overall_failed
             else "Oracle-driven verify loop completed for affected capsules."
         ),
@@ -6720,7 +7234,42 @@ def _run_verify_stage(
     }
 
 
-def _run_export_stage(repo_root: str, mode: str) -> dict[str, object]:
+def _run_export_stage(
+    repo_root: str,
+    mode: str,
+    policy: dict[str, object] | None = None,
+) -> dict[str, object]:
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
+    if policy_error:
+        return {
+            "name": "export",
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "message": policy_error.get("message", "policy configuration is invalid"),
+            "mode": mode,
+            "updated_exports": [],
+            "unchanged_exports": [],
+            "errors": [policy_error.get("message", "policy configuration is invalid")],
+        }
+
+    write_check = _evaluate_policy_writes(
+        policy_payload,
+        command="export",
+        mode=mode,
+        targets=list(EXPORT_PATHS.values()),
+    )
+    if write_check is not None:
+        return {
+            "name": "export",
+            "status": "error",
+            "message": str(write_check.get("message", "policy denied write")),
+            "mode": mode,
+            "updated_exports": [],
+            "unchanged_exports": [],
+            "errors": [str(write_check.get("message", "policy denied write"))],
+            **write_check,
+        }
+
     try:
         updated_exports, unchanged_exports, snapshot = _run_export_refresh(repo_root)
         message = "Export refresh completed."
@@ -6847,6 +7396,42 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
         "mode": mode,
         "force_full_sync": force_full_sync,
     }
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error:
+        payload = {
+            "status": "error",
+            "code": POLICY_CONFIG_ERROR_CODE,
+            "command": "sync",
+            "subcommand": None,
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+            "snapshot": snapshot,
+            "pending": False,
+            "pending_consumed": False,
+            "short_circuit": False,
+            "steps": [
+                {
+                    "name": "policy",
+                    "status": "error",
+                    **policy_error,
+                    "message": str(policy_error.get("message", "policy configuration is invalid")),
+                }
+            ],
+            "message": str(policy_error.get("message", "policy configuration is invalid")),
+            "options": sync_options,
+            "diff_baseline": snapshot.get("diff_baseline"),
+            "force_full_sync": force_full_sync,
+        }
+        _record_sync_summary_event(repo_root, payload, 0)
+        _build_work_payload(
+            repo_root,
+            status="degraded",
+            last_sync_id=run_id,
+            last_idempotency_key=idempotency_key,
+            last_message="sync failed policy validation",
+        )
+        return payload
+
 
     try:
         _validate_canonical_artifact_records(repo_root)
@@ -6985,7 +7570,13 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="apply", last_message="starting apply")
     apply_result = _time_step(
         "apply",
-        lambda: _run_apply_stage(repo_root, distill, run_id, mode=mode),
+        lambda: _run_apply_stage(
+            repo_root=repo_root,
+            distill_result=distill,
+            run_id=run_id,
+            mode=mode,
+            policy=policy_payload,
+        ),
     )
     steps.append(apply_result)
 
@@ -6999,6 +7590,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             snapshot.get("changed_files", []) if isinstance(snapshot, dict) else [],
             run_id,
             mode=mode,
+            policy=policy_payload,
         ),
     )
     steps.append(verify)
@@ -7006,7 +7598,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="export", last_message="starting export")
     export = _time_step(
         "export",
-        lambda: _run_export_stage(repo_root, mode=mode),
+        lambda: _run_export_stage(repo_root, mode=mode, policy=policy_payload),
     )
     steps.append(export)
 
@@ -7078,6 +7670,17 @@ def build_payload(
     if output_json:
         payload["structured"] = True
     return payload
+
+
+def _payload_has_code(payload: dict[str, object], code: str) -> bool:
+    if str(payload.get("code") or "") == code:
+        return True
+    steps = payload.get("steps")
+    if isinstance(steps, list):
+        for raw_step in steps:
+            if isinstance(raw_step, dict) and str(raw_step.get("code") or "") == code:
+                return True
+    return False
 
 
 def run_command(args: list[str], output_json: bool) -> int:
@@ -7154,6 +7757,8 @@ def run_command(args: list[str], output_json: bool) -> int:
             payload = _run_sync_job(repo_root, options)
             payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload}
             emit_command_result(payload, output_json)
+            if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
+                return EXIT_USAGE
             return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
         finally:
             _release_work_lock(repo_root, holder)
@@ -7166,6 +7771,8 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json:
             payload["message"] = _render_verify(payload)
         emit_command_result(payload, output_json)
+        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
+            return EXIT_USAGE
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
     if command == "replay":
@@ -7200,6 +7807,8 @@ def run_command(args: list[str], output_json: bool) -> int:
         payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
         payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
         emit_command_result(payload, output_json)
+        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
+            return EXIT_USAGE
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
     if command == "status":
@@ -7229,6 +7838,8 @@ def run_command(args: list[str], output_json: bool) -> int:
             "artifact_counts": export.get("artifact_counts", {}),
         }
         emit_command_result(payload, output_json)
+        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
+            return EXIT_USAGE
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
     if command == "explain":

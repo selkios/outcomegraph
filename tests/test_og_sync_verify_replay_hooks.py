@@ -610,3 +610,98 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         payload = og._collect_policy_checks(str(self.repo))
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["checks"][0]["type"], "policy_schema_version")
+
+    def test_collect_policy_checks_parses_nested_rules(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            """schema_version: 2\nallow:\n  file_writes:\n    - \".outcomegraph/**\"\ndeny:\n  file_writes:\n    - \"src/**\"\nmode: observe\n""",
+            encoding="utf-8",
+        )
+
+        payload = og._collect_policy_checks(str(self.repo))
+        parsed = payload["parsed"]
+        self.assertEqual(payload["status"], "ok")
+        self.assertIsInstance(parsed.get("allow"), dict)
+        self.assertEqual(parsed.get("allow", {}).get("file_writes"), [".outcomegraph/**"])
+
+    def test_run_apply_stage_blocks_policy_denied_writes(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            """schema_version: 2\nmode: observe\nallow:\n  file_writes:\n    - \"export/**\"\ndeny:\n  file_writes:\n    - \".outcomegraph/**\"\n""",
+            encoding="utf-8",
+        )
+
+        payload = og._run_apply_stage(
+            str(self.repo),
+            {
+                "name": "distill",
+                "status": "ok",
+                "generated_deltas": [],
+                "affected_capsules": ["default"],
+            },
+            "run-1",
+            "observe",
+        )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.POLICY_DENIED_CODE)
+        self.assertEqual(payload["category"], "file_writes")
+        self.assertIn("forbids", str(payload["message"]).lower())
+
+    def test_run_verify_stage_blocks_oracle_command_when_not_allowed(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            """schema_version: 2\nmode: observe\nallow:\n  verify_commands:\n    - \"echo ok\"\n  sandbox_operations:\n    - read_artifacts\ndeny:\n  verify_commands:\n    - \"go test*\"\n""",
+            encoding="utf-8",
+        )
+
+        with self.git_root_patch(), patch.object(
+            og,
+            "_load_capsule_oracles",
+            return_value=[{"name": "policy-blocked", "command": "go test ./...", "scope": []}],
+        ):
+            payload = og._run_verify_stage(
+                str(self.repo),
+                ["default"],
+                ["capsules/default.yaml"],
+                "run-verify",
+                "observe",
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("default", payload["failed_capsules"])
+        checks = payload["oracle_results"].get("default", [])
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].get("code"), og.POLICY_DENIED_CODE)
+
+    def test_run_replay_stage_blocks_disallowed_sandbox_operation(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            """schema_version: 2\nmode: observe\nallow:\n  sandbox_operations:\n    - read_artifacts\n  file_writes:\n    - \"export/**\"\ndeny:\n  sandbox_operations:\n    - create_isolated_worktree\n""",
+            encoding="utf-8",
+        )
+
+        payload = og._run_replay_stage(
+            str(self.repo),
+            {"changed_files": ["capsules/default.yaml"]},
+            "run-replay",
+            "analyze",
+            "observe",
+            changed_only=True,
+        )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.POLICY_DENIED_CODE)
+        self.assertEqual(payload["category"], "sandbox_operations")
+
+    def test_run_export_stage_blocks_disallowed_writes(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            """schema_version: 2\nmode: observe\nallow:\n  file_writes:\n    - \".outcomegraph/**\"\n  sandbox_operations:\n    - read_artifacts\ndeny:\n  file_writes:\n    - \"export/**\"\n""",
+            encoding="utf-8",
+        )
+
+        payload = og._run_export_stage(str(self.repo), "observe")
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.POLICY_DENIED_CODE)
+        self.assertEqual(payload["category"], "file_writes")
