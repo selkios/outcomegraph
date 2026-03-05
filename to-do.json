@@ -825,7 +825,7 @@
       "id": "OG-SPEC-004",
       "title": "Implement full sync baseline algorithm and force-full-sync controls",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Align change detection with SPEC section 8 baseline resolution, edge cases, and runtime path filtering semantics.",
       "steps": [
         "Resolve baseline using HEAD~1, then ORIG_HEAD merge-base, then empty-tree fallback",
@@ -848,7 +848,7 @@
       "depends_on": [
         "OG-SPEC-001"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T08:56:07Z"
     },
     {
       "id": "OG-SPEC-005",

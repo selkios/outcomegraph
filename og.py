@@ -49,6 +49,7 @@ RUNTIME_IGNORE_PREFIXES = (
     ".outcomegraph/objects/",
     ".outcomegraph/traces/",
 )
+EMPTY_TREE_OBJECT_ID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 OG_INIT_DIRS = (
     "constitution",
     "capsules",
@@ -4072,6 +4073,7 @@ def parse_command_flags(
     allow_mode: bool,
     output_json: bool,
     allow_force_hooks_path: bool = False,
+    allow_force_full_sync: bool = False,
     allow_capsule_filter: bool = False,
     allow_ref_filter: bool = False,
     allow_certificate_filter: bool = False,
@@ -4080,6 +4082,7 @@ def parse_command_flags(
     profile = None
     mode = None
     force_hooks_path = False
+    force_full_sync = False
     capsule_filters: list[str] = []
     ref_filters: list[str] = []
     certificate_filters: list[str] = []
@@ -4232,11 +4235,33 @@ def parse_command_flags(
                 emit_error(f"invalid --force-hooks-path value: {exc}", command, EXIT_USAGE, output_json)
             i += 1
             continue
+        if arg == "--force-full-sync":
+            if not allow_force_full_sync:
+                emit_error(f"{command} does not accept --force-full-sync", command, EXIT_USAGE, output_json)
+            force_full_sync = True
+            i += 1
+            continue
+        if arg.startswith("--force-full-sync="):
+            if not allow_force_full_sync:
+                emit_error(f"{command} does not accept --force-full-sync", command, EXIT_USAGE, output_json)
+            try:
+                force_full_sync = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --force-full-sync value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg.startswith("-"):
             emit_error(f"unknown option '{arg}' for {command}", command, EXIT_USAGE, output_json)
         emit_error(f"unexpected argument '{arg}' for {command}", command, EXIT_USAGE, output_json)
 
-    options: dict[str, object] = {"changed": changed, "profile": profile, "mode": mode, "force_hooks_path": force_hooks_path, "output_json": output_json}
+    options: dict[str, object] = {
+        "changed": changed,
+        "profile": profile,
+        "mode": mode,
+        "force_hooks_path": force_hooks_path,
+        "force_full_sync": force_full_sync,
+        "output_json": output_json,
+    }
     if capsule_filters:
         options["capsule"] = capsule_filters
     if ref_filters:
@@ -4591,9 +4616,21 @@ def _evaluate_prompts(
     return result
 
 
-def _collect_changed_paths(repo_root: str) -> list[str]:
-    unstaged = _run_git(repo_root, ["diff", "--name-only"]).stdout
-    cached = _run_git(repo_root, ["diff", "--cached", "--name-only"]).stdout
+def _collect_all_non_runtime_files(repo_root: str) -> list[str]:
+    tracked = _run_git(repo_root, ["ls-files"]).stdout
+    raw = _normalize_path_list(tracked)
+    normalized: list[str] = []
+    for path in raw:
+        candidate = _normalize_repo_relative_path(path)
+        if any(candidate.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
+            continue
+        normalized.append(candidate)
+    return normalized
+
+
+def _collect_changed_paths(repo_root: str, baseline_ref: str) -> list[str]:
+    unstaged = _run_git(repo_root, ["diff", "--name-only", baseline_ref]).stdout
+    cached = _run_git(repo_root, ["diff", "--cached", "--name-only", baseline_ref]).stdout
     untracked = _run_git(repo_root, ["ls-files", "--others", "--exclude-standard"]).stdout
     raw = _normalize_path_list(unstaged + "\n" + cached + "\n" + untracked)
     normalized: list[str] = []
@@ -4605,15 +4642,49 @@ def _collect_changed_paths(repo_root: str) -> list[str]:
     return normalized
 
 
-def _collect_sync_snapshot(repo_root: str, profile: str, mode: str) -> dict[str, object]:
+def _resolve_sync_baseline(repo_root: str) -> dict[str, object]:
+    head_parent = _run_git(repo_root, ["rev-parse", "HEAD~1"])
+    if head_parent.returncode == 0 and head_parent.stdout.strip():
+        return {
+            "strategy": "head~1",
+            "reference": "HEAD~1",
+            "resolved": head_parent.stdout.strip(),
+            "details": "using previous commit parent",
+        }
+
+    orig_head = _run_git(repo_root, ["rev-parse", "ORIG_HEAD"])
+    orig_head_value = orig_head.stdout.strip()
+    if orig_head.returncode == 0 and orig_head_value:
+        merge_base = _run_git(repo_root, ["merge-base", orig_head_value, "HEAD"])
+        merge_base_value = merge_base.stdout.strip()
+        if merge_base.returncode == 0 and merge_base_value:
+            return {
+                "strategy": "orig_head_merge_base",
+                "reference": "merge-base(ORIG_HEAD,HEAD)",
+                "resolved": merge_base_value,
+                "details": "using merge-base from ORIG_HEAD",
+            }
+
+    return {
+        "strategy": "empty_tree",
+        "reference": "empty-tree",
+        "resolved": EMPTY_TREE_OBJECT_ID,
+        "details": "fallback full-tree comparison",
+    }
+
+
+def _collect_sync_snapshot(repo_root: str, profile: str, mode: str, *, force_full_sync: bool = False) -> dict[str, object]:
     head_result = _run_git(repo_root, ["rev-parse", "HEAD"])
     branch_result = _run_git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"])
-    changed_files = _collect_changed_paths(repo_root)
-    changed_without_runtime = [
-        item
-        for item in changed_files
-        if not any(item.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES)
-    ]
+    baseline = _resolve_sync_baseline(repo_root)
+    baseline_ref = str(baseline.get("resolved") or "")
+    if baseline.get("strategy") == "empty_tree":
+        changed_files = _collect_all_non_runtime_files(repo_root)
+    else:
+        changed_files = _collect_changed_paths(repo_root, baseline_ref)
+    if not changed_files and force_full_sync and baseline.get("strategy") != "empty_tree":
+        changed_files = _collect_all_non_runtime_files(repo_root)
+    changed_files = sorted(set(changed_files))
     head = head_result.stdout.strip() if head_result.returncode == 0 else "HEAD_NOT_AVAILABLE"
     branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "detached"
     if branch == "HEAD":
@@ -4621,9 +4692,11 @@ def _collect_sync_snapshot(repo_root: str, profile: str, mode: str) -> dict[str,
     return {
         "repository_head": head,
         "branch": branch,
-        "changed_files": changed_without_runtime,
-        "changed_count": len(changed_without_runtime),
-        "has_changes": len(changed_without_runtime) > 0,
+        "changed_files": changed_files,
+        "changed_count": len(changed_files),
+        "has_changes": len(changed_files) > 0,
+        "force_full_sync": force_full_sync,
+        "diff_baseline": baseline,
         "profile": profile,
         "mode": mode,
         "captured_at": _utc_timestamp(),
@@ -4634,6 +4707,7 @@ def _compute_idempotency_key(snapshot: dict[str, object], profile: str, mode: st
     payload = {
         "head": snapshot["repository_head"],
         "branch": snapshot["branch"],
+        "baseline": snapshot.get("diff_baseline", {}),
         "mode": mode,
         "profile": profile,
         "changed": snapshot["changed_files"],
@@ -6763,9 +6837,16 @@ def _record_drift_report_event(repo_root: str, payload: dict[str, object], total
 def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
     profile = str(options.get("profile") or "analyze")
     mode = str(options.get("mode") or "observe")
-    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    force_full_sync = bool(options.get("force_full_sync", False))
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode, force_full_sync=force_full_sync)
     idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
     run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
+    sync_options: dict[str, object] = {
+        "changed": options.get("changed", False),
+        "profile": profile,
+        "mode": mode,
+        "force_full_sync": force_full_sync,
+    }
 
     try:
         _validate_canonical_artifact_records(repo_root)
@@ -6792,11 +6873,9 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
                 }
             ],
             "message": "sync validation failed before apply.",
-            "options": {
-                "changed": options.get("changed", False),
-                "profile": profile,
-                "mode": mode,
-            },
+            "options": sync_options,
+            "diff_baseline": snapshot.get("diff_baseline"),
+            "force_full_sync": force_full_sync,
         }
         _record_sync_summary_event(repo_root, payload, 0)
         _build_work_payload(
@@ -6826,11 +6905,9 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
                 }
             ],
             "message": "sync failed during materials lock repair.",
-            "options": {
-                "changed": options.get("changed", False),
-                "profile": profile,
-                "mode": mode,
-            },
+            "options": sync_options,
+            "diff_baseline": snapshot.get("diff_baseline"),
+            "force_full_sync": force_full_sync,
         }
         _record_sync_summary_event(repo_root, payload, 0)
         _build_work_payload(
@@ -6869,11 +6946,9 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             "short_circuit": True,
             "steps": steps,
             "message": "sync short-circuit: idempotent state already materialized.",
-            "options": {
-                "changed": options.get("changed", False),
-                "profile": profile,
-                "mode": mode,
-            },
+            "options": sync_options,
+            "diff_baseline": snapshot.get("diff_baseline"),
+            "force_full_sync": force_full_sync,
         }
         _record_sync_summary_event(repo_root, payload, 0)
         _build_work_payload(
@@ -6957,11 +7032,9 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
         "short_circuit": was_short_circuit,
         "steps": steps,
         "message": sync_message,
-        "options": {
-            "changed": options.get("changed", False),
-            "profile": profile,
-            "mode": mode,
-        },
+        "options": sync_options,
+        "diff_baseline": snapshot.get("diff_baseline"),
+        "force_full_sync": force_full_sync,
     }
     duration_ms = int((time.perf_counter() - start_at) * 1000)
     summary_path = _record_sync_summary_event(repo_root, payload, duration_ms)
@@ -7029,7 +7102,15 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_SUCCESS
 
     if command == "sync":
-        options, _ = parse_command_flags(rest, "sync", False, True, True, output_json)
+        options, _ = parse_command_flags(
+            rest,
+            "sync",
+            False,
+            True,
+            True,
+            output_json,
+            allow_force_full_sync=True,
+        )
         repo_root = _git_root()
         integrity = _validate_event_chain(repo_root)
         if integrity.get("status") != "ok":

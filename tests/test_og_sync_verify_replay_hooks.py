@@ -139,6 +139,136 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(snapshot["branch"], "detached")
         self.assertEqual(snapshot["changed_count"], 0)
 
+    def test_collect_changed_paths_resolve_head_parent_first(self) -> None:
+        def fake_run_git(_repo_root: str, args: list[str], check: bool = False):
+            if args == ["rev-parse", "HEAD"]:
+                return self._git_completed(0, stdout="111111")
+            if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return self._git_completed(0, stdout="main")
+            if args == ["rev-parse", "HEAD~1"]:
+                return self._git_completed(0, stdout="aaaa")
+            if args == ["diff", "--name-only", "aaaa"]:
+                return self._git_completed(0, stdout="capsules/default.yaml\n.outcomegraph/work/cache/file.txt")
+            if args == ["diff", "--cached", "--name-only", "aaaa"]:
+                return self._git_completed(0, stdout="")
+            if args == ["ls-files", "--others", "--exclude-standard"]:
+                return self._git_completed(0, stdout="")
+            if args == ["rev-parse", "ORIG_HEAD"]:
+                return self._git_completed(1, stdout="", stderr="fatal")
+            return self._git_completed(1, stdout="", stderr="fatal")
+
+        with self.git_root_patch(), patch.object(og, "_run_git", side_effect=fake_run_git):
+            snapshot = og._collect_sync_snapshot(str(self.repo), "analyze", "observe")
+
+        self.assertEqual(snapshot["diff_baseline"]["strategy"], "head~1")
+        self.assertEqual(snapshot["diff_baseline"]["resolved"], "aaaa")
+        self.assertEqual(snapshot["changed_files"], ["capsules/default.yaml"])
+        self.assertEqual(snapshot["changed_count"], 1)
+        self.assertEqual(snapshot["has_changes"], True)
+
+    def test_collect_changed_paths_prefers_orig_head_merge_base(self) -> None:
+        def fake_run_git(_repo_root: str, args: list[str], check: bool = False):
+            if args == ["rev-parse", "HEAD"]:
+                return self._git_completed(0, stdout="111111")
+            if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return self._git_completed(0, stdout="main")
+            if args == ["rev-parse", "HEAD~1"]:
+                return self._git_completed(1, stdout="", stderr="fatal")
+            if args == ["rev-parse", "ORIG_HEAD"]:
+                return self._git_completed(0, stdout="222222")
+            if args == ["merge-base", "222222", "HEAD"]:
+                return self._git_completed(0, stdout="333333")
+            if args == ["diff", "--name-only", "333333"]:
+                return self._git_completed(0, stdout="capsules/default.yaml")
+            if args == ["diff", "--cached", "--name-only", "333333"]:
+                return self._git_completed(0, stdout=".outcomegraph/work/tmp.outcome")
+            if args == ["ls-files", "--others", "--exclude-standard"]:
+                return self._git_completed(0, stdout="")
+            return self._git_completed(1, stdout="", stderr="fatal")
+
+        with self.git_root_patch(), patch.object(og, "_run_git", side_effect=fake_run_git):
+            merge_snapshot = og._collect_sync_snapshot(str(self.repo), "analyze", "observe")
+
+        self.assertEqual(merge_snapshot["diff_baseline"]["strategy"], "orig_head_merge_base")
+        self.assertEqual(merge_snapshot["diff_baseline"]["resolved"], "333333")
+        self.assertEqual(merge_snapshot["changed_files"], ["capsules/default.yaml"])
+
+    def test_collect_changed_paths_falls_back_to_empty_tree(self) -> None:
+        def fake_run_git(_repo_root: str, args: list[str], check: bool = False):
+            if args == ["rev-parse", "HEAD"]:
+                return self._git_completed(0, stdout="111111")
+            if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return self._git_completed(0, stdout="main")
+            if args == ["rev-parse", "HEAD~1"]:
+                return self._git_completed(1, stdout="", stderr="fatal")
+            if args == ["rev-parse", "ORIG_HEAD"]:
+                return self._git_completed(0, stdout="222222")
+            if args == ["merge-base", "222222", "HEAD"]:
+                return self._git_completed(1, stdout="", stderr="fatal")
+            if args == ["ls-files"]:
+                return self._git_completed(
+                    0,
+                    stdout="capsules/default.yaml\nREADME.md\n.outcomegraph/work/runtime.json\n",
+                )
+            return self._git_completed(1, stdout="", stderr="fatal")
+
+        with self.git_root_patch(), patch.object(og, "_run_git", side_effect=fake_run_git):
+            snapshot = og._collect_sync_snapshot(str(self.repo), "analyze", "observe")
+
+        self.assertEqual(snapshot["diff_baseline"]["strategy"], "empty_tree")
+        self.assertEqual(snapshot["changed_files"], ["README.md", "capsules/default.yaml"])
+        self.assertEqual(snapshot["changed_count"], 2)
+
+    def test_collect_changed_paths_forces_full_sync_when_runtime_only_changes(self) -> None:
+        def fake_run_git(_repo_root: str, args: list[str], check: bool = False):
+            if args == ["rev-parse", "HEAD"]:
+                return self._git_completed(0, stdout="111111")
+            if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return self._git_completed(0, stdout="main")
+            if args == ["rev-parse", "HEAD~1"]:
+                return self._git_completed(0, stdout="aaaa")
+            if args == ["diff", "--name-only", "aaaa"]:
+                return self._git_completed(0, stdout=".outcomegraph/work/cache/file.txt")
+            if args == ["diff", "--cached", "--name-only", "aaaa"]:
+                return self._git_completed(0, stdout="")
+            if args == ["ls-files", "--others", "--exclude-standard"]:
+                return self._git_completed(0, stdout="")
+            if args == ["ls-files"]:
+                return self._git_completed(0, stdout="capsules/default.yaml\nREADME.md\n.outcomegraph/work/keep.json")
+            return self._git_completed(1, stdout="", stderr="fatal")
+
+        with self.git_root_patch(), patch.object(og, "_run_git", side_effect=fake_run_git):
+            snapshot = og._collect_sync_snapshot(str(self.repo), "analyze", "observe")
+
+        self.assertEqual(snapshot["changed_count"], 0)
+
+        with self.git_root_patch(), patch.object(og, "_run_git", side_effect=fake_run_git):
+            forced_snapshot = og._collect_sync_snapshot(
+                str(self.repo),
+                "analyze",
+                "observe",
+                force_full_sync=True,
+            )
+
+        self.assertEqual(forced_snapshot["force_full_sync"], True)
+        self.assertEqual(forced_snapshot["diff_baseline"]["strategy"], "head~1")
+        self.assertEqual(sorted(forced_snapshot["changed_files"]), ["README.md", "capsules/default.yaml"])
+
+    def test_sync_parse_accepts_force_full_sync(self) -> None:
+        options, _ = og.parse_command_flags(
+            ["--force-full-sync", "--profile", "apply", "--mode", "autonomous"],
+            "sync",
+            False,
+            True,
+            True,
+            False,
+            allow_force_full_sync=True,
+        )
+
+        self.assertTrue(options["force_full_sync"])
+        self.assertEqual(options["profile"], "apply")
+        self.assertEqual(options["mode"], "autonomous")
+
     def test_run_sync_job_short_circuits_when_idempotent(self) -> None:
         snapshot = {
             "repository_head": "abc123",
