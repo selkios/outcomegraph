@@ -973,7 +973,7 @@
       "id": "OG-SPEC-009",
       "title": "Align exports and control surfaces to canonical graph state",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Ensure AGENTS/skill/MCP exports are deterministic projections of canonical artifacts and not alternate truth sources.",
       "steps": [
         "Drive export generation strictly from canonical artifact graph",
@@ -998,7 +998,7 @@
         "OG-SPEC-002",
         "OG-SPEC-003"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:24:26Z"
     },
     {
       "id": "OG-SPEC-010",

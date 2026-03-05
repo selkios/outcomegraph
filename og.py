@@ -111,6 +111,11 @@ MCP_CONTROL_TOOL_DEFS = (
 )
 MCP_CONTROL_RESOURCES = ("capsules", "refs", "constitution", "certificates")
 MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
+MCP_CONTROL_TOOL_NAMES = tuple(item["name"] for item in MCP_CONTROL_TOOL_DEFS)
+MCP_CONTROL_RESOURCE_NAMES = tuple(MCP_CONTROL_RESOURCES)
+MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
+CONTROL_SURFACE_MISMATCH_CODE = "CONTROL_SURFACE_MISMATCH"
+CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
 WORK_LOCK_STALE_SECONDS = 300
 OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
 OPTIMIZATION_SUPPORTED_METRICS = ("contains", "exact")
@@ -1652,6 +1657,13 @@ def _collect_drift_state(repo_root: str, now: datetime.datetime, include_ledger:
             if isinstance(item, str):
                 remediation.append(item)
 
+    export_surface = _collect_export_drift_check(repo_root)
+    if export_surface is not None:
+        checks.append(export_surface)
+        for item in export_surface.get("remediation", []):
+            if isinstance(item, str):
+                remediation.append(item)
+
     if not checks:
         checks.append(
             {
@@ -1693,6 +1705,61 @@ def _collect_drift_state(repo_root: str, now: datetime.datetime, include_ledger:
             if latest_event
             else None
         ),
+    }
+
+
+def _collect_export_drift_check(repo_root: str) -> dict[str, object] | None:
+    try:
+        snapshot = _canonical_export_snapshot(repo_root)
+    except Exception as exc:
+        return {
+            "type": "export_control_surface",
+            "status": "error",
+            "message": f"Unable to compute canonical export snapshot: {exc}",
+            "remediation": [
+                "Run `og sync` to rebuild canonical snapshots and repair schema violations.",
+            ],
+            "details": {"phase": "snapshot"},
+        }
+
+    outputs = _build_export_outputs(snapshot)
+    mismatches: list[dict[str, object]] = []
+
+    for relative_path, content in outputs.items():
+        full_path = os.path.join(repo_root, relative_path)
+        generated_hash = _content_sha256(content.encode("utf-8"))
+        if not os.path.exists(full_path):
+            mismatches.append({"path": relative_path, "type": "missing", "generated_hash": generated_hash})
+            continue
+        observed_hash = _read_file_content_hash(repo_root, relative_path)
+        if generated_hash != observed_hash:
+            mismatches.append(
+                {"path": relative_path, "type": "hash_mismatch", "generated_hash": generated_hash, "observed_hash": observed_hash}
+            )
+
+    try:
+        payload = _build_mcp_server_payload(snapshot, {})
+        mcp_surface_issues = _validate_mcp_control_surface_payload(payload)
+        for item in mcp_surface_issues:
+            mismatches.append({"type": "control_surface", "message": item})
+    except Exception as exc:
+        mismatches.append({"type": "control_surface", "message": f"Unable to validate control surface payload: {exc}"})
+
+    if not mismatches:
+        return None
+
+    return {
+        "type": "export_control_surface",
+        "status": "warn",
+        "message": "Exported control surfaces are out of sync with canonical artifacts.",
+        "remediation": [
+            "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+            "Re-run `og sync` after fixing canonical artifact path/type or payload errors.",
+        ],
+        "details": {
+            "total_artifacts": snapshot.get("counts", {}).get("total", 0),
+            "issues": mismatches,
+        },
     }
 
 
@@ -3540,6 +3607,85 @@ def _collect_canonical_artifact_files(repo_root: str) -> list[str]:
     return sorted(set(artifact_files))
 
 
+def _collect_export_artifact_files(repo_root: str) -> list[str]:
+    artifact_files: list[str] = []
+    for root in CANONICAL_EXPORT_SCOPES:
+        root_path = os.path.join(repo_root, OG_ROOT, root)
+        if not os.path.isdir(root_path):
+            continue
+        for dirpath, _, filenames in os.walk(root_path):
+            for filename in sorted(filenames):
+                if filename.startswith("."):
+                    continue
+                if not filename.endswith((".json", ".yaml", ".yml")):
+                    continue
+                artifact_files.append(os.path.relpath(os.path.join(dirpath, filename), repo_root).replace("\\", "/"))
+    materials_lock_path = f"{OG_ROOT}/materials.lock"
+    if os.path.exists(os.path.join(repo_root, materials_lock_path)):
+        artifact_files.append(materials_lock_path)
+    return sorted(set(artifact_files))
+
+
+def _read_file_content_hash(repo_root: str, relative_path: str) -> str:
+    full_path = os.path.join(repo_root, relative_path)
+    try:
+        with open(full_path, "rb") as handle:
+            return _content_sha256(handle.read())
+    except OSError:
+        return ""
+
+
+def _artifact_scope(relative_path: str) -> str:
+    normalized = _normalize_repo_relative_path(relative_path)
+    if not normalized.startswith(f"{OG_ROOT}/"):
+        return normalized.split("/", 1)[0] if "/" in normalized else normalized
+    scope = normalized[len(f"{OG_ROOT}/") :]
+    return scope.split("/", 1)[0]
+
+
+def _read_export_record(repo_root: str, relative_path: str, scope: str) -> dict[str, object]:
+    expected_artifact_type = _expected_canonical_artifact_type(relative_path)
+    if relative_path.endswith(".json") and scope != "constitution":
+        payload = _read_canonical_artifact_payload(
+            repo_root,
+            relative_path,
+            expected_artifact_type=expected_artifact_type,
+        )
+        artifact_id = payload.get("id")
+        artifact_type = payload.get("artifact_type")
+        schema_version = payload.get("schema_version")
+    else:
+        fallback = _read_artifact_record(repo_root, relative_path)
+        artifact_id = fallback.get("id")
+        artifact_type = fallback.get("artifact_type")
+        schema_version = fallback.get("schema_version")
+
+    if scope == "constitution" and artifact_type is None:
+        artifact_type = "constitution"
+    if artifact_type is None and expected_artifact_type is not None:
+        artifact_type = expected_artifact_type
+
+    if not isinstance(artifact_id, str) or not artifact_id.strip():
+        artifact_id = os.path.splitext(os.path.basename(relative_path))[0]
+
+    return {
+        "path": relative_path,
+        "id": artifact_id,
+        "artifact_type": artifact_type,
+        "schema_version": schema_version,
+    }
+
+
+def _build_export_outputs(snapshot: dict[str, object]) -> dict[str, str]:
+    outputs = {
+        EXPORT_PATHS["agents"]: _render_agents_export(snapshot),
+        EXPORT_PATHS["outcomes"]: _render_readme_outcomes(snapshot),
+        EXPORT_PATHS["skill"]: _render_skill_export(snapshot),
+        EXPORT_PATHS["mcp_resources"]: _render_mcp_resource_export(snapshot),
+    }
+    return {path: outputs[path] for path in sorted(outputs)}
+
+
 def _validate_canonical_artifact_records(repo_root: str) -> None:
     for relative_path in _collect_canonical_artifact_files(repo_root):
         record = _read_artifact_record(repo_root, relative_path)
@@ -3563,46 +3709,34 @@ def _validate_canonical_artifact_records(repo_root: str) -> None:
 
 
 def _canonical_export_snapshot(repo_root: str) -> dict[str, object]:
-    canonical_roots = ("constitution", "capsules", "refs", "decisions", "claims", "certificates", "datasets")
-    artifact_files: list[str] = []
-    for root in canonical_roots:
-        root_path = os.path.join(repo_root, OG_ROOT, root)
-        if not os.path.isdir(root_path):
-            continue
-        for dirpath, _, filenames in os.walk(root_path):
-            for filename in sorted(filenames):
-                if filename.startswith("."):
-                    continue
-                if not filename.endswith((".yaml", ".yml", ".json")):
-                    continue
-                relative_path = os.path.relpath(os.path.join(dirpath, filename), repo_root).replace("\\", "/")
-                artifact_files.append(relative_path)
-
-    for filename in ("materials.lock", "policy.yaml", "config.yaml"):
-        full_path = os.path.join(repo_root, OG_ROOT, filename)
-        if os.path.exists(full_path):
-            artifact_files.append(f"{OG_ROOT}/{filename}")
-
-    artifact_files = sorted(set(artifact_files))
-
-    records = [_read_artifact_record(repo_root, path) for path in artifact_files]
+    artifact_files = _collect_export_artifact_files(repo_root)
+    records: list[dict[str, object]] = []
     by_scope: dict[str, int] = {}
     ids_by_scope: dict[str, list[str]] = {}
-    for record in records:
-        rel_path = record["path"]
-        scope = rel_path.split("/", 2)[1] if rel_path.startswith(f"{OG_ROOT}/") else rel_path.split("/", 1)[0]
+
+    for path in artifact_files:
+        scope = _artifact_scope(path)
+        record = _read_export_record(repo_root, path, scope)
+        content_hash = _read_file_content_hash(repo_root, path)
+        record["content_hash"] = content_hash
+        records.append(record)
         by_scope[scope] = by_scope.get(scope, 0) + 1
         artifact_id = record.get("id")
         if isinstance(artifact_id, str) and artifact_id:
             ids_by_scope.setdefault(scope, []).append(artifact_id)
     return {
         "generated_at": _utc_timestamp(),
-        "artifacts": records,
+        "artifacts": sorted(records, key=lambda record: record["path"]),
         "counts": {
-            "total": len(records),
+            "total": len(artifact_files),
             "by_scope": by_scope,
         },
         "ids_by_scope": {scope: sorted(set(ids)) for scope, ids in ids_by_scope.items()},
+        "artifact_hashes": {
+            record["path"]: record["content_hash"]
+            for record in sorted(records, key=lambda record: record["path"])
+            if record["path"] is not None
+        },
     }
 
 
@@ -3784,29 +3918,35 @@ def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
 
 def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, object]) -> dict[str, object]:
     artifact_counts = snapshot.get("counts", {}).get("by_scope", {}) if isinstance(snapshot.get("counts"), dict) else {}
+    resources = [
+        {
+            "uri": f"outcomegraph://{scope}",
+            "name": scope,
+            "description": f"Canonical artifact projection for {scope} scope.",
+            "category": "artifact",
+            "paths": sorted(
+                [
+                    record["path"]
+                    for record in snapshot.get("artifacts", [])
+                    if isinstance(record, dict)
+                    and str(record.get("path", "")).startswith(f"{OG_ROOT}/{scope}")
+                ]
+            ),
+        }
+        for scope in MCP_CONTROL_RESOURCES
+    ]
+    controls = {
+        "tools": sorted(MCP_CONTROL_TOOL_DEFS, key=lambda item: item["name"]),
+        "resources": resources,
+        "prompts": list(MCP_CONTROL_PROMPTS),
+    }
     return {
         "schema_version": 2,
         "command": "mcp-server",
         "options": options,
-        "tools": sorted(MCP_CONTROL_TOOL_DEFS, key=lambda item: item["name"]),
-        "resources": [
-            {
-                "uri": f"outcomegraph://{scope}",
-                "name": scope,
-                "description": f"Canonical artifact projection for {scope} scope.",
-                "category": "artifact",
-                "paths": sorted(
-                    [
-                        record["path"]
-                        for record in snapshot.get("artifacts", [])
-                        if isinstance(record, dict)
-                        and str(record.get("path", "")).startswith(f"{OG_ROOT}/{scope}")
-                    ]
-                ),
-            }
-            for scope in MCP_CONTROL_RESOURCES
-        ],
-        "prompts": list(MCP_CONTROL_PROMPTS),
+        "tools": controls["tools"],
+        "resources": controls["resources"],
+        "prompts": controls["prompts"],
         "artifact_counts": {scope: artifact_counts.get(scope, 0) for scope in MCP_CONTROL_RESOURCES},
         "status": "ok",
         "generated_at": snapshot.get("generated_at"),
@@ -3814,10 +3954,61 @@ def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, ob
     }
 
 
+def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[str]:
+    issues: list[str] = []
+    tools = payload.get("tools")
+    if not isinstance(tools, list):
+        issues.append("`tools` must be a list")
+        tools = []
+    resources = payload.get("resources")
+    if not isinstance(resources, list):
+        issues.append("`resources` must be a list")
+        resources = []
+    prompts = payload.get("prompts")
+    if not isinstance(prompts, list):
+        issues.append("`prompts` must be a list")
+        prompts = []
+
+    tool_names = sorted({str(item.get("name")) for item in tools if isinstance(item, dict) and str(item.get("name"))})
+    resource_names = sorted({str(item.get("name")) for item in resources if isinstance(item, dict) and str(item.get("name"))})
+    prompt_values = sorted(str(value) for value in prompts if str(value))
+
+    expected_tool_names = sorted(MCP_CONTROL_TOOL_NAMES)
+    expected_resource_names = sorted(MCP_CONTROL_RESOURCE_NAMES)
+    expected_prompt_names = sorted(MCP_CONTROL_PROMPT_NAMES)
+    if tool_names != expected_tool_names:
+        issues.append(f"`tools` does not match contract: expected {expected_tool_names}, observed {tool_names}")
+    if resource_names != expected_resource_names:
+        issues.append(f"`resources` does not match contract: expected {expected_resource_names}, observed {resource_names}")
+    if prompt_values != expected_prompt_names:
+        issues.append(f"`prompts` does not match contract: expected {expected_prompt_names}, observed {prompt_values}")
+
+    if str(payload.get("command")) != "mcp-server":
+        issues.append("command field must be 'mcp-server'")
+    if payload.get("schema_version") != 2:
+        issues.append("schema_version must be 2")
+
+    return issues
+
+
 def _run_mcp_server_stage(repo_root: str, options: dict[str, object]) -> dict[str, object]:
     try:
         snapshot = _canonical_export_snapshot(repo_root)
         payload = _build_mcp_server_payload(snapshot, options)
+        issues = _validate_mcp_control_surface_payload(payload)
+        if issues:
+            return {
+                "schema_version": 2,
+                "status": "error",
+                "code": CONTROL_SURFACE_MISMATCH_CODE,
+                "command": "mcp-server",
+                "options": options,
+                "tools": [],
+                "resources": [],
+                "prompts": list(MCP_CONTROL_PROMPTS),
+                "message": "Control-surface payload does not match canonical contract.",
+                "details": {"issues": issues},
+            }
         return payload
     except Exception as exc:
         return {
@@ -3867,12 +4058,9 @@ def _run_export_refresh(repo_root: str) -> tuple[list[str], list[str], dict[str,
     snapshot = _canonical_export_snapshot(repo_root)
     updated_exports: list[str] = []
     unchanged_exports: list[str] = []
-
-    outputs = {
-        EXPORT_PATHS["agents"]: _render_agents_export(snapshot),
-        EXPORT_PATHS["outcomes"]: _render_readme_outcomes(snapshot),
-        EXPORT_PATHS["skill"]: _render_skill_export(snapshot),
-        EXPORT_PATHS["mcp_resources"]: _render_mcp_resource_export(snapshot),
+    outputs = _build_export_outputs(snapshot)
+    snapshot["export_hashes"] = {
+        relative_path: _content_sha256(content.encode("utf-8")) for relative_path, content in outputs.items()
     }
 
     for relative_path, content in outputs.items():
