@@ -77,6 +77,29 @@ EXPORT_PATHS = {
     "mcp_resources": ".outcomegraph/export/mcp-resources.json",
     "skill": "skills/outcome-steward/SKILL.md",
 }
+CLEAN_SCOPES = {"runtime", "generated", "all"}
+CLEAN_RUNTIME_TARGETS = (
+    f"{OG_ROOT}/work",
+    f"{OG_ROOT}/cache",
+    f"{OG_ROOT}/events",
+    f"{OG_ROOT}/objects",
+    f"{OG_ROOT}/traces",
+)
+CLEAN_GENERATED_TARGETS = (
+    f"{OG_ROOT}/capsules",
+    f"{OG_ROOT}/refs",
+    f"{OG_ROOT}/decisions",
+    f"{OG_ROOT}/claims",
+    f"{OG_ROOT}/certificates",
+    f"{OG_ROOT}/export",
+    f"{OG_ROOT}/materials.lock",
+)
+CLEAN_ALL_TARGETS = (
+    OG_ROOT,
+    "skills/outcome-steward",
+    ".agents/skills/og",
+    ".claude/skills/og",
+)
 MCP_CONTROL_TOOL_DEFS = (
     {
         "uri": "outcomegraph://tools/sync",
@@ -810,6 +833,7 @@ Core commands:
   og replay [--changed]
   og status
   og export
+  og clean [--scope runtime|generated|all] [--dry-run] [--yes]
   og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]]
   og drift
   og mcp-server
@@ -3765,6 +3789,7 @@ def _render_agents_export(snapshot: dict[str, object]) -> str:
         "- og replay --changed",
         "- og status",
         "- og export",
+        "- og clean [--scope runtime|generated|all] [--dry-run] [--yes]",
         "- og explain",
         "- og drift",
         "- og mcp-server",
@@ -5364,6 +5389,186 @@ def parse_command_flags(
     if certificate_filters:
         options["certificate"] = certificate_filters
     return options, []
+
+
+def _clean_usage() -> str:
+    return (
+        "Usage: og clean [--scope runtime|generated|all] [--dry-run] [--yes]\n\n"
+        "Scopes:\n"
+        "  runtime   remove transient runtime state under .outcomegraph (work/cache/events/objects/traces)\n"
+        "  generated remove generated canonical/export artifacts (capsules/refs/decisions/claims/certificates/export/materials.lock)\n"
+        "  all       remove .outcomegraph and managed skill/symlink outputs in this repository\n"
+    )
+
+
+def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
+    scope = "runtime"
+    dry_run = False
+    confirmed = False
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in {"-h", "--help"}:
+            emit_command_result({"message": _clean_usage()}, output_json)
+            raise SystemExit(EXIT_SUCCESS)
+        if arg == "--json":
+            output_json = True
+            i += 1
+            continue
+        if arg.startswith("--json="):
+            try:
+                output_json = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --json value: {exc}", "clean", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--scope":
+            if i + 1 >= len(args):
+                emit_error("clean requires a value for --scope", "clean", EXIT_USAGE, output_json)
+            scope = str(args[i + 1]).strip().lower()
+            i += 2
+            continue
+        if arg.startswith("--scope="):
+            scope = str(arg.split("=", 1)[1]).strip().lower()
+            i += 1
+            continue
+        if arg == "--dry-run":
+            dry_run = True
+            i += 1
+            continue
+        if arg.startswith("--dry-run="):
+            try:
+                dry_run = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --dry-run value: {exc}", "clean", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--yes":
+            confirmed = True
+            i += 1
+            continue
+        if arg.startswith("--yes="):
+            try:
+                confirmed = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --yes value: {exc}", "clean", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        emit_error(f"unknown option '{arg}' for clean", "clean", EXIT_USAGE, output_json)
+
+    if scope not in CLEAN_SCOPES:
+        emit_error(
+            f"invalid --scope '{scope}', expected one of: runtime, generated, all",
+            "clean",
+            EXIT_USAGE,
+            output_json,
+        )
+    if not dry_run and not confirmed:
+        emit_error("clean requires --yes unless --dry-run is set", "clean", EXIT_USAGE, output_json)
+    return {
+        "scope": scope,
+        "dry_run": dry_run,
+        "yes": confirmed,
+        "output_json": output_json,
+    }
+
+
+def _clean_targets_for_scope(scope: str) -> tuple[str, ...]:
+    if scope == "runtime":
+        return CLEAN_RUNTIME_TARGETS
+    if scope == "generated":
+        return CLEAN_GENERATED_TARGETS
+    return CLEAN_ALL_TARGETS
+
+
+def _remove_repo_target(repo_root: str, target: str) -> tuple[bool, str | None]:
+    normalized = _normalize_repo_relative_path(str(target)).strip("/")
+    if not normalized:
+        return False, "invalid empty cleanup target"
+    full_path = os.path.join(repo_root, normalized)
+    repo_abs = os.path.abspath(repo_root)
+    full_abs = os.path.abspath(full_path)
+    if full_abs != repo_abs and not full_abs.startswith(repo_abs + os.sep):
+        return False, "target resolves outside repository root"
+    if not os.path.lexists(full_path):
+        return False, None
+    try:
+        if os.path.islink(full_path) or os.path.isfile(full_path):
+            os.remove(full_path)
+        else:
+            shutil.rmtree(full_path)
+        return True, None
+    except OSError as exc:
+        return False, str(exc)
+
+
+def _run_clean_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    scope = str(options.get("scope") or "runtime")
+    dry_run = bool(options.get("dry_run"))
+    removed: list[str] = []
+    skipped: list[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if scope == "all":
+        if dry_run:
+            warnings.append("dry-run: would stop daemon before cleanup")
+            warnings.append("dry-run: would disable autopilot before cleanup")
+        else:
+            try:
+                daemon_payload = _daemon_stop()
+                if str(daemon_payload.get("status") or "").lower() == "error":
+                    warnings.append(str(daemon_payload.get("message") or "daemon stop reported error"))
+            except SystemExit as exc:
+                errors.append(f"daemon stop failed with exit code {exc.code}")
+            except Exception as exc:
+                errors.append(f"daemon stop failed: {exc}")
+            try:
+                autopilot_payload = _disable_autopilot()
+                if str(autopilot_payload.get("status") or "").lower() != "ok":
+                    warnings.append(str(autopilot_payload.get("message") or "autopilot disable returned non-ok status"))
+            except SystemExit as exc:
+                errors.append(f"autopilot disable failed with exit code {exc.code}")
+            except Exception as exc:
+                errors.append(f"autopilot disable failed: {exc}")
+
+    for target in sorted(set(_clean_targets_for_scope(scope))):
+        normalized = _normalize_repo_relative_path(target).strip("/")
+        full_path = os.path.join(repo_root, normalized)
+        if not os.path.lexists(full_path):
+            skipped.append(normalized)
+            continue
+        if dry_run:
+            removed.append(normalized)
+            continue
+        removed_ok, error_message = _remove_repo_target(repo_root, normalized)
+        if removed_ok:
+            removed.append(normalized)
+            continue
+        if error_message is None:
+            skipped.append(normalized)
+            continue
+        errors.append(f"{normalized}: {error_message}")
+
+    status = "error" if errors else "ok"
+    message = "cleanup completed."
+    if dry_run:
+        message = "cleanup dry-run completed."
+    elif errors:
+        message = "cleanup completed with errors."
+
+    return {
+        "status": status,
+        "command": "clean",
+        "scope": scope,
+        "dry_run": dry_run,
+        "options": options,
+        "removed": sorted(set(removed)),
+        "skipped": sorted(set(skipped)),
+        "errors": errors,
+        "warnings": sorted(set(warnings)),
+        "message": message,
+    }
 
 
 def _parse_optimize_prompts_flags(
@@ -9328,6 +9533,13 @@ def run_command(args: list[str], output_json: bool) -> int:
         options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json)
         payload = _daemon_status()
         payload["options"] = options
+        emit_command_result(payload, output_json)
+        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+
+    if command == "clean":
+        options = _parse_clean_flags(rest, output_json)
+        repo_root = _git_root()
+        payload = _run_clean_job(repo_root, options)
         emit_command_result(payload, output_json)
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
