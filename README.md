@@ -269,3 +269,30 @@ If you see unexpected status or stale diagnostics:
 - [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
 - [SPEC_IMPLEMENTATION_MATRIX.md](./SPEC_IMPLEMENTATION_MATRIX.md)
 - [QUICKSTART.md](./QUICKSTART.md)
+
+## Cleanup OutcomeGraph artifacts
+
+Use `og clean` to remove OutcomeGraph state safely.
+
+```bash
+# Preview runtime cleanup only (non-destructive)
+og clean --scope runtime --dry-run --json
+
+# Preview generated canonical/export cleanup (non-destructive)
+og clean --scope generated --dry-run --json
+
+# Remove runtime artifacts
+og clean --scope runtime --yes
+
+# Remove generated artifacts
+og clean --scope generated --yes
+
+# Remove all OutcomeGraph artifacts and managed skill/symlink outputs
+# (also attempts daemon stop + autopilot disable first)
+og clean --scope all --yes
+```
+
+Scopes:
+- `runtime`: `.outcomegraph/work`, `cache`, `events`, `objects`, `traces`
+- `generated`: `.outcomegraph/capsules`, `refs`, `decisions`, `claims`, `certificates`, `export`, `materials.lock`
+- `all`: `.outcomegraph`, `skills/outcome-steward`, `.agents/skills/og`, `.claude/skills/og`

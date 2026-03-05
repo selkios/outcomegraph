@@ -1554,6 +1554,11 @@ def _resolve_policy_for_repo(
     repo_root: str,
     policy_payload: dict[str, object] | None = None,
 ) -> tuple[dict[str, object], dict[str, object] | None]:
+    if isinstance(policy_payload, dict) and "status" not in policy_payload and "policy" not in policy_payload:
+        allow = policy_payload.get("allow")
+        deny = policy_payload.get("deny")
+        if isinstance(allow, dict) and isinstance(deny, dict):
+            return policy_payload, None
     payload = policy_payload or _collect_policy_checks(repo_root)
     status = str(payload.get("status") or "error").lower() if isinstance(payload, dict) else "error"
     if status == "error":
@@ -2698,6 +2703,9 @@ def _write_text_payload(path: str, payload: object) -> bytes:
     else:
         rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     encoded = rendered.encode("utf-8")
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(rendered)
     return encoded
@@ -4259,6 +4267,7 @@ def _is_lock_stale(lock_payload: dict, now: datetime.datetime) -> bool:
 
 def _acquire_work_lock(repo_root: str, holder: dict) -> tuple[bool, dict | None]:
     lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     while True:
         has_lock_file = os.path.exists(lock_path)
