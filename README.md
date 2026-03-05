@@ -55,6 +55,19 @@ cd outcomegraph
 uv run og <command>
 ```
 
+### Dogfood Example In This Repository
+
+Use this repository itself as a reference project:
+
+```bash
+uv run og init
+uv run og sync --json
+uv run og status --json
+```
+
+Then inspect generated artifacts under `.outcomegraph/` and exported skill output under
+`skills/outcome-steward/SKILL.md`.
+
 Typical CI/automation loop:
 
 ```bash
@@ -233,4 +246,5 @@ If you see unexpected status or stale diagnostics:
 - [RUNBOOKS.md](./RUNBOOKS.md)
 - [SECURITY_POLICY.md](./SECURITY_POLICY.md)
 - [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
+- [SPEC_IMPLEMENTATION_MATRIX.md](./SPEC_IMPLEMENTATION_MATRIX.md)
 - [QUICKSTART.md](./QUICKSTART.md)

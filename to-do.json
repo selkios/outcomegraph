@@ -744,7 +744,7 @@
       "id": "OG-SPEC-001",
       "title": "Create SPEC-v2 conformance matrix and enforce acceptance criteria",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Map every MUST/SHOULD in SPEC-v2 to implementation status, owning files, and automated acceptance checks before further feature work.",
       "steps": [
         "Create SPEC_IMPLEMENTATION_MATRIX.md with section-by-section requirement mapping",
@@ -758,12 +758,13 @@
         "quality"
       ],
       "files": [
-        "SPEC-v2.md",
-        "ARCHITECTURE.md",
+        "SPEC_IMPLEMENTATION_MATRIX.md",
+        "RUNBOOKS.md",
         "README.md",
         "to-do.json"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T08:44:27Z",
+      "blockers": []
     },
     {
       "id": "OG-SPEC-002",

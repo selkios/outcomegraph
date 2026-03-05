@@ -124,3 +124,24 @@ If recovery remains blocked:
 - collect latest event logs and status JSON output,
 - include environment details (`OG_*`, mode, profile),
 - capture last successful adapter and policy snapshots before escalation.
+
+## 4) Release/readiness review workflow
+
+Use this checklist for release candidates and handoff gates:
+
+1. Run core freshness and validation commands:
+   - `og sync --json`
+   - `og status --json`
+   - `og verify --changed --json`
+2. Confirm conformance matrix readiness:
+   - Open [`SPEC_IMPLEMENTATION_MATRIX.md`](./SPEC_IMPLEMENTATION_MATRIX.md)
+   - Run `rg -n "\\b(partial|missing)\\b" SPEC_IMPLEMENTATION_MATRIX.md`
+   - Release is not ready until all gating requirements are `implemented` or explicitly approved with follow-up tasks.
+3. Run targeted verification tests:
+   - `uv run pytest tests/test_og_sync_verify_replay_hooks.py`
+4. Gate decisions:
+   - If matrix has `missing` status items: set release to blocked.
+   - If matrix has `partial` status items: capture compensating controls and owner tasks before proceeding.
+   - If matrix is clear: proceed with release readiness approval.
+
+`SPEC_IMPLEMENTATION_MATRIX.md` is now the canonical checklist for whether `SPEC-v2` conformance is acceptable before release.
