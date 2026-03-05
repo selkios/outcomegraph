@@ -283,6 +283,7 @@ Either flag-based input or payload input is supported:
 ### `og autopilot`
 
 - `autopilot init` wires lifecycle hooks and tracks managed hook state.
+- managed `pre-commit` runs the local quality pass and blocks the commit if it fails.
 - `autopilot disable` restores core hook state and removes managed scripts.
 
 ### `og daemon`

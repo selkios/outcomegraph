@@ -85,7 +85,8 @@ The dataset format is:
 
 ## 3) Autonomous flow
 
-When autopilot is enabled, Steward runs `og sync` from hooks/daemon/CI.
+When autopilot is enabled, Steward runs the local quality pass from `pre-commit`
+and `og sync` from hooks/daemon/CI.
 `og status` is the primary check for freshness, pending work, and verification state.
 
 ## 4) Safety defaults

@@ -632,7 +632,8 @@ Hook edge cases:
 
 - Missing `HEAD~1`: use empty tree baseline.
 - Missing `ORIG_HEAD`: fallback to merge-base or full sync.
-- Hook failures warn and defer work by default (do not block developer flow).
+- Managed `pre-commit` runs the local quality pass and blocks the commit on failure.
+- Other hook failures warn and defer work by default (do not block developer flow).
 
 ## 11) Plugin architecture contracts
 

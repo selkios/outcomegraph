@@ -123,6 +123,7 @@ AUTOPILOT_HOOKS = ("pre-commit", "post-commit", "post-merge", "post-checkout", "
 AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
 AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
+AUTOPILOT_PRE_COMMIT_QUALITY_PASS = "skills/og-quality-pass/scripts/run_quality_pass.sh"
 OG_ROOT = ".outcomegraph"
 OUTCOME_GITIGNORE = f"{OG_ROOT}/.gitignore"
 WORK_STATE_FILE = ".outcomegraph/work/state.json"
@@ -6069,6 +6070,36 @@ def _mark_hook_pending(repo_root: str, hook_name: str) -> None:
         handle.write(f'{{"hook":"{hook_name}","at":"{timestamp}"}}\\n')
 
 
+def _hook_pending_script(repo_root: str, hook_name: str) -> str:
+    pending_path = os.path.join(repo_root, ".outcomegraph", "work", "pending")
+    return (
+        f'PENDING_FILE="{pending_path}"\n'
+        f'WORK_FILE="{pending_path}"\n'
+        "mkdir -p \"$(dirname \"$WORK_FILE\")\"\n"
+        'TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"\n'
+        "cat > \"$WORK_FILE\" <<EOF\n"
+        f'{{"hook":"{hook_name}","at":"$TIMESTAMP"}}\n'
+        "EOF\n"
+    )
+
+
+def _hook_quality_gate_script(repo_root: str, hook_name: str) -> str:
+    if hook_name != "pre-commit":
+        return ""
+    quality_pass_script = os.path.join(repo_root, AUTOPILOT_PRE_COMMIT_QUALITY_PASS)
+    return (
+        f'QUALITY_PASS_SCRIPT="{quality_pass_script}"\n'
+        'if [ ! -f "$QUALITY_PASS_SCRIPT" ]; then\n'
+        '  echo "og-autopilot: missing pre-commit quality pass script at $QUALITY_PASS_SCRIPT" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+        'if ! bash "$QUALITY_PASS_SCRIPT" "$REPO_ROOT"; then\n'
+        '  echo "og-autopilot: pre-commit quality pass failed." >&2\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
+
 def _hook_script(repo_root: str, hook_name: str, original_hook: str | None) -> str:
     original_invocation = ""
     if original_hook:
@@ -6079,6 +6110,12 @@ def _hook_script(repo_root: str, hook_name: str, original_hook: str | None) -> s
             f"  fi\n"
             f"fi\n"
         )
+    pending_script = _hook_pending_script(repo_root, hook_name)
+    quality_gate_script = _hook_quality_gate_script(repo_root, hook_name)
+    if hook_name == "pre-commit":
+        hook_body = f"{original_invocation}{quality_gate_script}{pending_script}"
+    else:
+        hook_body = f"{pending_script}{original_invocation}"
     return (
         "#!/usr/bin/env bash\n"
         "# outcomegraph-autopilot-hook\n"
@@ -6089,11 +6126,7 @@ def _hook_script(repo_root: str, hook_name: str, original_hook: str | None) -> s
         "fi\n"
         "\n"
         f'REPO_ROOT="{repo_root}"\n'
-        f'PENDING_FILE="{os.path.join(repo_root, ".outcomegraph", "work", "pending")}"\n'
-        f'WORK_FILE="{os.path.join(repo_root, ".outcomegraph", "work", "pending")}"\n'
-        "mkdir -p \"$(dirname \"$WORK_FILE\")\"\n"
-        f'printf \'%s\\n\' \"' + f'{{\"hook\":\"{hook_name}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}' + '" > \"$WORK_FILE\"\\n'
-        f"{original_invocation}"
+        f"{hook_body}"
         "exit 0\n"
     )
 
@@ -6110,7 +6143,13 @@ def _install_bridge_hooks(repo_root: str, hooks_dir: str) -> list[dict[str, str 
 
         if os.path.lexists(target):
             if _is_managed_hook(target):
-                installed.append({"hook": hook_name, "path": target, "backup": None, "status": "already-managed"})
+                backup_candidate = os.path.join(backup_dir, f"{hook_name}.orig")
+                if os.path.isfile(backup_candidate):
+                    backup = backup_candidate
+                with open(target, "w", encoding="utf-8", newline="\n") as handle:
+                    handle.write(_hook_script(repo_root, hook_name, backup))
+                os.chmod(target, 0o755)
+                installed.append({"hook": hook_name, "path": target, "backup": backup, "status": "updated-managed"})
                 continue
 
             backup = os.path.join(backup_dir, f"{hook_name}.orig")

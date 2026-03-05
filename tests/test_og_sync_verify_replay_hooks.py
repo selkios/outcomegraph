@@ -30,6 +30,23 @@ class _RepoTestCase(TestCase):
     def _git_completed(self, returncode: int, stdout: str = "", stderr: str = ""):
         return subprocess.CompletedProcess(args=["git"], returncode=returncode, stdout=stdout, stderr=stderr)
 
+    def _write_quality_pass_script(self, exit_code: int) -> Path:
+        script_path = self.repo / og.AUTOPILOT_PRE_COMMIT_QUALITY_PASS
+        script_path.parent.mkdir(parents=True, exist_ok=True)
+        script_path.write_text(
+            (
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "REPO_ROOT=\"$1\"\n"
+                "mkdir -p \"$REPO_ROOT/.outcomegraph/work\"\n"
+                "printf '%s\\n' \"quality-pass\" > \"$REPO_ROOT/.outcomegraph/work/quality-pass-ran\"\n"
+                f"exit {exit_code}\n"
+            ),
+            encoding="utf-8",
+        )
+        script_path.chmod(0o755)
+        return script_path
+
 
 class TestHelpContracts(TestCase):
     def _run_main(self, args: list[str]) -> tuple[int, str]:
@@ -267,6 +284,7 @@ class TestJsonEnvelopeContract(TestCase):
 
 class TestHookLifecycle(_RepoTestCase):
     def test_autopilot_init_installs_and_disables_hooks(self) -> None:
+        self._write_quality_pass_script(0)
         with self.git_root_patch():
             init = og._init_autopilot(False)
             self.assertEqual(init["status"], "ok")
@@ -281,6 +299,8 @@ class TestHookLifecycle(_RepoTestCase):
                 self.assertTrue(hook_path.exists(), msg=f"missing hook script for {hook_name}")
                 hook_contents = hook_path.read_text(encoding="utf-8")
                 self.assertIn("outcomegraph-autopilot-hook", hook_contents)
+                if hook_name == "pre-commit":
+                    self.assertIn(og.AUTOPILOT_PRE_COMMIT_QUALITY_PASS, hook_contents)
 
             config_value = subprocess.run(
                 ["git", "-C", str(self.repo), "config", "--get", "core.hooksPath"],
@@ -323,6 +343,58 @@ class TestHookLifecycle(_RepoTestCase):
                 (hooks_dir / "pre-commit").read_text(encoding="utf-8"),
                 "#!/usr/bin/env bash\necho pre-commit-existing\n",
             )
+
+    def test_autopilot_init_refreshes_existing_managed_hooks(self) -> None:
+        hooks_dir = self.repo / og.AUTOPILOT_MANAGED_HOOK_DIR
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        legacy_hook = hooks_dir / "pre-commit"
+        legacy_hook.write_text(
+            "#!/usr/bin/env bash\n# outcomegraph-autopilot-hook\necho legacy-hook\n",
+            encoding="utf-8",
+        )
+
+        with self.git_root_patch():
+            init = og._init_autopilot(False)
+            self.assertEqual(init["status"], "ok")
+            state = init["state"]
+            self.assertIsInstance(state, dict)
+            pre_commit = next(item for item in state["installed_hooks"] if item["hook"] == "pre-commit")
+
+        self.assertEqual(pre_commit["status"], "updated-managed")
+        contents = legacy_hook.read_text(encoding="utf-8")
+        self.assertIn(og.AUTOPILOT_PRE_COMMIT_QUALITY_PASS, contents)
+        self.assertNotIn("legacy-hook", contents)
+
+    def test_autopilot_pre_commit_hook_runs_quality_pass_before_marking_pending(self) -> None:
+        self._write_quality_pass_script(0)
+        with self.git_root_patch():
+            init = og._init_autopilot(False)
+            self.assertEqual(init["status"], "ok")
+            state = init["state"]
+            self.assertIsInstance(state, dict)
+            pre_commit = next(item for item in state["installed_hooks"] if item["hook"] == "pre-commit")
+
+        hook_path = Path(pre_commit["path"])
+        result = subprocess.run([str(hook_path)], cwd=str(self.repo), text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue((self.repo / ".outcomegraph" / "work" / "quality-pass-ran").exists())
+        self.assertTrue((self.repo / ".outcomegraph" / "work" / "pending").exists())
+
+    def test_autopilot_pre_commit_hook_blocks_on_quality_pass_failure(self) -> None:
+        self._write_quality_pass_script(1)
+        with self.git_root_patch():
+            init = og._init_autopilot(False)
+            self.assertEqual(init["status"], "ok")
+            state = init["state"]
+            self.assertIsInstance(state, dict)
+            pre_commit = next(item for item in state["installed_hooks"] if item["hook"] == "pre-commit")
+
+        hook_path = Path(pre_commit["path"])
+        result = subprocess.run([str(hook_path)], cwd=str(self.repo), text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pre-commit quality pass failed", result.stderr)
+        self.assertTrue((self.repo / ".outcomegraph" / "work" / "quality-pass-ran").exists())
+        self.assertFalse((self.repo / ".outcomegraph" / "work" / "pending").exists())
 
     def test_autopilot_init_force_path_requires_yes_for_confirmation(self) -> None:
         hooks_dir = self.repo / "existing-hooks"
