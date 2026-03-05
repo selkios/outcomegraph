@@ -1278,19 +1278,20 @@
         "OG-AGENT-003"
       ],
       "files": [
-        "og.py",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
         "SPEC-v2.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T17:11:32Z"
+      "updated_at": "2026-03-05T17:11:58Z"
     },
     {
       "id": "OG-AGENT-007",
       "title": "Add payload shaping and streaming controls for large outputs",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Reduce token/context waste by letting agents request only needed fields and paged/streamed lists. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1315,7 +1316,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:15:36Z"
     },
     {
       "id": "OG-AGENT-008",

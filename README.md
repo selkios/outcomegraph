@@ -132,6 +132,9 @@ og describe daemon status
 Common flags:
 
 - `--json` / `--json=true|false`
+- `--output json|jsonl|human` (jsonl streams list-like fields in order)
+- `--fields <field>[,<field>...]` (top-level payload projection)
+- `--limit <n>` / `--offset <n>` (pagination for list-like fields)
 - `--strict` / `--strict=true|false`
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
@@ -180,11 +183,21 @@ Return contract:
   - `hint`: bounded short remediation hint
 - `warnings` are strings and remain informational.
 - `metrics` holds command-level timing and counters.
+- `data.list_window` advertises list pagination metadata when `--fields`, `--limit`, or `--offset` are used.
+- `--output jsonl` emits one envelope line plus one `event: "item"` line per streamed list entry.
 - In non-JSON mode, command output remains human-readable (`message` is still shown).
 - Exit codes:
   - `0` success
   - `1` runtime failure
   - `64` usage/validation failure
+
+For long lists, stream with `--output jsonl`:
+
+```bash
+og verify --output jsonl --fields verified_capsules --limit 50 --offset 100
+og explain --output jsonl --fields claims,decisions --limit 25
+og mcp-server --output jsonl --fields tools,resources --limit 100
+```
 
 ## Pipeline overview
 

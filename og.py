@@ -107,6 +107,9 @@ POLICY_DENY_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations"
 
 PROFILE_VALUES = {"analyze", "propose", "apply"}
 MODE_VALUES = {"observe", "autonomous"}
+OUTPUT_MODE_HUMAN = "human"
+OUTPUT_MODE_JSON = "json"
+OUTPUT_MODE_JSONL = "jsonl"
 AUTOPILOT_HOOKS = ("pre-commit", "post-commit", "post-merge", "post-checkout", "post-rewrite", "pre-push")
 AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
@@ -927,6 +930,8 @@ def _command_contract_help() -> str:
     return """Output modes:
   default   human-readable payload/message output
   --json    machine-readable JSON payload output
+  --output json|jsonl|human
+            json output mode control; jsonl streams list-like payload entries as JSON lines
 
 Exit codes:
   0        success
@@ -986,16 +991,34 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "verify":
         return _command_help(
-            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
             "Run verification for known or changed capsules and emit verification artifacts.",
-            ["--json", "--changed[=true|false]", "--profile analyze|propose|apply", "--mode observe|autonomous"],
+            [
+                "--json",
+                "--output json|jsonl|human",
+                "--fields <field>[,<field>...]",
+                "--limit <n>",
+                "--offset <n>",
+                "--changed[=true|false]",
+                "--profile analyze|propose|apply",
+                "--mode observe|autonomous",
+            ],
             ["og verify", "og verify --changed", "og verify --changed=false --json"],
         )
     if normalized == "replay":
         return _command_help(
-            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
             "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
-            ["--json", "--changed[=true|false]", "--profile analyze|propose|apply", "--mode observe|autonomous"],
+            [
+                "--json",
+                "--output json|jsonl|human",
+                "--fields <field>[,<field>...]",
+                "--limit <n>",
+                "--offset <n>",
+                "--changed[=true|false]",
+                "--profile analyze|propose|apply",
+                "--mode observe|autonomous",
+            ],
             ["og replay", "og replay --changed", "og replay --json"],
         )
     if normalized == "status":
@@ -1030,10 +1053,14 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "explain":
         return _command_help(
-            "og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
             "Explain artifact provenance and proof chain for selected capsules, refs, and certificates.",
             [
                 "--json",
+                "--output json|jsonl|human",
+                "--fields <field>[,<field>...]",
+                "--limit <n>",
+                "--offset <n>",
                 "--capsule <id>[,<id>...]",
                 "--ref <id>[,<id>...]",
                 "--certificate <id>[,<id>...]",
@@ -1055,9 +1082,15 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "mcp-server":
         return _command_help(
-            "og mcp-server",
+            "og mcp-server [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
             "Render MCP server control surface definitions (tools/resources/prompts).",
-            ["--json"],
+            [
+                "--json",
+                "--output json|jsonl|human",
+                "--fields <field>[,<field>...]",
+                "--limit <n>",
+                "--offset <n>",
+            ],
             ["og mcp-server", "og mcp-server --json"],
         )
     if normalized == "optimize":
@@ -1294,6 +1327,16 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "Run verification for known or changed capsules and emit verification artifacts.",
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--output",
+                    "string",
+                    "Output mode.",
+                    enum=[OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL],
+                    default=OUTPUT_MODE_JSON,
+                ),
+                _command_schema_field("--fields", "string", "Comma-separated top-level payload fields."),
+                _command_schema_field("--limit", "integer", "Maximum list items per list-like field."),
+                _command_schema_field("--offset", "integer", "0-based list offset for pagination."),
                 _command_schema_field("--changed", "boolean", "Verify only changed capsules.", default=False),
                 _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
                 _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
@@ -1303,6 +1346,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("options", "object", "Parsed command options."),
                 _command_schema_field("results", "array", "Verification results for each stage."),
+                _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og verify --changed", "og verify --json"],
@@ -1313,6 +1357,16 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--output",
+                    "string",
+                    "Output mode.",
+                    enum=[OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL],
+                    default=OUTPUT_MODE_JSON,
+                ),
+                _command_schema_field("--fields", "string", "Comma-separated top-level payload fields."),
+                _command_schema_field("--limit", "integer", "Maximum list items per list-like field."),
+                _command_schema_field("--offset", "integer", "0-based list offset for pagination."),
                 _command_schema_field("--changed", "boolean", "Replay only changed capsules.", default=False),
                 _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
                 _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
@@ -1324,6 +1378,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("replay_plans", "array", "Replay plan artifacts produced."),
                 _command_schema_field("replay_results", "array", "Replay execution results."),
                 _command_schema_field("certificate_ids", "array", "Replay certificates issued."),
+                _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, WORKER_RUNTIME_UNAVAILABLE_CODE],
             examples=["og replay --changed", "og replay --json"],
@@ -1379,6 +1434,16 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "Explain artifact provenance and proof chain for selected capsules, refs, and certificates.",
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--output",
+                    "string",
+                    "Output mode.",
+                    enum=[OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL],
+                    default=OUTPUT_MODE_JSON,
+                ),
+                _command_schema_field("--fields", "string", "Comma-separated top-level payload fields."),
+                _command_schema_field("--limit", "integer", "Maximum list items per list-like field."),
+                _command_schema_field("--offset", "integer", "0-based list offset for pagination."),
                 _command_schema_field("--capsule", "array", "One or more capsule IDs to filter by."),
                 _command_schema_field("--ref", "array", "One or more ref IDs to filter by."),
                 _command_schema_field("--certificate", "array", "One or more certificate IDs to filter by."),
@@ -1391,6 +1456,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("claims", "array", "Explained claim artifacts."),
                 _command_schema_field("certificates", "array", "Explained certificate artifacts."),
                 _command_schema_field("decisions", "array", "Decision artifacts for the explain run."),
+                _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og explain --capsule default", "og explain --json --certificate cert-1"],
@@ -1413,12 +1479,25 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "mcp-server",
             "og mcp-server",
             "Render MCP server control surface definitions (tools/resources/prompts).",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--output",
+                    "string",
+                    "Output mode.",
+                    enum=[OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL],
+                    default=OUTPUT_MODE_JSON,
+                ),
+                _command_schema_field("--fields", "string", "Comma-separated top-level payload fields."),
+                _command_schema_field("--limit", "integer", "Maximum list items per list-like field."),
+                _command_schema_field("--offset", "integer", "0-based list offset for pagination."),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("tools", "array", "Discovered MCP tools."),
                 _command_schema_field("resources", "array", "Discovered MCP resources."),
+                _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, CONTROL_SURFACE_MISMATCH_CODE],
             examples=["og mcp-server", "og mcp-server --json"],
@@ -1871,6 +1950,66 @@ def emit_json(payload: dict) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=True))
 
 
+def emit_jsonl_line(payload: dict) -> None:
+    print(json.dumps(payload, ensure_ascii=True))
+
+
+def emit_command_result_jsonl(payload: dict, command: str | None) -> None:
+    payload = _build_command_result_envelope(command or "og", payload)
+    list_fields = {
+        str(key): value
+        for key, value in payload.get("data", {}).items()
+        if isinstance(value, list)
+    }
+    if not list_fields:
+        emit_jsonl_line(payload)
+        return
+
+    list_window = payload.get("data", {}).get("list_window")
+    if not isinstance(list_window, dict):
+        list_window = {}
+
+    stream_payload = dict(payload.get("data", {}))
+    stream_list_window: dict[str, dict[str, object]] = {}
+    for name in sorted(list_fields):
+        window = list_window.get(name)
+        items = list_fields[name]
+        metadata = {
+            "total": len(items),
+            "offset": int(window.get("offset", 0)),
+            "returned": len(items),
+        }
+        if isinstance(window, dict) and "limit" in window:
+            metadata["limit"] = window["limit"]
+        if isinstance(window, dict):
+            for key in ("total", "offset", "returned", "limit"):
+                if key in window:
+                    metadata[key] = window[key]
+        stream_payload[name] = {"_streamed": True, "metadata": metadata}
+        stream_list_window[name] = metadata
+    if stream_list_window:
+        stream_payload["list_window"] = stream_list_window
+    payload["data"] = stream_payload
+    emit_jsonl_line(payload)
+
+    for list_name in sorted(list_fields):
+        items = list_fields[list_name]
+        window = stream_list_window.get(list_name)
+        if not isinstance(window, dict):
+            window = {}
+        base_offset = int(window.get("offset", 0))
+        for index, item in enumerate(items):
+            emit_jsonl_line(
+                {
+                    "event": "item",
+                    "command": command or "og",
+                    "field": list_name,
+                    "index": base_offset + index,
+                    "item": item,
+                }
+            )
+
+
 def emit_command_result(payload: dict, output_json: bool, command: str | None = None) -> None:
     if output_json:
         emit_json(_build_command_result_envelope(command or "og", payload))
@@ -1887,6 +2026,107 @@ def parse_bool_option(raw: str) -> bool:
     if value in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"invalid boolean value '{raw}'")
+
+
+def parse_int_option(raw: str, field: str) -> int:
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an integer") from exc
+    if value < 0:
+        raise ValueError(f"{field} must be zero or greater")
+    return value
+
+
+def _parse_csv_fields(raw: str, field: str) -> list[str]:
+    fields = [item.strip() for item in raw.split(",")]
+    if not fields or not any(field_name for field_name in fields):
+        raise ValueError(f"{field} must contain at least one non-empty field name")
+    normalized: list[str] = []
+    for item in fields:
+        if not item:
+            continue
+        if item not in normalized:
+            normalized.append(item)
+    if not normalized:
+        raise ValueError(f"{field} must contain at least one non-empty field name")
+    return normalized
+
+
+def _stable_list_sort(values: list[object]) -> list[object]:
+    try:
+        return sorted(values, key=lambda value: json.dumps(value, sort_keys=True, ensure_ascii=True))
+    except TypeError:
+        return sorted(values, key=lambda value: json.dumps(value, default=str, sort_keys=True, ensure_ascii=True))
+
+
+def _normalize_pagination(payload: dict[str, object], options: dict[str, object], *, force_sort: bool) -> dict[str, object]:
+    fields = options.get("fields")
+    limit = options.get("limit")
+    offset = options.get("offset")
+    limit_value = limit if isinstance(limit, int) else None
+    offset_value = int(offset) if isinstance(offset, int) else 0
+    if not isinstance(fields, list):
+        fields = None
+    else:
+        fields = [item for item in fields if isinstance(item, str)]
+    if fields is not None:
+        field_keys = fields
+    else:
+        field_keys = [key for key in payload.keys()]
+
+    output_payload: dict[str, object] = {}
+    window_payload: dict[str, object] = {}
+    if not payload:
+        return {}
+
+    for key in field_keys:
+        if key not in payload:
+            continue
+        value = payload[key]
+        if isinstance(value, list):
+            normalized = list(value)
+            if force_sort:
+                normalized = _stable_list_sort(normalized)
+            total_count = len(normalized)
+            start = max(0, offset_value)
+            if limit_value is None:
+                end = total_count
+            else:
+                end = start + limit_value
+            windowed = normalized[start:end]
+            output_payload[key] = windowed
+            if limit_value is not None or offset_value > 0:
+                window_payload[key] = {
+                    "total": total_count,
+                    "offset": start,
+                    "limit": limit_value,
+                    "returned": len(windowed),
+                }
+        else:
+            output_payload[key] = value
+
+    if window_payload:
+        output_payload["list_window"] = window_payload
+
+    return output_payload
+
+
+def _apply_output_controls(payload: dict[str, object], options: dict[str, object], *, output_mode: str) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return payload
+    if output_mode != OUTPUT_MODE_JSONL and output_mode != OUTPUT_MODE_JSON:
+        return payload
+
+    limit = options.get("limit")
+    offset = options.get("offset")
+    limit_value = limit if isinstance(limit, int) else None
+    offset_value = offset if isinstance(offset, int) else 0
+    return _normalize_pagination(
+        payload,
+        options,
+        force_sort=bool(limit_value is not None or offset_value > 0 or output_mode == OUTPUT_MODE_JSONL),
+    )
 
 
 def parse_float_option(raw: str, field: str) -> float:
@@ -6321,6 +6561,7 @@ def parse_command_flags(
     allow_capsule_filter: bool = False,
     allow_ref_filter: bool = False,
     allow_certificate_filter: bool = False,
+    allow_output_controls: bool = False,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
@@ -6332,6 +6573,10 @@ def parse_command_flags(
     ref_filters: list[str] = []
     certificate_filters: list[str] = []
     strict = bool(default_strict)
+    output_mode = OUTPUT_MODE_JSON if output_json else OUTPUT_MODE_HUMAN
+    fields: list[str] | None = None
+    limit: int | None = None
+    offset = 0
 
     def normalize_identifier_csv(raw_value: str, field: str) -> list[str]:
         try:
@@ -6339,6 +6584,41 @@ def parse_command_flags(
         except ValueError as exc:
             emit_error(str(exc), command, EXIT_USAGE, output_json)
             raise
+
+    def normalize_output_fields(raw_value: str, field: str) -> list[str]:
+        try:
+            return _parse_csv_fields(raw_value, field)
+        except ValueError as exc:
+            emit_error(f"invalid {field}: {exc}", command, EXIT_USAGE, output_json)
+            raise
+
+    def parse_output_mode(raw_value: str) -> str:
+        value = raw_value.lower().strip()
+        if value not in {OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL}:
+            emit_error(
+                f"invalid --output value '{raw_value}', expected one of: {OUTPUT_MODE_HUMAN}, {OUTPUT_MODE_JSON}, {OUTPUT_MODE_JSONL}",
+                command,
+                EXIT_USAGE,
+                output_json,
+            )
+        return value
+
+    def parse_output_offset(raw_value: str) -> int:
+        try:
+            return parse_int_option(raw_value, "offset")
+        except ValueError as exc:
+            emit_error(f"invalid --offset value: {exc}", command, EXIT_USAGE, output_json)
+            raise
+
+    def parse_output_limit(raw_value: str) -> int:
+        try:
+            parsed = parse_int_option(raw_value, "limit")
+        except ValueError as exc:
+            emit_error(f"invalid --limit value: {exc}", command, EXIT_USAGE, output_json)
+            raise
+        if parsed == 0:
+            emit_error("invalid --limit value: limit must be greater than 0", command, EXIT_USAGE, output_json)
+        return parsed
 
     i = 0
     while i < len(args):
@@ -6356,6 +6636,65 @@ def parse_command_flags(
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
+            output_mode = OUTPUT_MODE_JSON
+            i += 1
+            continue
+        if arg == "--output":
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --output", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --output", command, EXIT_USAGE, output_json)
+            output_mode = parse_output_mode(args[i + 1])
+            output_json = output_mode != OUTPUT_MODE_HUMAN
+            i += 2
+            continue
+        if arg.startswith("--output="):
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --output", command, EXIT_USAGE, output_json)
+            output_mode = parse_output_mode(arg.split("=", 1)[1])
+            output_json = output_mode != OUTPUT_MODE_HUMAN
+            i += 1
+            continue
+        if arg == "--fields":
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --fields", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --fields", command, EXIT_USAGE, output_json)
+            fields = normalize_output_fields(args[i + 1], "--fields")
+            i += 2
+            continue
+        if arg.startswith("--fields="):
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --fields", command, EXIT_USAGE, output_json)
+            fields = normalize_output_fields(arg.split("=", 1)[1], "--fields")
+            i += 1
+            continue
+        if arg == "--limit":
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --limit", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --limit", command, EXIT_USAGE, output_json)
+            limit = parse_output_limit(args[i + 1])
+            i += 2
+            continue
+        if arg.startswith("--limit="):
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --limit", command, EXIT_USAGE, output_json)
+            limit = parse_output_limit(arg.split("=", 1)[1])
+            i += 1
+            continue
+        if arg == "--offset":
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --offset", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --offset", command, EXIT_USAGE, output_json)
+            offset = parse_output_offset(args[i + 1])
+            i += 2
+            continue
+        if arg.startswith("--offset="):
+            if not allow_output_controls:
+                emit_error(f"{command} does not accept --offset", command, EXIT_USAGE, output_json)
+            offset = parse_output_offset(arg.split("=", 1)[1])
             i += 1
             continue
         if arg == "--strict":
@@ -6532,6 +6871,7 @@ def parse_command_flags(
         "mode": mode,
         "force_hooks_path": force_hooks_path,
         "force_full_sync": force_full_sync,
+        "output_mode": output_mode,
         "output_json": output_json,
         "strict": strict,
     }
@@ -6541,6 +6881,12 @@ def parse_command_flags(
         options["ref"] = ref_filters
     if certificate_filters:
         options["certificate"] = certificate_filters
+    if fields is not None:
+        options["fields"] = fields
+    if limit is not None:
+        options["limit"] = limit
+    if offset:
+        options["offset"] = offset
     return options, []
 
 
@@ -10696,16 +11042,39 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
         return EXIT_SUCCESS
 
     if command == "verify":
-        options, _ = parse_command_flags(rest, "verify", True, True, True, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "verify",
+            True,
+            True,
+            True,
+            output_json,
+            allow_output_controls=True,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         payload = _run_verify_job(repo_root, options)
-        if not output_json:
+        output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        payload = _apply_output_controls(payload, options, output_mode=output_mode)
+        if output_mode == OUTPUT_MODE_HUMAN:
             payload["message"] = _render_verify(payload)
-        emit_command_result(payload, output_json)
+        if output_mode == OUTPUT_MODE_JSONL:
+            emit_command_result_jsonl(payload, "verify")
+            return _command_exit_code(payload)
+        emit_command_result(payload, output_mode != OUTPUT_MODE_HUMAN)
         return _command_exit_code(payload)
 
     if command == "replay":
-        options, _ = parse_command_flags(rest, "replay", True, True, True, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "replay",
+            True,
+            True,
+            True,
+            output_json,
+            allow_output_controls=True,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         profile = str(options.get("profile") or "analyze")
         mode = str(options.get("mode") or "observe")
@@ -10735,7 +11104,12 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
         }
         payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
         payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
-        emit_command_result(payload, output_json)
+        output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        payload = _apply_output_controls(payload, options, output_mode=output_mode)
+        if output_mode == OUTPUT_MODE_JSONL:
+            emit_command_result_jsonl(payload, "replay")
+            return _command_exit_code(payload)
+        emit_command_result(payload, output_mode != OUTPUT_MODE_HUMAN)
         return _command_exit_code(payload)
 
     if command == "status":
@@ -10775,6 +11149,7 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
             True,
             True,
             output_json,
+            allow_output_controls=True,
             allow_capsule_filter=True,
             allow_ref_filter=True,
             allow_certificate_filter=True,
@@ -10807,9 +11182,14 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
             "filters": explain.get("filters", {}),
             "errors": explain.get("errors", []),
         }
-        if not output_json:
+        output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        payload = _apply_output_controls(payload, options, output_mode=output_mode)
+        if output_mode == OUTPUT_MODE_HUMAN:
             payload["message"] = _render_explain(payload)
-        emit_command_result(payload, output_json)
+        if output_mode == OUTPUT_MODE_JSONL:
+            emit_command_result_jsonl(payload, "explain")
+            return _command_exit_code(payload)
+        emit_command_result(payload, output_mode != OUTPUT_MODE_HUMAN)
         return _command_exit_code(payload)
 
     if command == "drift":
@@ -10827,12 +11207,26 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
         return _command_exit_code(payload)
 
     if command == "mcp-server":
-        options, _ = parse_command_flags(rest, "mcp-server", False, False, False, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "mcp-server",
+            False,
+            False,
+            False,
+            output_json,
+            allow_output_controls=True,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         payload = _run_mcp_server_stage(repo_root, options)
-        if not output_json and payload.get("status") == "ok":
+        output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        payload = _apply_output_controls(payload, options, output_mode=output_mode)
+        if output_mode == OUTPUT_MODE_HUMAN and payload.get("status") == "ok":
             payload["message"] = _render_mcp_server(payload)
-        emit_command_result(payload, output_json)
+        if output_mode == OUTPUT_MODE_JSONL:
+            emit_command_result_jsonl(payload, "mcp-server")
+            return _command_exit_code(payload)
+        emit_command_result(payload, output_mode != OUTPUT_MODE_HUMAN)
         return _command_exit_code(payload)
 
     if command == "optimize":

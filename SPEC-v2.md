@@ -176,6 +176,10 @@ Core parsing rules:
 - `--strict` is supported globally and can be set per-run to enforce strictness (`--strict=true` or `--strict=false`).
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
+- `verify`, `replay`, `explain`, and `mcp-server` support output shaping flags:
+  - `--output json|jsonl|human` (human-readable default, explicit JSON envelope, or JSONL stream mode).
+  - `--fields <field>[,<field>...]` for top-level payload projection.
+  - `--limit <n>` and `--offset <n>` for deterministic pagination of list-like fields.
 - Agent-provided identifiers and optimization inputs are normalized and validated: `--capsule`, `--ref`, and `--certificate` use strict identifier allowlists (`[a-z0-9._-]`, max 128 chars), while `--dataset`, `--candidate`, and `--baseline` are validated as repository-relative paths and rejected when absolute, traversal-laden, control-character-bearing, or percent-encoded.
 - Unknown options or subcommands are treated as usage errors.
 
@@ -211,6 +215,10 @@ Exit codes:
 Structured output:
 
 - `--json` prints a single top-level envelope for every command and error path.
+- `--output jsonl` prints envelope + item stream lines for each projected list field.
+  - Envelope and stream lines are single-line JSON.
+  - List fields are replaced by `"_streamed": true` payload markers and accompanied by `data.list_window` metadata.
+  - Each stream line is shaped as `{"event":"item","command":...,"field":"...","index":...,"item":...}`.
 - Envelope fields are:
   - `schema_version` (`1`)
   - `command`

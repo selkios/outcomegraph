@@ -107,7 +107,7 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(data["schema_version"], og.COMMAND_INTROSPECTION_SCHEMA_VERSION)
         self.assertEqual(data["command_count"], len(data["commands"]))
         signatures = {entry["command"]: entry for entry in data["commands"]}
-        for command_name in {"schema", "describe", "sync", "daemon status", "optimize prompts"}:
+        for command_name in {"schema", "describe", "sync", "daemon status", "optimize prompts", "verify", "replay", "explain", "mcp-server"}:
             self.assertIn(command_name, signatures, msg=f"missing signature for {command_name}")
             signature = signatures[command_name]
             self.assertIn("usage", signature)
@@ -119,6 +119,12 @@ class TestCommandIntrospectionContracts(TestCase):
                 request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
                 self.assertIn("--params", request_field_names)
                 self.assertIn("--strict", request_field_names)
+            if command_name in {"verify", "replay", "explain", "mcp-server"}:
+                request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
+                response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
+                for flag_name in {"--output", "--fields", "--limit", "--offset"}:
+                    self.assertIn(flag_name, request_field_names, msg=f"missing request field {flag_name} for {command_name}")
+                self.assertIn("list_window", response_field_names, msg=f"missing list_window response field for {command_name}")
 
     def test_describe_command_resolves_signature(self) -> None:
         buffer = io.StringIO()
@@ -449,6 +455,95 @@ class TestSyncWorkflows(_RepoTestCase):
             allow_force_full_sync=True,
         )
         self.assertFalse(options["strict"])
+
+    def test_parse_command_flags_supports_output_controls(self) -> None:
+        options, _ = og.parse_command_flags(
+            ["--output", "jsonl", "--fields", "claims,steps", "--limit", "2", "--offset", "1"],
+            "verify",
+            True,
+            True,
+            True,
+            False,
+            allow_output_controls=True,
+        )
+
+        self.assertEqual(options["output_mode"], og.OUTPUT_MODE_JSONL)
+        self.assertEqual(options["fields"], ["claims", "steps"])
+        self.assertEqual(options["limit"], 2)
+        self.assertEqual(options["offset"], 1)
+
+    def test_parse_command_flags_rejects_invalid_output_controls(self) -> None:
+        def parse_error(args: list[str], fragment: str) -> None:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og.parse_command_flags(
+                        args,
+                        "verify",
+                        True,
+                        True,
+                        True,
+                        False,
+                        allow_output_controls=True,
+                    )
+            self.assertEqual(context.exception.code, og.EXIT_USAGE)
+            payload = json.loads(buffer.getvalue() or "{}")
+            self.assertIn(fragment, str(payload["errors"][0]["message"]))
+
+        cases = [
+            (["--output", "yaml"], "invalid --output value"),
+            (["--limit", "abc"], "invalid --limit value"),
+            (["--offset", "-1"], "must be zero or greater"),
+            (["--limit", "0"], "must be greater than 0"),
+        ]
+        for args, fragment in cases:
+            with self.subTest(args=args):
+                parse_error(args, fragment)
+
+    def test_apply_output_controls_supports_field_filtering_and_pagination(self) -> None:
+        payload = {"status": "ok", "claims": [{"id": "b"}, {"id": "a"}], "message": "full"}
+        shaped = og._apply_output_controls(
+            payload,
+            {"fields": ["claims"], "limit": 1, "offset": 0},
+            output_mode=og.OUTPUT_MODE_JSONL,
+        )
+
+        self.assertNotIn("message", shaped)
+        self.assertIn("claims", shaped)
+        self.assertEqual(shaped["claims"], [{"id": "a"}])
+        self.assertIn("list_window", shaped)
+        self.assertEqual(shaped["list_window"]["claims"]["total"], 2)
+        self.assertEqual(shaped["list_window"]["claims"]["returned"], 1)
+
+    def test_emit_command_result_jsonl_streams_lists(self) -> None:
+        payload = {
+            "status": "ok",
+            "claims": [{"id": "b"}, {"id": "a"}],
+            "message": "full",
+        }
+        shaped = og._apply_output_controls(
+            payload,
+            {"fields": ["claims"], "limit": 1, "offset": 0},
+            output_mode=og.OUTPUT_MODE_JSONL,
+        )
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            og.emit_command_result_jsonl(shaped, "explain")
+        lines = [json.loads(line) for line in (buffer.getvalue() or "").splitlines() if line.strip()]
+
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]["command"], "explain")
+        self.assertIn("list_window", lines[0]["data"])
+        self.assertIn("claims", lines[0]["data"])
+        self.assertTrue(lines[0]["data"]["claims"]["_streamed"])
+        self.assertEqual(lines[1], {
+            "event": "item",
+            "command": "explain",
+            "field": "claims",
+            "index": 0,
+            "item": {"id": "a"},
+        })
 
     def test_parse_command_flags_rejects_invalid_identifiers(self) -> None:
         def parse_error(args: list[str]) -> str:
