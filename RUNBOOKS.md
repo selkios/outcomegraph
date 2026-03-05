@@ -157,3 +157,26 @@ Use this checklist for release candidates and handoff gates:
    - If matrix is clear: proceed with release readiness approval.
 
 `SPEC_IMPLEMENTATION_MATRIX.md` is now the canonical checklist for whether `SPEC-v2` conformance is acceptable before release.
+
+## 4.1) Full-spec dogfood evidence runbook
+
+Run these commands during pre-release rollout:
+
+1. `og status --json > .outcomegraph/events/dogfood-status.json`
+2. `og sync --json > .outcomegraph/events/dogfood-sync.json`
+3. `og verify --changed --json > .outcomegraph/events/dogfood-verify.json`
+4. `og drift > .outcomegraph/events/dogfood-drift.txt`
+
+Acceptance criteria:
+
+- `dogfood-status.json` has `status: ok`, runtime `status: idle`, and `issues: []`.
+- `dogfood-sync.json` has `status: ok`, a non-empty `steps` array, and no schema validation errors.
+- `dogfood-verify.json` has `status: ok` and a populated `verified_capsules` list.
+- `dogfood-drift.txt` does not report `POLICY_DENIED` or drift-blocking recommendations.
+
+Store evidence under `.outcomegraph/events` and include event IDs in release notes.
+
+This repository currently has a dogfood migration blocker:
+
+- Validation fails with `materials.lock` schema mismatch because `artifact_type` is missing.
+- Fix the migration first, then rerun from step 1 before deciding rollout completion.

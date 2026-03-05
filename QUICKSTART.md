@@ -103,3 +103,34 @@ Not tracked by default:
 - local caches
 
 For details, contracts, schemas, and architecture, use [SPEC-v2.md](./SPEC-v2.md).
+
+## 6) Full-spec rollout validation (dogfood)
+
+Run this sequence as a release-readiness gate:
+
+```bash
+uv run og status --json
+uv run og sync --json
+uv run og verify --changed --json
+uv run og drift
+```
+
+Expected outputs before rollout:
+
+```text
+status: ok
+sync:  status: ok with steps [distill, apply, verify, export]
+verify: status: ok and verified_capsules present
+drift:  no blocking policy or certificate regressions
+```
+
+Observed rollout evidence in this repository:
+
+- `.outcomegraph/events/sync-20260305T082953Z-8485041f63.json`
+- `.outcomegraph/events/sync-20260305T092058Z-9008c47e88.json`
+- `.outcomegraph/events/verify-20260305T092059Z-a1789787d4.json`
+
+Known migration blocker discovered during dogfood:
+
+- `.outcomegraph/materials.lock` missing `artifact_type` caused validation errors.
+- Fix per `MIGRATION_GUIDE.md` and rerun the full sequence.

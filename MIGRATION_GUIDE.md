@@ -64,6 +64,39 @@ For each adapter:
 
 If an adapter is optional, keep degraded feature mode and unblock when safe.
 
+### 3a) Dogfood migration blocker: `materials.lock` artifact_type
+
+This repository surfaced a rollout-blocking schema mismatch:
+
+- `.outcomegraph/materials.lock` had `schema_version: 2` but lacked `artifact_type`.
+- Validation failed with `expected 'materials_lock' for this path and schema_version 2`.
+
+Expected canonical shape:
+
+```json
+{
+  "schema_version": 2,
+  "artifact_type": "materials_lock",
+  "material_paths": [],
+  "notes": "bootstrap-generated materials lock",
+  "created_at": "..."
+}
+```
+
+Repair command:
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path('.outcomegraph/materials.lock')
+data = json.loads(path.read_text(encoding='utf-8'))
+data['artifact_type'] = 'materials_lock'
+path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+PY
+```
+
 ## 6) Post-migration validation
 
 Expected clean state:
@@ -73,3 +106,8 @@ Expected clean state:
 - no adapter mismatch errors
 - `og sync` can complete end-to-end with generated exports updated
 - `og verify --changed` and `og replay --changed` complete on scoped candidates
+
+For this rollout, archive evidence by ensuring:
+
+- `RUNBOOKS`-captured `dogfood-*.json` files are status `ok`
+- migration failure events are gone from current run IDs

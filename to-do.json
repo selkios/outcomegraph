@@ -956,10 +956,10 @@
         "integrity"
       ],
       "files": [
-        "og.py",
-        "SPEC-v2.md",
         "RUNBOOKS.md",
         "SECURITY_POLICY.md",
+        "SPEC-v2.md",
+        "og.py",
         "to-do.json"
       ],
       "depends_on": [
@@ -967,7 +967,7 @@
         "OG-SPEC-005",
         "OG-SPEC-007"
       ],
-      "updated_at": "2026-03-05T09:20:25Z"
+      "updated_at": "2026-03-05T09:20:47Z"
     },
     {
       "id": "OG-SPEC-009",
@@ -1039,7 +1039,7 @@
       "id": "OG-SPEC-011",
       "title": "Finalize docs, migration guidance, and dogfood validation for full-spec rollout",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Publish implementation decisions, migration path, and verified dogfood evidence after full-spec completion.",
       "steps": [
         "Update README/QUICKSTART/RUNBOOKS with final user and operator flows",
@@ -1062,7 +1062,8 @@
       "depends_on": [
         "OG-SPEC-010"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:21:20Z",
+      "blockers": []
     }
   ]
 }

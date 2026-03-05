@@ -55,6 +55,27 @@ cd outcomegraph
 uv run og <command>
 ```
 
+## Full-spec rollout and dogfood checklist
+
+Use this repository as rollout validation:
+
+1. `uv run og status --json` and confirm top-level `status: "ok"` and `state: "ok"`.
+2. `uv run og sync --json` and confirm:
+   - `status: "ok"`
+   - `steps` include `distill`, `apply`, `verify`, and `export`
+3. `uv run og verify --changed --json` and confirm:
+   - `status: "ok"`
+   - `verified_capsules` is non-empty
+4. Run `uv run og drift` to confirm policy/certificate checks are healthy.
+
+Canonical evidence artifacts captured in this repo:
+
+- `.outcomegraph/events/sync-20260305T082953Z-8485041f63.json` (successful sync summary)
+- `.outcomegraph/events/sync-20260305T092058Z-9008c47e88.json` (migration validation failure)
+- `.outcomegraph/events/verify-20260305T092059Z-a1789787d4.json` (migration validation failure)
+
+If sync or verify fails with schema checks, apply `MIGRATION_GUIDE.md` and rerun from step 1.
+
 ### Dogfood Example In This Repository
 
 Use this repository itself as a reference project:
