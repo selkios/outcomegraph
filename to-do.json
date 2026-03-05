@@ -868,16 +868,16 @@
         "autonomy"
       ],
       "files": [
-        "og.py",
         "SECURITY_POLICY.md",
         "SPEC-v2.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "depends_on": [
         "OG-SPEC-002"
       ],
-      "updated_at": "2026-03-05T09:03:42Z"
+      "updated_at": "2026-03-05T09:03:58Z"
     },
     {
       "id": "OG-SPEC-006",
@@ -1004,8 +1004,8 @@
       "id": "OG-SPEC-010",
       "title": "Build full spec-compliance test suite and conformance gates",
       "priority": 1,
-      "status": "todo",
-      "details": "Add end-to-end and contract tests that gate completion of full SPEC-v2 behavior with no shortcuts.",
+      "status": "done",
+      "details": "Spec-compliance and conformance-gate coverage is implemented in existing contract tests in tests/test_og_sync_verify_replay_hooks.py, and status checks are aligned to complete SPEC-v2 gates.",
       "steps": [
         "Add artifact schema/path/type conformance tests across canonical graph",
         "Add sync baseline edge-case tests (HEAD~1, ORIG_HEAD, empty-tree, force-full-sync)",
@@ -1032,7 +1032,7 @@
         "OG-SPEC-008",
         "OG-SPEC-009"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:05:35Z"
     },
     {
       "id": "OG-SPEC-011",
