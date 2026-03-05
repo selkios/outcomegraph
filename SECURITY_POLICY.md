@@ -65,6 +65,16 @@ deny:
 - missing allow entries block by default with `POLICY_DENIED`
 - `AUTONOMOUS_WRITE_BLOCKED` is returned when writes are requested in `autonomous` mode while policy is degraded or integrity cannot be validated.
 
+## 3b) CLI input safety
+
+- `og` treats agent-supplied IDs (`--capsule`, `--ref`, `--certificate`) as untrusted input and rejects values with:
+  - unsupported characters outside `[a-z0-9._-]`,
+  - control characters,
+  - malformed percent-encoding,
+  - empty values, or values that exceed policy limits.
+- `og` treats prompt optimization paths (`--dataset`, `--candidate`, `--baseline`) as untrusted input and rejects values that are absolute, traverse outside the repository, include control characters, or include percent-encoding.
+- On input violations, commands fail closed with usage-level exit and explicit error messaging.
+
 ## 4) Error and remediation
 
 When denied, `og` must emit error payload with:

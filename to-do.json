@@ -1231,7 +1231,7 @@
       "id": "OG-AGENT-005",
       "title": "Harden path and identifier validation for agent-supplied inputs",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Treat agent input as adversarial and enforce strict path/ID validation to prevent traversal, encoding tricks, and control-character abuse. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1252,7 +1252,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:06:14Z"
     },
     {
       "id": "OG-AGENT-006",

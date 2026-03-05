@@ -175,6 +175,7 @@ Core parsing rules:
 - All command and flag validation is explicit and exits with command-appropriate error codes.
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
+- Agent-provided identifiers and optimization inputs are normalized and validated: `--capsule`, `--ref`, and `--certificate` use strict identifier allowlists (`[a-z0-9._-]`, max 128 chars), while `--dataset`, `--candidate`, and `--baseline` are validated as repository-relative paths and rejected when absolute, traversal-laden, control-character-bearing, or percent-encoded.
 - Unknown options or subcommands are treated as usage errors.
 
 Machine introspection is supported:

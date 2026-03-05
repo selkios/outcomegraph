@@ -407,6 +407,60 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(options["profile"], "apply")
         self.assertEqual(options["mode"], "autonomous")
 
+    def test_parse_command_flags_rejects_invalid_identifiers(self) -> None:
+        def parse_error(args: list[str]) -> str:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og.parse_command_flags(
+                        args,
+                        "explain",
+                        False,
+                        True,
+                        True,
+                        True,
+                        allow_capsule_filter=True,
+                        allow_ref_filter=True,
+                        allow_certificate_filter=True,
+                    )
+            self.assertEqual(context.exception.code, og.EXIT_USAGE)
+            payload = json.loads(buffer.getvalue() or "{}")
+            return str(payload["errors"][0]["message"])
+
+        cases = [
+            (["--capsule", "../alpha"], "unsupported characters"),
+            (["--ref", "bad%2fref"], "percent-encoded input"),
+            (["--certificate", "cert\x00id"], "control characters"),
+        ]
+        for args, expected_fragment in cases:
+            with self.subTest(args=args):
+                message = parse_error(args)
+                self.assertIn(expected_fragment, message)
+
+    def test_parse_optimize_prompts_flags_rejects_bad_paths(self) -> None:
+        valid_candidate = "candidate.txt"
+        valid_baseline = "baseline.txt"
+
+        def parse_error(args: list[str]) -> str:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og._parse_optimize_prompts_flags(args, True)
+            self.assertEqual(context.exception.code, og.EXIT_USAGE)
+            payload = json.loads(buffer.getvalue() or "{}")
+            return str(payload["errors"][0]["message"])
+
+        cases = [
+            (["--dataset", "../datasets/base.json", "--candidate", valid_candidate, "--baseline", valid_baseline], "contains traversal segments"),
+            (["--dataset", "/tmp/base.json", "--candidate", valid_candidate, "--baseline", valid_baseline], "must be repository-relative"),
+            (["--dataset", "datasets/base.json", "--candidate", "candidate%2f.txt", "--baseline", valid_baseline], "percent-encoded input"),
+            (["--dataset", "datasets/base.json", "--candidate", valid_candidate, "--baseline", "base\x00.txt"], "contains control characters"),
+        ]
+        for args, expected_fragment in cases:
+            with self.subTest(args=args):
+                message = parse_error(args)
+                self.assertIn(expected_fragment, message)
+
     def test_run_sync_job_short_circuits_when_idempotent(self) -> None:
         snapshot = {
             "repository_head": "abc123",
