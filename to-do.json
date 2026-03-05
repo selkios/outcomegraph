@@ -1258,7 +1258,7 @@
       "id": "OG-AGENT-006",
       "title": "Add first-class raw payload input mode and CLI strictness",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Support full request payload submission for complex actions and provide `--strict` to forbid silent defaults/fallbacks in production automation. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1284,7 +1284,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:38:15Z"
+      "updated_at": "2026-03-05T17:11:32Z"
     },
     {
       "id": "OG-AGENT-007",

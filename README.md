@@ -132,6 +132,7 @@ og describe daemon status
 Common flags:
 
 - `--json` / `--json=true|false`
+- `--strict` / `--strict=true|false`
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
 - `--changed` (for focused sync/verify/replay behavior)
@@ -245,6 +246,25 @@ Builds a runtime/freshness dashboard used by operators and daemons:
 
 Generates a control-plane resource payload for MCP clients (`tools`, `resources`,
 `prompts`, counts, and errors when available).
+
+### `og optimize prompts`
+
+`--params` submits the full request payload as JSON, either from a file path or
+from stdin with `-`.
+
+- `og optimize prompts --params payload.json`
+- `cat payload.json | og optimize prompts --params -`
+
+Either flag-based input or payload input is supported:
+
+- `--dataset`, `--candidate`, and `--baseline` are required in strict mode even if
+  defaults exist, and `--metric`, `--min-improvement`, and `--approve` are
+  optional.
+- Payload keys `dataset`, `candidate`, `baseline`, `metric`, `min_improvement`, and
+  `approve` may replace the matching flags.
+- `--params` payload values can be overridden by explicit flags.
+- In `--strict` mode, unknown payload keys, missing optional defaults, and lossy
+  type coercions are rejected.
 
 ### `og autopilot`
 

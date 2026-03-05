@@ -173,6 +173,7 @@ ogd status
 Core parsing rules:
 
 - All command and flag validation is explicit and exits with command-appropriate error codes.
+- `--strict` is supported globally and can be set per-run to enforce strictness (`--strict=true` or `--strict=false`).
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
 - Agent-provided identifiers and optimization inputs are normalized and validated: `--capsule`, `--ref`, and `--certificate` use strict identifier allowlists (`[a-z0-9._-]`, max 128 chars), while `--dataset`, `--candidate`, and `--baseline` are validated as repository-relative paths and rejected when absolute, traversal-laden, control-character-bearing, or percent-encoded.
@@ -188,10 +189,18 @@ Machine introspection is supported:
 - `--dataset <path>` path to an `eval_dataset` artifact (`schema_version: 2`).
 - `--candidate <path>` path to candidate prompt artifact text.
 - `--baseline <path>` path to baseline prompt artifact text.
+- `--params <json-file|->` payload submitter for full request body (path or stdin via `-`).
 - `--metric {contains|exact}` scoring metric (`contains` default).
 - `--min-improvement <number>` score delta threshold, interpreted as percentage when > 1.
 - `--approve` to persist an active prompt pack.
 - `--json` for machine-readable output.
+- `--strict` to reject unknown payload keys, implicit defaults, and lossy coercions when payload keys are used.
+
+Payload precedence in strict mode:
+
+- Explicit command flags override payload keys when both are provided.
+- In strict mode, optional payload fields are required if absent from command flags (`--metric`, `--min-improvement`, `--approve`).
+- In non-strict mode, unknown payload fields are ignored and best-effort coercion applies where safe.
 
 Exit codes:
 

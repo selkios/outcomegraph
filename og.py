@@ -17,6 +17,7 @@ import signal
 import time
 import shlex
 import tempfile
+import string
 
 
 VERSION = "0.1.0-dev"
@@ -42,6 +43,8 @@ ERROR_CLASS_RUNTIME = "runtime"
 DEFAULT_ERROR_CLASS = ERROR_CLASS_RUNTIME
 ERROR_HINT_MAX_LENGTH = 180
 ERROR_HINT_DEFAULT = "Inspect command-specific errors for next-step remediation and retry decision."
+IDENTIFIER_ALLOWED_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789._-")
+IDENTIFIER_MAX_LENGTH = 128
 ERROR_CLASS_BY_CODE: dict[str, dict[str, object]] = {
     USAGE_ERROR_CODE: {
         "error_class": ERROR_CLASS_USAGE,
@@ -897,7 +900,7 @@ class WorkerAdapterError(ValueError):
 
 
 def emit_usage() -> str:
-    return """Usage: og [--json] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
+    return """Usage: og [--json] [--strict] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
 
 Core commands:
   og init
@@ -933,6 +936,13 @@ Exit codes:
 
 
 def _command_help(usage: str, summary: str, options: list[str], examples: list[str], notes: list[str] | None = None) -> str:
+    options = list(options)
+    if not any(option.startswith("--strict") for option in options):
+        if options == ["none"]:
+            options = [*options, "--strict[=true|false]"]
+        else:
+            options.append("--strict[=true|false]")
+
     lines = [f"Usage: {usage}", "", summary, "", "Accepted options:"]
     if options:
         lines.extend(f"  {item}" for item in options)
@@ -1060,7 +1070,7 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "optimize prompts":
         return _command_help(
-            "og optimize prompts --dataset <path> --candidate <path> --baseline <path> [--metric contains|exact] [--min-improvement <float>] [--approve[=true|false]]",
+            "og optimize prompts --dataset <path> --candidate <path> --baseline <path> [--metric contains|exact] [--min-improvement <float>] [--approve[=true|false]] [--params <json-file|->]",
             "Run dataset-based prompt optimization and optionally activate a candidate when it passes thresholds.",
             [
                 "--dataset <path>",
@@ -1069,11 +1079,13 @@ def _help_for_command(command: str) -> str:
                 "--metric contains|exact",
                 "--min-improvement <float>",
                 "--approve[=true|false]",
+                "--params <json-file|->",
                 "--json",
             ],
             [
                 "og optimize prompts --dataset .outcomegraph/datasets/bugfix.json --candidate next.txt --baseline base.txt",
                 "og optimize prompts --dataset ds.json --candidate next.txt --baseline base.txt --approve",
+                "cat payload.json | og optimize prompts --params -",
             ],
         )
     if normalized == "autopilot":
@@ -1199,13 +1211,24 @@ def _command_signature_entry(
         "envelope_schema_version": COMMAND_RESULT_SCHEMA_VERSION,
         "data_fields": response_fields,
     }
-    required_request = [entry["name"] for entry in request_fields if entry.get("required")]
+    request_fields_with_strict = list(request_fields)
+    if not any(entry.get("name") == "--strict" for entry in request_fields_with_strict):
+        request_fields_with_strict.append(
+            _command_schema_field(
+                "--strict",
+                "boolean",
+                "Reject unknown fields, implicit defaults, and lossy coercions in request payload mode.",
+                default=False,
+            )
+        )
+
+    required_request = [entry["name"] for entry in request_fields_with_strict if entry.get("required")]
     signature: dict[str, object] = {
         "command": command,
         "usage": usage,
         "summary": summary,
         "request": {
-            "fields": request_fields,
+            "fields": request_fields_with_strict,
             "required_fields": required_request,
         },
         "response": response_schema,
@@ -1419,6 +1442,11 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "Run dataset-based prompt optimization and optionally activate a candidate when it passes thresholds.",
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--params",
+                    "string",
+                    "Path to JSON payload file, or - for stdin payload stream.",
+                ),
                 _command_schema_field("--dataset", "string", "Path to eval_dataset artifact.", required=True),
                 _command_schema_field("--candidate", "string", "Path to candidate prompt artifact text.", required=True),
                 _command_schema_field("--baseline", "string", "Path to baseline prompt artifact text.", required=True),
@@ -1960,6 +1988,31 @@ def _read_json_file(path: str) -> dict | None:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> dict | None:
+    try:
+        if path == "-":
+            text = sys.stdin.read()
+        else:
+            with open(path, "r", encoding="utf-8") as handle:
+                text = handle.read()
+    except OSError as exc:
+        if path == "-":
+            emit_error(f"failed reading params from stdin: {exc}", command, EXIT_USAGE, output_json)
+        emit_error(f"failed reading params file '{path}': {exc}", command, EXIT_USAGE, output_json)
+
+    if not text.strip():
+        emit_error("params payload is empty", command, EXIT_USAGE, output_json)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        emit_error(f"params payload is not valid JSON: {exc}", command, EXIT_USAGE, output_json)
+        return None
+
+    if not isinstance(payload, dict):
+        emit_error("params payload must be a JSON object", command, EXIT_USAGE, output_json)
+    return payload
 
 
 def _read_file_updated_at(repo_root: str, relative_path: str) -> datetime.datetime | None:
@@ -3679,6 +3732,84 @@ def _safe_slug(value: str) -> str:
     sanitized = "".join(ch.lower() if ch.isalnum() or ch in "-_" else "-" for ch in value.strip())
     sanitized = sanitized.strip("-")
     return sanitized or "item"
+
+
+def _reject_invalid_control_characters(raw: str, field: str) -> str:
+    if any((0 <= ord(char) <= 0x1F or ord(char) == 0x7F) for char in raw):
+        raise ValueError(f"{field} contains control characters")
+    return raw
+
+
+def _reject_malformed_percent_encoding(raw: str, field: str) -> str:
+    index = 0
+    while index < len(raw):
+        if raw[index] != "%":
+            index += 1
+            continue
+        if index + 2 >= len(raw):
+            raise ValueError(f"{field} contains malformed percent encoding")
+        segment = raw[index + 1 : index + 3]
+        if any(char not in string.hexdigits for char in segment):
+            raise ValueError(f"{field} contains malformed percent encoding")
+        raise ValueError(f"{field} contains percent-encoded input")
+    return raw
+
+
+def _normalize_agent_identifier(raw: object, field: str) -> str:
+    if not isinstance(raw, str):
+        raise ValueError(f"{field} must be a string")
+    value = raw.strip().lower()
+    if not value:
+        raise ValueError(f"{field} must be a non-empty string")
+    if len(value) > IDENTIFIER_MAX_LENGTH:
+        raise ValueError(f"{field} exceeds maximum length of {IDENTIFIER_MAX_LENGTH}")
+    value = _reject_invalid_control_characters(value, field)
+    value = _reject_malformed_percent_encoding(value, field)
+    for char in value:
+        if char not in IDENTIFIER_ALLOWED_CHARS:
+            raise ValueError(f"{field} contains unsupported characters; use [a-z0-9._-]")
+    if not value[0].isalnum():
+        raise ValueError(f"{field} must start with a letter or digit")
+    return value
+
+
+def _normalize_agent_identifier_csv(raw: str, field: str) -> list[str]:
+    normalized: list[str] = []
+    for item in raw.split(","):
+        candidate = item.strip()
+        if not candidate:
+            continue
+        normalized.append(_normalize_agent_identifier(candidate, field))
+    if not normalized:
+        raise ValueError(f"{field} must contain at least one identifier")
+    return normalized
+
+
+def _normalize_repo_relative_user_path(raw: object, field: str) -> str:
+    if not isinstance(raw, str):
+        raise ValueError(f"{field} must be a path string")
+    path = raw.strip().replace("\\", "/")
+    if not path:
+        raise ValueError(f"{field} must be a non-empty path")
+    path = _reject_invalid_control_characters(path, field)
+    path = _reject_malformed_percent_encoding(path, field)
+    if os.path.isabs(path):
+        raise ValueError(f"{field} must be repository-relative")
+    drive, _ = os.path.splitdrive(path)
+    if drive:
+        raise ValueError(f"{field} contains an invalid drive prefix")
+    while path.startswith("./"):
+        path = path[2:]
+    if path in {"", ".", ".."}:
+        raise ValueError(f"{field} must be a non-empty relative path")
+    parts = [part for part in path.split("/") if part]
+    if not parts or any(part == ".." or part in {"", "."} for part in parts):
+        raise ValueError(f"{field} contains traversal segments")
+    normalized = "/".join(parts)
+    normalized = os.path.normpath(normalized).replace("\\", "/")
+    if normalized in {"", ".", ".."} or normalized.startswith("../"):
+        raise ValueError(f"{field} resolves outside repository root")
+    return normalized
 
 
 def _write_text_payload(path: str, payload: object) -> bytes:
@@ -6190,6 +6321,7 @@ def parse_command_flags(
     allow_capsule_filter: bool = False,
     allow_ref_filter: bool = False,
     allow_certificate_filter: bool = False,
+    default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
     profile = None
@@ -6199,6 +6331,14 @@ def parse_command_flags(
     capsule_filters: list[str] = []
     ref_filters: list[str] = []
     certificate_filters: list[str] = []
+    strict = bool(default_strict)
+
+    def normalize_identifier_csv(raw_value: str, field: str) -> list[str]:
+        try:
+            return _normalize_agent_identifier_csv(raw_value, field)
+        except ValueError as exc:
+            emit_error(str(exc), command, EXIT_USAGE, output_json)
+            raise
 
     i = 0
     while i < len(args):
@@ -6216,6 +6356,17 @@ def parse_command_flags(
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
+            i += 1
+            continue
+        if arg == "--strict":
+            strict = True
+            i += 1
+            continue
+        if arg.startswith("--strict="):
+            try:
+                strict = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --strict value: {exc}", command, EXIT_USAGE, output_json)
             i += 1
             continue
         if arg == "--changed":
@@ -6299,14 +6450,14 @@ def parse_command_flags(
             if i + 1 >= len(args):
                 emit_error(f"{command} requires a value for --capsule", command, EXIT_USAGE, output_json)
             value = args[i + 1]
-            capsule_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            capsule_filters.extend(normalize_identifier_csv(value, "capsule"))
             i += 2
             continue
         if arg.startswith("--capsule="):
             if not allow_capsule_filter:
                 emit_error(f"{command} does not accept --capsule", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
-            capsule_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            capsule_filters.extend(normalize_identifier_csv(value, "capsule"))
             i += 1
             continue
         if arg == "--ref":
@@ -6315,14 +6466,14 @@ def parse_command_flags(
             if i + 1 >= len(args):
                 emit_error(f"{command} requires a value for --ref", command, EXIT_USAGE, output_json)
             value = args[i + 1]
-            ref_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            ref_filters.extend(normalize_identifier_csv(value, "ref"))
             i += 2
             continue
         if arg.startswith("--ref="):
             if not allow_ref_filter:
                 emit_error(f"{command} does not accept --ref", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
-            ref_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            ref_filters.extend(normalize_identifier_csv(value, "ref"))
             i += 1
             continue
         if arg == "--certificate":
@@ -6331,14 +6482,14 @@ def parse_command_flags(
             if i + 1 >= len(args):
                 emit_error(f"{command} requires a value for --certificate", command, EXIT_USAGE, output_json)
             value = args[i + 1]
-            certificate_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            certificate_filters.extend(normalize_identifier_csv(value, "certificate"))
             i += 2
             continue
         if arg.startswith("--certificate="):
             if not allow_certificate_filter:
                 emit_error(f"{command} does not accept --certificate", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
-            certificate_filters.extend([item.strip() for item in value.split(",") if item.strip()])
+            certificate_filters.extend(normalize_identifier_csv(value, "certificate"))
             i += 1
             continue
         if arg == "--force-hooks-path":
@@ -6382,6 +6533,7 @@ def parse_command_flags(
         "force_hooks_path": force_hooks_path,
         "force_full_sync": force_full_sync,
         "output_json": output_json,
+        "strict": strict,
     }
     if capsule_filters:
         options["capsule"] = capsule_filters
@@ -6577,14 +6729,22 @@ def _run_clean_job(repo_root: str, options: dict[str, object]) -> dict[str, obje
 def _parse_optimize_prompts_flags(
     args: list[str],
     output_json: bool,
+    default_strict: bool = False,
 ) -> dict[str, object]:
-    dataset_path: str | None = None
-    candidate_prompt: str | None = None
-    baseline_prompt: str | None = None
-    metric = "contains"
-    min_improvement = OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT
-    approve = False
+    strict = bool(default_strict)
+    has_payload = False
+    payload: dict[str, object] = {}
+    flag_values: dict[str, object] = {}
     i = 0
+
+    allowed_payload_fields = {"dataset", "candidate", "baseline", "metric", "min_improvement", "approve"}
+
+    def normalize_dataset_input(raw_value: str, field: str) -> str:
+        try:
+            return _normalize_repo_relative_user_path(raw_value, field)
+        except ValueError as exc:
+            emit_error(str(exc), "optimize", EXIT_USAGE, output_json)
+            raise
 
     while i < len(args):
         arg = args[i]
@@ -6604,34 +6764,97 @@ def _parse_optimize_prompts_flags(
             output_json = True
             i += 1
             continue
+        if arg == "--strict":
+            strict = True
+            i += 1
+            continue
+        if arg.startswith("--strict="):
+            try:
+                strict = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --strict value: {exc}", "optimize", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--params":
+            if i + 1 >= len(args):
+                emit_error("optimize prompts requires a value for --params", "optimize", EXIT_USAGE, output_json)
+            if has_payload:
+                emit_error("optimize prompts accepts only one --params argument", "optimize", EXIT_USAGE, output_json)
+            payload = _read_json_payload_source(args[i + 1], command="optimize", output_json=output_json) or {}
+            if strict:
+                for key in payload.keys():
+                    if key not in allowed_payload_fields:
+                        emit_error(
+                            f"strict mode rejects unknown params fields: {key}",
+                            "optimize",
+                            EXIT_USAGE,
+                            output_json,
+                        )
+            has_payload = True
+            i += 2
+            continue
+        if arg.startswith("--params="):
+            if has_payload:
+                emit_error("optimize prompts accepts only one --params argument", "optimize", EXIT_USAGE, output_json)
+            payload = _read_json_payload_source(arg.split("=", 1)[1], command="optimize", output_json=output_json) or {}
+            if strict:
+                for key in payload.keys():
+                    if key not in allowed_payload_fields:
+                        emit_error(
+                            f"strict mode rejects unknown params fields: {key}",
+                            "optimize",
+                            EXIT_USAGE,
+                            output_json,
+                        )
+            has_payload = True
+            i += 1
+            continue
         if arg == "--dataset":
             if i + 1 >= len(args):
                 emit_error("optimize prompts requires a value for --dataset", "optimize", EXIT_USAGE, output_json)
-            dataset_path = args[i + 1].strip()
+            value = args[i + 1].strip()
+            if not value:
+                emit_error("optimize prompts requires --dataset", "optimize", EXIT_USAGE, output_json)
+            flag_values["dataset"] = normalize_dataset_input(value, "dataset")
             i += 2
             continue
         if arg.startswith("--dataset="):
-            dataset_path = arg.split("=", 1)[1].strip()
+            value = arg.split("=", 1)[1].strip()
+            if not value:
+                emit_error("optimize prompts requires --dataset", "optimize", EXIT_USAGE, output_json)
+            flag_values["dataset"] = normalize_dataset_input(value, "dataset")
             i += 1
             continue
         if arg == "--candidate":
             if i + 1 >= len(args):
                 emit_error("optimize prompts requires a value for --candidate", "optimize", EXIT_USAGE, output_json)
-            candidate_prompt = args[i + 1].strip()
+            value = args[i + 1].strip()
+            if not value:
+                emit_error("optimize prompts requires --candidate", "optimize", EXIT_USAGE, output_json)
+            flag_values["candidate"] = normalize_dataset_input(value, "candidate")
             i += 2
             continue
         if arg.startswith("--candidate="):
-            candidate_prompt = arg.split("=", 1)[1].strip()
+            value = arg.split("=", 1)[1].strip()
+            if not value:
+                emit_error("optimize prompts requires --candidate", "optimize", EXIT_USAGE, output_json)
+            flag_values["candidate"] = normalize_dataset_input(value, "candidate")
             i += 1
             continue
         if arg == "--baseline":
             if i + 1 >= len(args):
                 emit_error("optimize prompts requires a value for --baseline", "optimize", EXIT_USAGE, output_json)
-            baseline_prompt = args[i + 1].strip()
+            value = args[i + 1].strip()
+            if not value:
+                emit_error("optimize prompts requires --baseline", "optimize", EXIT_USAGE, output_json)
+            flag_values["baseline"] = normalize_dataset_input(value, "baseline")
             i += 2
             continue
         if arg.startswith("--baseline="):
-            baseline_prompt = arg.split("=", 1)[1].strip()
+            value = arg.split("=", 1)[1].strip()
+            if not value:
+                emit_error("optimize prompts requires --baseline", "optimize", EXIT_USAGE, output_json)
+            flag_values["baseline"] = normalize_dataset_input(value, "baseline")
             i += 1
             continue
         if arg == "--metric":
@@ -6645,7 +6868,7 @@ def _parse_optimize_prompts_flags(
                     EXIT_USAGE,
                     output_json,
                 )
-            metric = value
+            flag_values["metric"] = value
             i += 2
             continue
         if arg.startswith("--metric="):
@@ -6657,58 +6880,158 @@ def _parse_optimize_prompts_flags(
                     EXIT_USAGE,
                     output_json,
                 )
-            metric = value
+            flag_values["metric"] = value
             i += 1
             continue
         if arg == "--min-improvement":
             if i + 1 >= len(args):
                 emit_error("optimize prompts requires a value for --min-improvement", "optimize", EXIT_USAGE, output_json)
             try:
-                value = parse_float_option(args[i + 1], "min-improvement")
+                flag_values["min_improvement"] = parse_float_option(args[i + 1], "min-improvement")
             except ValueError as exc:
                 emit_error(f"invalid --min-improvement value: {exc}", "optimize", EXIT_USAGE, output_json)
-            min_improvement = value
             i += 2
             continue
         if arg.startswith("--min-improvement="):
             try:
-                value = parse_float_option(arg.split("=", 1)[1], "min-improvement")
+                flag_values["min_improvement"] = parse_float_option(arg.split("=", 1)[1], "min-improvement")
             except ValueError as exc:
                 emit_error(f"invalid --min-improvement value: {exc}", "optimize", EXIT_USAGE, output_json)
-            min_improvement = value
             i += 1
             continue
         if arg == "--approve":
-            approve = True
+            flag_values["approve"] = True
             i += 1
             continue
         if arg.startswith("--approve="):
             try:
-                approve = parse_bool_option(arg.split("=", 1)[1])
+                flag_values["approve"] = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --approve value: {exc}", "optimize", EXIT_USAGE, output_json)
             i += 1
             continue
         emit_error(f"unknown option '{arg}' for optimize prompts", "optimize", EXIT_USAGE, output_json)
 
-    if not dataset_path:
-        emit_error("optimize prompts requires --dataset", "optimize", EXIT_USAGE, output_json)
-    if not candidate_prompt:
-        emit_error("optimize prompts requires --candidate", "optimize", EXIT_USAGE, output_json)
-    if not baseline_prompt:
-        emit_error("optimize prompts requires --baseline", "optimize", EXIT_USAGE, output_json)
-    if not isinstance(min_improvement, (int, float)) or min_improvement < 0:
+    def resolve_field(name: str, *, required: bool, default_value: object, field_type: str) -> object:
+        if name in flag_values:
+            raw_value = flag_values[name]
+            from_payload = False
+        elif has_payload and name in payload:
+            raw_value = payload[name]
+            from_payload = True
+        else:
+            if required:
+                emit_error(
+                    f"optimize prompts requires --{name.replace('_', '-')}",
+                    "optimize",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            if strict:
+                emit_error(
+                    f"optimize prompts strict mode requires --{name.replace('_', '-')}",
+                    "optimize",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            return default_value
+
+        if field_type == "path":
+            if not isinstance(raw_value, str):
+                if strict and from_payload:
+                    emit_error(
+                        f"optimize prompts --{name.replace('_', '-')} must be a string in strict mode",
+                        "optimize",
+                        EXIT_USAGE,
+                        output_json,
+                    )
+                raw_value = str(raw_value)
+            return normalize_dataset_input(str(raw_value), name)
+
+        if field_type == "metric":
+            if not isinstance(raw_value, str):
+                if strict and from_payload:
+                    emit_error(
+                        "optimize prompts --metric must be a string in strict mode",
+                        "optimize",
+                        EXIT_USAGE,
+                        output_json,
+                    )
+                raw_value = str(raw_value)
+            value = str(raw_value).strip().lower()
+            if value not in OPTIMIZATION_SUPPORTED_METRICS:
+                emit_error(
+                    f"invalid --metric '{value}', expected one of: {', '.join(sorted(OPTIMIZATION_SUPPORTED_METRICS))}",
+                    "optimize",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            return value
+
+        if field_type == "min_improvement":
+            if strict and from_payload:
+                if isinstance(raw_value, bool):
+                    emit_error(
+                        "optimize prompts --min-improvement must be a number in strict mode",
+                        "optimize",
+                        EXIT_USAGE,
+                        output_json,
+                    )
+                if not isinstance(raw_value, (int, float)):
+                    emit_error(
+                        "optimize prompts --min-improvement must be a number in strict mode",
+                        "optimize",
+                        EXIT_USAGE,
+                        output_json,
+                    )
+            if isinstance(raw_value, bool):
+                emit_error("optimize prompts --min-improvement must be >= 0", "optimize", EXIT_USAGE, output_json)
+            if isinstance(raw_value, (int, float)):
+                return float(raw_value)
+            if isinstance(raw_value, str):
+                try:
+                    return parse_float_option(raw_value, "min-improvement")
+                except ValueError as exc:
+                    emit_error(f"invalid --min-improvement value: {exc}", "optimize", EXIT_USAGE, output_json)
+            emit_error("optimize prompts --min-improvement must be a number", "optimize", EXIT_USAGE, output_json)
+
+        if field_type == "approve":
+            if isinstance(raw_value, bool):
+                return raw_value
+            if strict and from_payload:
+                emit_error("optimize prompts --approve must be boolean in strict mode", "optimize", EXIT_USAGE, output_json)
+            if isinstance(raw_value, str):
+                try:
+                    return parse_bool_option(raw_value)
+                except ValueError as exc:
+                    emit_error(f"invalid --approve value: {exc}", "optimize", EXIT_USAGE, output_json)
+            emit_error("optimize prompts --approve must be boolean", "optimize", EXIT_USAGE, output_json)
+        return raw_value
+
+    dataset = resolve_field("dataset", required=True, default_value=None, field_type="path")
+    candidate = resolve_field("candidate", required=True, default_value=None, field_type="path")
+    baseline = resolve_field("baseline", required=True, default_value=None, field_type="path")
+    metric = resolve_field("metric", required=False, default_value="contains", field_type="metric")
+    min_improvement = resolve_field("min_improvement", required=False, default_value=OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT, field_type="min_improvement")
+    approve = resolve_field("approve", required=False, default_value=False, field_type="approve")
+
+    if not isinstance(min_improvement, (int, float)):
+        emit_error("optimize prompts --min-improvement must be a number", "optimize", EXIT_USAGE, output_json)
+    if min_improvement < 0:
         emit_error("--min-improvement must be >= 0", "optimize", EXIT_USAGE, output_json)
     if min_improvement > 1:
         min_improvement = min_improvement / 100.0
+    if not isinstance(approve, bool):
+        emit_error("optimize prompts --approve must be boolean", "optimize", EXIT_USAGE, output_json)
 
     return {
-        "dataset": dataset_path.strip(),
-        "candidate": candidate_prompt.strip(),
-        "baseline": baseline_prompt.strip(),
+        "dataset": dataset,
+        "candidate": candidate,
+        "baseline": baseline,
         "metric": metric,
         "min_improvement": min_improvement,
         "approve": bool(approve),
+        "strict": strict,
         "output_json": output_json,
     }
 
@@ -6718,12 +7041,7 @@ def _normalize_path_list(raw: str) -> list[str]:
 
 
 def _normalize_dataset_path(value: object, field: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be a path string")
-    path = value.strip().replace("\\", "/")
-    if not path:
-        raise ValueError(f"{field} must be a non-empty path")
-    return _normalize_repo_relative_path(path)
+    return _normalize_repo_relative_user_path(value, field)
 
 
 def _load_text_artifact(repo_root: str, relative_path: str, label: str) -> str:
@@ -9022,10 +9340,10 @@ def _run_explain_stage(
     def normalize_identifier(value: object) -> str:
         if not isinstance(value, str):
             return ""
-        normalized = value.strip().lower()
-        if not normalized:
+        try:
+            return _normalize_agent_identifier(value, "filter")
+        except ValueError:
             return ""
-        return os.path.splitext(os.path.basename(normalized))[0]
 
     def format_certificate(cert: dict[str, object]) -> dict[str, object]:
         return {
@@ -9082,7 +9400,7 @@ def _run_explain_stage(
     selected_ref_capsules: set[str] = set()
     if requested_refs:
         for raw_ref in refs:
-            if normalize_identifier(raw_ref.get("id")) in requested_refs or normalize_identifier(raw_ref.get("path")) in requested_refs:
+            if normalize_identifier(raw_ref.get("id")) in requested_refs:
                 selected_ref_capsules.add(normalize_identifier(raw_ref.get("capsule_id") or "default"))
         if not selected_ref_capsules:
             return {
@@ -9109,7 +9427,6 @@ def _run_explain_stage(
         selected_certificates = [
             cert for cert in certificates
             if normalize_identifier(cert.get("id")) in requested_certificates
-            or normalize_identifier(cert.get("path")) in requested_certificates
         ]
         if not selected_certificates:
             return {
@@ -10298,7 +10615,7 @@ def _command_exit_code(payload: dict[str, object]) -> int:
     return EXIT_RUNTIME
 
 
-def run_command(args: list[str], output_json: bool) -> int:
+def run_command(args: list[str], output_json: bool, strict: bool = False) -> int:
     if not args:
         emit_error("missing command\n\n" + emit_usage(), None, EXIT_USAGE, output_json)
 
@@ -10315,7 +10632,7 @@ def run_command(args: list[str], output_json: bool) -> int:
                 emit_error(f"invalid --json value: {exc}", command, EXIT_USAGE, output_json)
 
     if command == "init":
-        options, _ = parse_command_flags(rest, "init", False, False, False, output_json)
+        options, _ = parse_command_flags(rest, "init", False, False, False, output_json, default_strict=strict)
         emit_command_result(_init_outcomegraph(), output_json)
         return EXIT_SUCCESS
 
@@ -10328,6 +10645,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             True,
             output_json,
             allow_force_full_sync=True,
+            default_strict=strict,
         )
         repo_root = _git_root()
         integrity = _validate_event_chain(repo_root)
@@ -10378,7 +10696,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_SUCCESS
 
     if command == "verify":
-        options, _ = parse_command_flags(rest, "verify", True, True, True, output_json)
+        options, _ = parse_command_flags(rest, "verify", True, True, True, output_json, default_strict=strict)
         repo_root = _git_root()
         payload = _run_verify_job(repo_root, options)
         if not output_json:
@@ -10387,7 +10705,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return _command_exit_code(payload)
 
     if command == "replay":
-        options, _ = parse_command_flags(rest, "replay", True, True, True, output_json)
+        options, _ = parse_command_flags(rest, "replay", True, True, True, output_json, default_strict=strict)
         repo_root = _git_root()
         profile = str(options.get("profile") or "analyze")
         mode = str(options.get("mode") or "observe")
@@ -10421,7 +10739,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return _command_exit_code(payload)
 
     if command == "status":
-        options, _ = parse_command_flags(rest, "status", False, False, False, output_json)
+        options, _ = parse_command_flags(rest, "status", False, False, False, output_json, default_strict=strict)
         repo_root = _git_root()
         payload = _build_status_payload(repo_root, options)
         if not output_json:
@@ -10430,7 +10748,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return _command_exit_code(payload)
 
     if command == "export":
-        options, _ = parse_command_flags(rest, "export", False, False, False, output_json)
+        options, _ = parse_command_flags(rest, "export", False, False, False, output_json, default_strict=strict)
         repo_root = _git_root()
         export = _run_export_stage(repo_root, mode="observe")
         status = "ok" if export.get("status") == "ok" else "error"
@@ -10460,6 +10778,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             allow_capsule_filter=True,
             allow_ref_filter=True,
             allow_certificate_filter=True,
+            default_strict=strict,
         )
         repo_root = _git_root()
         profile = str(options.get("profile") or "analyze")
@@ -10494,7 +10813,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return _command_exit_code(payload)
 
     if command == "drift":
-        options, _ = parse_command_flags(rest, "drift", False, False, False, output_json)
+        options, _ = parse_command_flags(rest, "drift", False, False, False, output_json, default_strict=strict)
         repo_root = _git_root()
         start = time.perf_counter()
         payload = _build_drift_payload(repo_root, options)
@@ -10508,7 +10827,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         return _command_exit_code(payload)
 
     if command == "mcp-server":
-        options, _ = parse_command_flags(rest, "mcp-server", False, False, False, output_json)
+        options, _ = parse_command_flags(rest, "mcp-server", False, False, False, output_json, default_strict=strict)
         repo_root = _git_root()
         payload = _run_mcp_server_stage(repo_root, options)
         if not output_json and payload.get("status") == "ok":
@@ -10538,7 +10857,7 @@ def run_command(args: list[str], output_json: bool) -> int:
                 EXIT_USAGE,
                 output_json,
             )
-        options = _parse_optimize_prompts_flags(rest[1:], output_json)
+        options = _parse_optimize_prompts_flags(rest[1:], output_json, default_strict=strict)
         repo_root = _git_root()
         payload = _run_optimize_prompts_stage(repo_root, options)
         if not output_json:
@@ -10578,6 +10897,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             False,
             output_json,
             allow_force_hooks_path=sub == "init",
+            default_strict=strict,
         )
         if sub == "init":
             state = _init_autopilot(bool(options.get("force_hooks_path", False)))
@@ -10614,34 +10934,34 @@ def run_command(args: list[str], output_json: bool) -> int:
                 output_json,
             )
         if sub == "run":
-            parse_command_flags(rest[1:], "daemon run", False, False, False, output_json)
+            parse_command_flags(rest[1:], "daemon run", False, False, False, output_json, default_strict=strict)
             return _daemon_run()
         if sub == "install":
-            options, _ = parse_command_flags(rest[1:], "daemon install", False, False, False, output_json)
+            options, _ = parse_command_flags(rest[1:], "daemon install", False, False, False, output_json, default_strict=strict)
             payload = _daemon_install()
             payload["options"] = options
             emit_command_result(payload, output_json)
             return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
         if sub == "start":
-            options, _ = parse_command_flags(rest[1:], "daemon start", False, False, False, output_json)
+            options, _ = parse_command_flags(rest[1:], "daemon start", False, False, False, output_json, default_strict=strict)
             payload = _daemon_start()
             payload["options"] = options
             emit_command_result(payload, output_json)
             return _command_exit_code(payload)
         if sub == "stop":
-            options, _ = parse_command_flags(rest[1:], "daemon stop", False, False, False, output_json)
+            options, _ = parse_command_flags(rest[1:], "daemon stop", False, False, False, output_json, default_strict=strict)
             payload = _daemon_stop()
             payload["options"] = options
             emit_command_result(payload, output_json)
             return _command_exit_code(payload)
-        options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json)
+        options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json, default_strict=strict)
         payload = _daemon_status()
         payload["options"] = options
         emit_command_result(payload, output_json)
         return _command_exit_code(payload)
 
     if command == "schema":
-        parse_command_flags(rest, "schema", False, False, False, output_json)
+        parse_command_flags(rest, "schema", False, False, False, output_json, default_strict=strict)
         payload = {
             "status": "ok",
             "command": "schema",
@@ -10685,6 +11005,14 @@ def run_command(args: list[str], output_json: bool) -> int:
                     output_json = parse_bool_option(arg.split("=", 1)[1])
                 except ValueError as exc:
                     emit_error(f"invalid --json value for describe: {exc}", "describe", EXIT_USAGE, output_json)
+                continue
+            if arg == "--strict":
+                continue
+            if arg.startswith("--strict="):
+                try:
+                    _ = parse_bool_option(arg.split("=", 1)[1])
+                except ValueError as exc:
+                    emit_error(f"invalid --strict value for describe: {exc}", "describe", EXIT_USAGE, output_json)
                 continue
             if arg.startswith("-"):
                 emit_error(
@@ -10734,6 +11062,7 @@ def run_command(args: list[str], output_json: bool) -> int:
 
 def main(argv: list[str]) -> int:
     output_json = False
+    strict = False
     i = 0
     while i < len(argv):
         arg = argv[i]
@@ -10746,6 +11075,17 @@ def main(argv: list[str]) -> int:
                 output_json = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --json value: {exc}", None, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--strict":
+            strict = True
+            i += 1
+            continue
+        if arg.startswith("--strict="):
+            try:
+                strict = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --strict value: {exc}", None, EXIT_USAGE, output_json)
             i += 1
             continue
         if arg in {"-h", "--help"}:
@@ -10770,7 +11110,7 @@ def main(argv: list[str]) -> int:
         break
 
     command_args = argv[i:]
-    return run_command(command_args, output_json)
+    return run_command(command_args, output_json, strict)
 
 
 def og_cli() -> None:

@@ -17,7 +17,7 @@ Scope: `/home/agent/outcomegraph`
 2. JSON output uses a single, versioned, command-level envelope for all command results and failures.
 3. Error payloads are now typed with `error_class`, `error_code`, and bounded `retryable`/`hint` metadata.
 4. Runtime introspection is now first-class via `schema` and `describe`, with request/response metadata discoverable for each command.
-5. Path inputs for `optimize prompts` are not constrained to repo root.
+5. Path inputs for `optimize prompts` are constrained to repository-safe paths.
 
 ## Checklist Results
 
@@ -26,7 +26,7 @@ Scope: `/home/agent/outcomegraph`
 | 1) CLI surface contract | Done | `og.py` and tests in `tests/test_og_sync_verify_replay_hooks.py` | `og <command> --help` now dispatches per-command usage contracts, and nested dispatches (`optimize`, `autopilot`, `daemon`) include `help` coverage including `daemon run`. |
 | 2) Structured output + unambiguous success | Done | [`og.py`](./og.py) | `--json` now emits a single contract envelope with `schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, and `metrics` for command/help/error paths across all commands. |
 | 3) Error model + exit codes | Done | [`og.py:1169`](./og.py#L1169), [`README.md:135`](./README.md#L135), [`SPEC-v2.md:198`](./SPEC-v2.md#L198), [`tests/test_og_sync_verify_replay_hooks.py:670`](./tests/test_og_sync_verify_replay_hooks.py#L670) | Error payload now includes stable typed metadata (`error_class`, `error_code`, `retryable`, `hint`), envelope rendering normalizes `errors` to object records, and exit mapping uses `error_class` semantics. |
-| 4) Agent-oriented input design | Fail | [`og.py:5197`](./og.py#L5197), [`og.py:5583`](./og.py#L5583) | No raw request-body input path (`--params`/input JSON contract) and no CLI `--strict`. |
+| 4) Agent-oriented input design | Done | [`og.py:6312`](./og.py#L6312), [`og.py:6729`](./og.py#L6729), [`tests/test_og_sync_verify_replay_hooks.py:48`](./tests/test_og_sync_verify_replay_hooks.py#L48), [`tests/test_og_sync_verify_replay_hooks.py:531`](./tests/test_og_sync_verify_replay_hooks.py#L531), [`README.md:132`](./README.md#L132), [`SPEC-v2.md:173`](./SPEC-v2.md#L173) | Added `--params` payload mode for `optimize prompts`, global/command strict mode support, and schema/help coverage for strict+payload controls. |
 | 5) Runtime introspection | Done | [`og.py:899`](./og.py#L899), [`og.py:10643`](./og.py#L10643), [`og.py:10716`](./og.py#L10716), [`og.py:11270`](./og.py#L11270) | `schema` and `describe` now provide machine-readable command signatures for discovery and per-command introspection. |
 | 6) Context/window + payload controls | Fail | [`og.py:5197`](./og.py#L5197) | No `--fields`, pagination controls, or streaming list output mode. |
 | 7) Interaction traps | Partial | [`og.py:4629`](./og.py#L4629), [`og.py:4644`](./og.py#L4644) | Most commands are non-interactive; `autopilot init --force-hooks-path` can prompt and there is no global `--non-interactive`. |

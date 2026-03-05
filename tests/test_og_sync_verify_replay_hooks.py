@@ -41,9 +41,20 @@ class TestHelpContracts(TestCase):
     def test_top_level_help_includes_global_contract(self) -> None:
         code, text = self._run_main(["--help"])
         self.assertEqual(code, 0)
-        self.assertIn("Usage: og [--json] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>", text)
+        self.assertIn("Usage: og [--json] [--strict] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>", text)
         self.assertIn("Use: og <command> --help for command-specific contracts.", text)
         self.assertIn("Core commands:", text)
+
+    def test_main_accepts_global_strict_flag(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["--strict", "--json", "schema"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "schema")
+        self.assertEqual(payload["status"], "ok")
 
     def test_command_specific_help_contracts_are_rendered(self) -> None:
         test_cases = [
@@ -104,6 +115,10 @@ class TestCommandIntrospectionContracts(TestCase):
             self.assertIn("response", signature)
             self.assertIn("known_error_codes", signature)
             self.assertIn("envelope_schema_version", signature["response"])
+            if command_name == "optimize prompts":
+                request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
+                self.assertIn("--params", request_field_names)
+                self.assertIn("--strict", request_field_names)
 
     def test_describe_command_resolves_signature(self) -> None:
         buffer = io.StringIO()
@@ -407,6 +422,34 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(options["profile"], "apply")
         self.assertEqual(options["mode"], "autonomous")
 
+    def test_parse_command_flags_supports_command_level_strict(self) -> None:
+        options, _ = og.parse_command_flags(
+            ["--strict", "--profile", "observe", "--mode", "autonomous"],
+            "sync",
+            False,
+            True,
+            True,
+            False,
+            default_strict=False,
+            allow_force_full_sync=True,
+        )
+        self.assertTrue(options["strict"])
+        self.assertEqual(options["profile"], "observe")
+        self.assertEqual(options["mode"], "autonomous")
+
+    def test_parse_command_flags_strict_flag_can_be_negated_from_default(self) -> None:
+        options, _ = og.parse_command_flags(
+            ["--strict=false", "--profile", "observe", "--mode", "autonomous"],
+            "sync",
+            False,
+            True,
+            True,
+            False,
+            default_strict=True,
+            allow_force_full_sync=True,
+        )
+        self.assertFalse(options["strict"])
+
     def test_parse_command_flags_rejects_invalid_identifiers(self) -> None:
         def parse_error(args: list[str]) -> str:
             buffer = io.StringIO()
@@ -460,6 +503,143 @@ class TestSyncWorkflows(_RepoTestCase):
             with self.subTest(args=args):
                 message = parse_error(args)
                 self.assertIn(expected_fragment, message)
+
+    def test_parse_optimize_prompts_flags_supports_json_params(self) -> None:
+        payload = {
+            "dataset": "datasets/base.json",
+            "candidate": "candidate.txt",
+            "baseline": "baseline.txt",
+            "metric": "exact",
+            "min_improvement": 0.12,
+            "approve": True,
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as handle:
+            json.dump(payload, handle)
+            payload_path = handle.name
+        try:
+            options = og._parse_optimize_prompts_flags(["--params", payload_path], True)
+        finally:
+            Path(payload_path).unlink()
+
+        self.assertEqual(options["dataset"], "datasets/base.json")
+        self.assertEqual(options["candidate"], "candidate.txt")
+        self.assertEqual(options["baseline"], "baseline.txt")
+        self.assertEqual(options["metric"], "exact")
+        self.assertEqual(options["min_improvement"], 0.12)
+        self.assertTrue(options["approve"])
+
+    def test_parse_optimize_prompts_flags_supports_json_params_from_stdin(self) -> None:
+        payload = {
+            "dataset": "datasets/base.json",
+            "candidate": "candidate.txt",
+            "baseline": "baseline.txt",
+            "metric": "exact",
+            "min_improvement": 0.05,
+            "approve": False,
+        }
+        with patch("sys.stdin", io.StringIO(json.dumps(payload))):
+            options = og._parse_optimize_prompts_flags(["--params", "-"], True)
+
+        self.assertEqual(options["dataset"], "datasets/base.json")
+        self.assertEqual(options["candidate"], "candidate.txt")
+        self.assertEqual(options["baseline"], "baseline.txt")
+        self.assertEqual(options["metric"], "exact")
+        self.assertEqual(options["min_improvement"], 0.05)
+        self.assertFalse(options["approve"])
+
+    def test_parse_optimize_prompts_flags_prefer_convenience_flags_over_payload(self) -> None:
+        payload = {
+            "dataset": "datasets/payload.json",
+            "candidate": "payload-candidate.txt",
+            "baseline": "payload-baseline.txt",
+            "metric": "contains",
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as handle:
+            json.dump(payload, handle)
+            payload_path = handle.name
+        try:
+            options = og._parse_optimize_prompts_flags(
+                [
+                    "--params",
+                    payload_path,
+                    "--dataset",
+                    "datasets/cli.json",
+                    "--metric",
+                    "exact",
+                ],
+                True,
+            )
+        finally:
+            Path(payload_path).unlink()
+
+        self.assertEqual(options["dataset"], "datasets/cli.json")
+        self.assertEqual(options["metric"], "exact")
+        self.assertEqual(options["candidate"], "payload-candidate.txt")
+        self.assertEqual(options["baseline"], "payload-baseline.txt")
+
+    def test_parse_optimize_prompts_flags_strict_rejects_unknown_and_implicit_defaults(self) -> None:
+        strict_unknown = {
+            "dataset": "datasets/base.json",
+            "candidate": "candidate.txt",
+            "baseline": "baseline.txt",
+            "approval": True,
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as handle:
+            json.dump(strict_unknown, handle)
+            unknown_payload_path = handle.name
+        try:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og._parse_optimize_prompts_flags(["--strict", "--params", unknown_payload_path], True, default_strict=True)
+            self.assertEqual(context.exception.code, 64)
+            payload = json.loads(buffer.getvalue() or "{}")
+            self.assertIn("unknown params fields", payload["errors"][0]["message"])
+        finally:
+            Path(unknown_payload_path).unlink()
+
+        strict_min_improvement = {
+            "dataset": "datasets/base.json",
+            "candidate": "candidate.txt",
+            "baseline": "baseline.txt",
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as handle:
+            json.dump(strict_min_improvement, handle)
+            missing_payload_path = handle.name
+        try:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og._parse_optimize_prompts_flags(["--params", missing_payload_path], True, default_strict=True)
+            self.assertEqual(context.exception.code, 64)
+            payload = json.loads(buffer.getvalue() or "{}")
+            self.assertIn("strict mode requires --min-improvement", payload["errors"][0]["message"])
+        finally:
+            Path(missing_payload_path).unlink()
+
+    def test_parse_optimize_prompts_flags_strict_rejects_payload_lossy_types(self) -> None:
+        payload = {
+            "dataset": "datasets/base.json",
+            "candidate": "candidate.txt",
+            "baseline": "baseline.txt",
+            "min_improvement": "12.5",
+            "approve": "true",
+        }
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as handle:
+            json.dump(payload, handle)
+            payload_path = handle.name
+        try:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                with self.assertRaises(SystemExit) as context:
+                    og._parse_optimize_prompts_flags(["--params", payload_path], True, default_strict=True)
+            self.assertEqual(context.exception.code, 64)
+            response = json.loads(buffer.getvalue() or "{}")
+            self.assertTrue(
+                any("min-improvement" in str(error["message"]) for error in response["errors"]),
+            )
+        finally:
+            Path(payload_path).unlink()
 
     def test_run_sync_job_short_circuits_when_idempotent(self) -> None:
         snapshot = {
