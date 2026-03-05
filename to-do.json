@@ -883,7 +883,7 @@
       "id": "OG-SPEC-006",
       "title": "Build adapter registry and plugin discovery per spec contracts",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Implement runtime adapter registration/discovery with interface negotiation and deterministic defaults.",
       "steps": [
         "Add adapter_register/adapter_get/adapter_list/adapter_set_default APIs",
@@ -906,7 +906,7 @@
       "depends_on": [
         "OG-SPEC-001"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T09:07:54Z"
     },
     {
       "id": "OG-SPEC-007",
@@ -1019,8 +1019,9 @@
         "quality-gate"
       ],
       "files": [
-        "tests/test_og_sync_verify_replay_hooks.py",
+        "/home/agent/outcomegraph/to-do.json",
         "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "depends_on": [
@@ -1032,7 +1033,7 @@
         "OG-SPEC-008",
         "OG-SPEC-009"
       ],
-      "updated_at": "2026-03-05T09:05:35Z"
+      "updated_at": "2026-03-05T09:05:39Z"
     },
     {
       "id": "OG-SPEC-011",

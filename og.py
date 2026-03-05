@@ -123,9 +123,33 @@ STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
 TRACKED_EVIDENCE_TAG = "file"
 UNTRACKED_EVIDENCE_TAG = "cas"
 WORKER_ADAPTER_NAME = "codex"
+STORE_ADAPTER_NAME = "filesystem"
+ORACLE_ADAPTER_NAME = "null-impl"
+SANDBOX_ADAPTER_NAME = "local-worktree"
+EXPORTER_ADAPTER_NAME = "canonical"
 WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+ADAPTER_SCHEMA_VERSION = 2
+ADAPTER_INTERFACE_MISMATCH_CODE = "ADAPTER_INTERFACE_MISMATCH"
+ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
+REQUIRED_ADAPTER_TYPES = {"worker", "store"}
+SUPPORTED_ADAPTER_TYPES = {"worker", "oracle", "sandbox", "store", "exporter"}
+ADAPTER_REQUIRED_INTERFACE_VERSIONS: dict[str, int] = {
+    "worker": 1,
+    "oracle": 1,
+    "sandbox": 1,
+    "store": 1,
+    "exporter": 1,
+}
+_ADAPTER_REGISTRY: dict[str, dict[str, dict[str, object]]] = {}
+_ADAPTER_DEFAULTS: dict[str, str] = {}
+_ADAPTER_BOOTSTRAP_STATE: dict[str, object] = {
+    "repo_root": None,
+    "initialized": False,
+    "errors": [],
+    "warnings": [],
+}
 WORKER_UNAVAILABLE_ERROR = "codex executable was not found"
 CANONICAL_ARTIFACT_TYPES = {
     "capsule",
@@ -307,6 +331,444 @@ def _evaluate_policy_writes(policy: dict[str, object], command: str, mode: str, 
         if denied is not None:
             return denied
     return None
+
+
+class AdapterRegistryError(ValueError):
+    """Raised when an adapter manifest cannot be registered."""
+
+
+class AdapterInterfaceMismatchError(AdapterRegistryError):
+    """Raised when manifest interface_version does not match the required version."""
+
+    def __init__(self, payload: dict[str, object]):
+        super().__init__(payload.get("message", "adapter interface mismatch"))
+        self.payload = payload
+
+
+def _clear_adapter_state() -> None:
+    _ADAPTER_REGISTRY.clear()
+    _ADAPTER_DEFAULTS.clear()
+    _ADAPTER_BOOTSTRAP_STATE["errors"] = []
+    _ADAPTER_BOOTSTRAP_STATE["warnings"] = []
+
+
+def _set_adapter_bootstrap_result(repo_root: str, errors: list[dict[str, object]], warnings: list[dict[str, object]]) -> None:
+    _ADAPTER_BOOTSTRAP_STATE["repo_root"] = repo_root
+    _ADAPTER_BOOTSTRAP_STATE["initialized"] = True
+    _ADAPTER_BOOTSTRAP_STATE["errors"] = errors
+    _ADAPTER_BOOTSTRAP_STATE["warnings"] = warnings
+
+
+def _adapter_manifest_defaults() -> dict[str, tuple[str, dict[str, object]]]:
+    return {
+        "worker": (WORKER_ADAPTER_NAME, _build_worker_manifest()),
+        "store": (STORE_ADAPTER_NAME, _build_store_manifest()),
+        "oracle": (ORACLE_ADAPTER_NAME, _build_oracle_manifest()),
+        "sandbox": (SANDBOX_ADAPTER_NAME, _build_sandbox_manifest()),
+        "exporter": (EXPORTER_ADAPTER_NAME, _build_exporter_manifest()),
+    }
+
+
+def _build_adapter_interface_payload(
+    adapter_type: str,
+    name: str,
+    required_interface_version: int,
+    detected_interface_version: object,
+) -> dict[str, object]:
+    detected = detected_interface_version if isinstance(detected_interface_version, int) else "unknown"
+    return {
+        "status": "error",
+        "code": ADAPTER_INTERFACE_MISMATCH_CODE,
+        "type": adapter_type,
+        "name": name,
+        "required_interface_version": required_interface_version,
+        "detected_interface_version": detected,
+        "message": (
+            f"Adapter '{name}' for type '{adapter_type}' uses interface_version={detected},"
+            f" expected {required_interface_version}."
+        ),
+        "remediation": [
+            f"Install a {adapter_type} adapter with interface_version={required_interface_version}.",
+            "Or upgrade steward runtime to support the detected interface_version.",
+        ],
+    }
+
+
+def _normalize_adapter_capabilities(raw: object) -> list[str]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("manifest.capabilities must be a string array")
+    values: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        values.append(item.strip())
+    return values
+
+
+def _normalize_adapter_manifest(raw: object, *, source: str | None = None) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"manifest from {source} must be an object")
+    manifest_type = raw.get("type")
+    if manifest_type not in SUPPORTED_ADAPTER_TYPES:
+        raise ValueError(
+            f"manifest.type must be one of {', '.join(sorted(SUPPORTED_ADAPTER_TYPES))}: {manifest_type}"
+        )
+    name = raw.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("manifest.name must be a non-empty string")
+    schema_version = raw.get("schema_version")
+    if schema_version != ADAPTER_SCHEMA_VERSION:
+        raise ValueError(
+            f"manifest.schema_version for {manifest_type}:{name} must be {ADAPTER_SCHEMA_VERSION}, got {schema_version}"
+        )
+    implementation_version = raw.get("implementation_version")
+    if not isinstance(implementation_version, str) or not implementation_version.strip():
+        raise ValueError(f"manifest.implementation_version for {manifest_type}:{name} must be a non-empty string")
+    interface_version = raw.get("interface_version")
+    if not isinstance(interface_version, int):
+        raise ValueError(f"manifest.interface_version for {manifest_type}:{name} must be an integer")
+    required_interface_version = ADAPTER_REQUIRED_INTERFACE_VERSIONS.get(manifest_type, 1)
+    if interface_version != required_interface_version:
+        raise AdapterInterfaceMismatchError(
+            _build_adapter_interface_payload(
+                adapter_type=manifest_type,
+                name=str(name),
+                required_interface_version=required_interface_version,
+                detected_interface_version=interface_version,
+            )
+        )
+    entrypoint = raw.get("entrypoint")
+    if not isinstance(entrypoint, str) or not entrypoint.strip():
+        raise ValueError(f"manifest.entrypoint for {manifest_type}:{name} must be a non-empty string")
+    return {
+        "schema_version": ADAPTER_SCHEMA_VERSION,
+        "type": str(manifest_type),
+        "name": str(name).strip(),
+        "implementation_version": str(implementation_version).strip(),
+        "interface_version": interface_version,
+        "capabilities": _normalize_adapter_capabilities(raw.get("capabilities")),
+        "entrypoint": entrypoint.strip(),
+    }
+
+
+def adapter_register(adapter_type: str, name: str, impl: object, manifest: object) -> None:
+    normalized_type = str(adapter_type)
+    normalized_name = str(name).strip()
+    if not normalized_type:
+        raise AdapterRegistryError("adapter type must not be empty")
+    if not normalized_name:
+        raise AdapterRegistryError("adapter name must not be empty")
+    if normalized_type not in SUPPORTED_ADAPTER_TYPES:
+        raise AdapterRegistryError(f"unsupported adapter type '{normalized_type}'")
+    normalized_manifest = _normalize_adapter_manifest(manifest, source=f"{normalized_type}:{normalized_name}")
+    manifest_name = normalized_manifest.get("name")
+    if manifest_name != normalized_name:
+        raise AdapterRegistryError(
+            f"register name '{normalized_name}' does not match manifest name '{manifest_name}'"
+        )
+    adapters = _ADAPTER_REGISTRY.setdefault(normalized_type, {})
+    if normalized_name in adapters:
+        raise AdapterRegistryError(
+            f"duplicate adapter registration for {normalized_type}:{normalized_name}"
+        )
+    adapters[normalized_name] = {"impl": impl, "manifest": normalized_manifest}
+
+
+def adapter_get(adapter_type: str, name: str | None = None) -> dict[str, object]:
+    normalized_type = str(adapter_type)
+    if normalized_type not in SUPPORTED_ADAPTER_TYPES:
+        raise AdapterRegistryError(f"unsupported adapter type '{normalized_type}'")
+    adapters = _ADAPTER_REGISTRY.get(normalized_type, {})
+    if not adapters:
+        raise AdapterRegistryError(f"no adapters registered for type '{normalized_type}'")
+    if name is None:
+        default_name = _ADAPTER_DEFAULTS.get(normalized_type)
+        if default_name is None:
+            default_name = sorted(adapters.keys())[0]
+        name = default_name
+    normalized_name = str(name)
+    entry = adapters.get(normalized_name)
+    if entry is None:
+        raise AdapterRegistryError(f"adapter '{normalized_name}' not registered for type '{normalized_type}'")
+    return {"type": normalized_type, "name": normalized_name, "impl": entry["impl"], "manifest": entry["manifest"]}
+
+
+def adapter_resolve(adapter_type: str, name: str | None = None) -> dict[str, object]:
+    return adapter_get(adapter_type, name)
+
+
+def adapter_list(adapter_type: str) -> list[dict[str, object]]:
+    normalized_type = str(adapter_type)
+    if normalized_type not in SUPPORTED_ADAPTER_TYPES:
+        raise AdapterRegistryError(f"unsupported adapter type '{normalized_type}'")
+    return [
+        {
+            "type": normalized_type,
+            "name": name,
+            "manifest": entry["manifest"],
+            "impl": entry["impl"],
+        }
+        for name, entry in sorted(_ADAPTER_REGISTRY.get(normalized_type, {}).items())
+    ]
+
+
+def adapter_set_default(adapter_type: str, name: str) -> None:
+    normalized_type = str(adapter_type)
+    normalized_name = str(name).strip()
+    if normalized_type not in SUPPORTED_ADAPTER_TYPES:
+        raise AdapterRegistryError(f"unsupported adapter type '{normalized_type}'")
+    if normalized_name not in _ADAPTER_REGISTRY.get(normalized_type, {}):
+        raise AdapterRegistryError(f"adapter '{normalized_name}' not registered for type '{normalized_type}'")
+    _ADAPTER_DEFAULTS[normalized_type] = normalized_name
+
+
+def _bootstrap_default_adapters() -> None:
+    for adapter_type, payload in _adapter_manifest_defaults().items():
+        builtin_name, manifest = payload
+        try:
+            adapter_register(adapter_type, builtin_name, {"entrypoint": manifest["entrypoint"]}, manifest)
+        except AdapterRegistryError:
+            continue
+        adapter_set_default(adapter_type, builtin_name)
+
+
+def _normalize_adapter_manifest_path(raw_path: object) -> str | None:
+    if not isinstance(raw_path, str):
+        return None
+    normalized = raw_path.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _normalize_adapter_search_root(raw_path: object, repo_root: str) -> str | None:
+    normalized = _normalize_adapter_manifest_path(raw_path)
+    if normalized is None:
+        return None
+    normalized = os.path.expanduser(normalized)
+    if not os.path.isabs(normalized):
+        normalized = os.path.normpath(os.path.join(repo_root, normalized))
+    return normalized
+
+
+def _collect_adapter_paths(search_root: str, adapter_type: str | None = None) -> list[str]:
+    if not os.path.isdir(search_root):
+        return []
+    candidate_paths: list[str] = []
+    if adapter_type is None:
+        try:
+            items = sorted(os.listdir(search_root))
+        except OSError:
+            return []
+        candidate_paths = [
+            os.path.join(search_root, filename)
+            for filename in items
+            if filename.endswith(".json") and os.path.isfile(os.path.join(search_root, filename))
+        ]
+    else:
+        typed_root = os.path.join(search_root, adapter_type)
+        if os.path.isdir(typed_root):
+            try:
+                items = sorted(os.listdir(typed_root))
+            except OSError:
+                items = []
+            candidate_paths.extend(
+                os.path.join(typed_root, filename)
+                for filename in items
+                if filename.endswith(".json") and os.path.isfile(os.path.join(typed_root, filename))
+            )
+    return candidate_paths
+
+
+def _read_and_register_adapter(
+    path: str,
+    errors: list[dict[str, object]],
+    warnings: list[dict[str, object]],
+) -> None:
+    payload = _read_json_file(path)
+    if payload is None:
+        warnings.append({
+            "status": "error",
+            "code": "ADAPTER_MANIFEST_INVALID",
+            "path": path,
+            "message": f"unable to read adapter manifest: {path}",
+        })
+        return
+    try:
+        manifest = _normalize_adapter_manifest(payload, source=path)
+        adapter_type = str(manifest.get("type"))
+        adapter_name = str(manifest.get("name"))
+    except AdapterInterfaceMismatchError as exc:
+        mismatch_payload = exc.payload
+        mismatch_payload["path"] = path
+        if adapter_type := mismatch_payload.get("type"):
+            if str(adapter_type) in REQUIRED_ADAPTER_TYPES:
+                errors.append(mismatch_payload)
+            else:
+                warnings.append(mismatch_payload)
+        else:
+            warnings.append(mismatch_payload)
+        return
+    except ValueError as exc:
+        warnings.append(
+            {
+                "status": "error",
+                "code": "ADAPTER_MANIFEST_INVALID",
+                "path": path,
+                "message": str(exc),
+            }
+        )
+        return
+
+    try:
+        adapter_register(adapter_type, adapter_name, {"path": path}, manifest)
+    except AdapterRegistryError:
+        warnings.append(
+            {
+                "status": "error",
+                "code": "ADAPTER_DUPLICATE",
+                "path": path,
+                "type": adapter_type,
+                "name": adapter_name,
+                "message": f"duplicate adapter registration for {adapter_type}:{adapter_name} skipped",
+            }
+        )
+
+
+def _discover_adapter_manifests(
+    search_root: str, *, include_types: bool = True
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    errors: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = []
+    normalized_root = os.path.normpath(search_root)
+    if not os.path.isdir(normalized_root):
+        return [], []
+    if include_types:
+        adapter_types = sorted(SUPPORTED_ADAPTER_TYPES)
+    else:
+        adapter_types = [None]
+
+    seen_paths: set[str] = set()
+    for adapter_type in adapter_types:
+        for raw_path in _collect_adapter_paths(normalized_root, adapter_type):
+            path = os.path.normpath(raw_path)
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            _read_and_register_adapter(path, errors, warnings)
+
+    return errors, warnings
+
+
+def _initialize_adapter_runtime(repo_root: str) -> list[dict[str, object]]:
+    if _ADAPTER_BOOTSTRAP_STATE.get("initialized") and _ADAPTER_BOOTSTRAP_STATE.get("repo_root") == repo_root:
+        if _ADAPTER_BOOTSTRAP_STATE.get("errors"):
+            return _ADAPTER_BOOTSTRAP_STATE["errors"]  # type: ignore[return-value]
+        return []
+
+    _clear_adapter_state()
+    errors: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = []
+
+    _bootstrap_default_adapters()
+
+    repo_adapters_root = os.path.join(repo_root, OG_ROOT, "adapters")
+    for adapter_type in sorted(SUPPORTED_ADAPTER_TYPES):
+        for path in _collect_adapter_paths(repo_adapters_root, adapter_type):
+            _read_and_register_adapter(path, errors, warnings)
+
+    for raw_override in os.environ.get(ADAPTER_PATH_ENV, "").split(os.pathsep):
+        normalized_root = _normalize_adapter_search_root(raw_override, repo_root)
+        if normalized_root is None:
+            continue
+        discovered_errors, discovered_warnings = _discover_adapter_manifests(normalized_root, include_types=True)
+        errors.extend(discovered_errors)
+        warnings.extend(discovered_warnings)
+
+    for adapter_type in sorted(SUPPORTED_ADAPTER_TYPES):
+        if adapter_type not in _ADAPTER_DEFAULTS:
+            available = sorted(_ADAPTER_REGISTRY.get(adapter_type, {}).keys())
+            if available:
+                _ADAPTER_DEFAULTS[adapter_type] = available[0]
+
+    for required_type in sorted(REQUIRED_ADAPTER_TYPES):
+        if required_type not in _ADAPTER_DEFAULTS:
+            errors.append(
+                {
+                    "status": "error",
+                    "code": ADAPTER_INTERFACE_MISMATCH_CODE,
+                    "type": required_type,
+                    "name": _adapter_manifest_defaults().get(required_type, ("", {}))[0],
+                    "required_interface_version": ADAPTER_REQUIRED_INTERFACE_VERSIONS[required_type],
+                    "detected_interface_version": None,
+                    "message": f"missing required {required_type} adapter registration",
+                    "remediation": [
+                        "Restore required built-in adapters or install a compatible adapter plugin.",
+                        "Or update steward runtime to add support for required adapter definitions.",
+                    ],
+                }
+            )
+
+    # Merge errors and warnings gathered during initialization.
+    _ADAPTER_BOOTSTRAP_STATE["errors"].extend(errors)
+    _ADAPTER_BOOTSTRAP_STATE["warnings"].extend(warnings)
+    initialized_errors = _ADAPTER_BOOTSTRAP_STATE["errors"][:]  # type: ignore[index]
+    _set_adapter_bootstrap_result(
+        repo_root,
+        errors=_ADAPTER_BOOTSTRAP_STATE["errors"],
+        warnings=_ADAPTER_BOOTSTRAP_STATE["warnings"],
+    )
+    return initialized_errors  # type: ignore[return-value]
+
+
+def _build_store_manifest() -> dict[str, object]:
+    return {
+        "schema_version": ADAPTER_SCHEMA_VERSION,
+        "type": "store",
+        "name": STORE_ADAPTER_NAME,
+        "implementation_version": "1.0.0",
+        "interface_version": ADAPTER_REQUIRED_INTERFACE_VERSIONS["store"],
+        "capabilities": ["put", "get", "exists"],
+        "entrypoint": "filesystem-store://v1",
+    }
+
+
+def _build_oracle_manifest() -> dict[str, object]:
+    return {
+        "schema_version": ADAPTER_SCHEMA_VERSION,
+        "type": "oracle",
+        "name": ORACLE_ADAPTER_NAME,
+        "implementation_version": "1.0.0",
+        "interface_version": ADAPTER_REQUIRED_INTERFACE_VERSIONS["oracle"],
+        "capabilities": ["run"],
+        "entrypoint": "null-oracle://v1",
+    }
+
+
+def _build_sandbox_manifest() -> dict[str, object]:
+    return {
+        "schema_version": ADAPTER_SCHEMA_VERSION,
+        "type": "sandbox",
+        "name": SANDBOX_ADAPTER_NAME,
+        "implementation_version": "1.0.0",
+        "interface_version": ADAPTER_REQUIRED_INTERFACE_VERSIONS["sandbox"],
+        "capabilities": ["create", "exec", "destroy"],
+        "entrypoint": "local-worktree://v1",
+    }
+
+
+def _build_exporter_manifest() -> dict[str, object]:
+    return {
+        "schema_version": ADAPTER_SCHEMA_VERSION,
+        "type": "exporter",
+        "name": EXPORTER_ADAPTER_NAME,
+        "implementation_version": "1.0.0",
+        "interface_version": ADAPTER_REQUIRED_INTERFACE_VERSIONS["exporter"],
+        "capabilities": ["render"],
+        "entrypoint": "canonical-exporter://v1",
+    }
 
 
 def _build_worker_manifest() -> dict[str, object]:
@@ -2348,18 +2810,50 @@ def _extract_worker_exec_error(raw_stdout: str, raw_stderr: str) -> str | None:
     return None
 
 
+def _build_worker_command_variants(entrypoint: str, schema_path: str, last_message_path: str) -> list[list[str]]:
+    resolved_entrypoint = str(entrypoint).strip()
+    if "://" in resolved_entrypoint:
+        resolved_entrypoint = resolved_entrypoint.split("://", 1)[0]
+    command_root = shlex.split(resolved_entrypoint) if resolved_entrypoint else []
+    if not command_root:
+        command_root = ["codex"]
+    normalized = [part for part in command_root if part]
+    if not normalized:
+        normalized = ["codex"]
+    return [
+        [
+            *normalized,
+            "exec",
+            "--json",
+            "--output-schema",
+            schema_path,
+            "--output-last-message",
+            last_message_path,
+            "-",
+        ],
+        [*normalized, "exec", "--json", "-"],
+        [*normalized, "exec", "-"],
+    ]
+
+
 def _run_codex_worker(
     role: str,
     payload: dict[str, object],
     repo_root: str,
     trace_path: str,
+    adapter: dict[str, object] | None = None,
     timeout_seconds: int = WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
-    manifest = _build_worker_manifest()
+    manifest = (adapter or {}).get("manifest") if isinstance(adapter, dict) else _build_worker_manifest()
+    if not isinstance(manifest, dict):
+        manifest = _build_worker_manifest()
     if manifest.get("schema_version") != WORKER_SCHEMA_VERSION:
         raise WorkerAdapterError("worker manifest schema mismatch")
     if manifest.get("interface_version") != WORKER_INTERFACE_VERSION:
         raise WorkerAdapterError("worker interface version mismatch")
+    entrypoint = manifest.get("entrypoint")
+    if not isinstance(entrypoint, str) or not entrypoint.strip():
+        raise WorkerAdapterError("worker manifest entrypoint missing")
 
     worker_prompt = _build_worker_prompt(role, payload)
     worker_schema = _build_worker_output_schema(role)
@@ -2374,12 +2868,11 @@ def _run_codex_worker(
         schema_path = os.path.join(temp_dir, f"{role}-schema.json")
         last_message_path = os.path.join(temp_dir, f"{role}-last-message.json")
         _write_text_payload(schema_path, json.dumps(worker_schema, sort_keys=True, indent=2, ensure_ascii=True) + "\n")
-
-        command_variants = [
-            ["codex", "exec", "--json", "--output-schema", schema_path, "--output-last-message", last_message_path, "-"],
-            ["codex", "exec", "--json", "-"],
-            ["codex", "exec", "-"],
-        ]
+        command_variants = _build_worker_command_variants(
+            str(entrypoint),
+            schema_path,
+            last_message_path,
+        )
 
         for command in command_variants:
             if os.path.exists(last_message_path):
@@ -5734,6 +6227,23 @@ def _run_distill_stage(
     profile: str,
     mode: str,
 ) -> dict[str, object]:
+    adapter_errors = _initialize_adapter_runtime(repo_root)
+    if adapter_errors:
+        first_error = adapter_errors[0]
+        return {
+            "name": "distill",
+            "status": "error",
+            "code": str(first_error.get("code") or ADAPTER_INTERFACE_MISMATCH_CODE),
+            "message": str(first_error.get("message") or "adapter initialization failed"),
+            "profile": profile,
+            "mode": mode,
+            "affected_capsules": [],
+            "generated_deltas": [],
+            "errors": [
+                str(first_error.get("message") or "adapter initialization failed"),
+            ],
+            **({"remediation": first_error.get("remediation", [])} if isinstance(first_error.get("remediation"), list) else {}),
+        }
     changed = snapshot["changed_files"]
     changed_capsules = _collect_affected_capsules(changed if isinstance(changed, list) else [])
     if not changed_capsules:
@@ -5750,6 +6260,20 @@ def _run_distill_stage(
     if not isinstance(changed, list):
         changed = []
     changed_files = [str(entry) for entry in changed]
+    try:
+        worker_adapter = adapter_get("worker")
+    except AdapterRegistryError as exc:
+        return {
+            "name": "distill",
+            "status": "error",
+            "code": ADAPTER_INTERFACE_MISMATCH_CODE,
+            "message": str(exc),
+            "profile": profile,
+            "mode": mode,
+            "affected_capsules": changed_capsules,
+            "generated_deltas": [],
+            "errors": [str(exc)],
+        }
     distill_input = _build_distill_input(
         run_id=run_id,
         profile=profile,
@@ -5760,7 +6284,13 @@ def _run_distill_stage(
     )
     trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-distill.json"
     try:
-        output, receipts = _run_codex_worker("distill", distill_input, repo_root, trace_path)
+        output, receipts = _run_codex_worker(
+            "distill",
+            distill_input,
+            repo_root,
+            trace_path,
+            adapter=worker_adapter,
+        )
         delta_payload = _normalize_distill_delta(output)
         deltas = []
         for update in delta_payload["capsule_updates"]:
@@ -5777,6 +6307,9 @@ def _run_distill_stage(
                     "adapter_receipts": receipts,
                 }
             )
+        adapter_name = str(worker_adapter.get("name", WORKER_ADAPTER_NAME))
+        for delta in deltas:
+            delta["adapter_name"] = adapter_name
     except WorkerAdapterError as exc:
         error_message = str(exc)
         if _is_worker_unavailable_error(error_message):
@@ -5790,8 +6323,8 @@ def _run_distill_stage(
             "affected_capsules": changed_capsules,
             "generated_deltas": [],
             "errors": [error_message],
+            "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         }
-
     return {
         "name": "distill",
         "status": "ok",
@@ -5799,6 +6332,7 @@ def _run_distill_stage(
         "profile": profile,
         "mode": mode,
         "affected_capsules": changed_capsules,
+        "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         "generated_deltas": deltas,
     }
 
@@ -6099,7 +6633,7 @@ def _run_apply_stage(
                 str(distill_result.get("profile") or "analyze"),
                 mode,
                 cert_receipts,
-                adapter_name=WORKER_ADAPTER_NAME,
+                adapter_name=str(distill_result.get("adapter_name") or WORKER_ADAPTER_NAME),
             )
             if not claim_refs:
                 raise RuntimeError("no claim refs produced")
@@ -6191,6 +6725,39 @@ def _run_replay_stage(
     changed_only: bool = True,
     policy: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    adapter_errors = _initialize_adapter_runtime(repo_root)
+    if adapter_errors:
+        first_error = adapter_errors[0]
+        return {
+            "name": "replay",
+            "status": "error",
+            "code": str(first_error.get("code") or ADAPTER_INTERFACE_MISMATCH_CODE),
+            "message": str(first_error.get("message") or "adapter initialization failed"),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [str(first_error.get("message") or "adapter initialization failed")],
+            **({"remediation": first_error.get("remediation", [])} if isinstance(first_error.get("remediation"), list) else {}),
+        }
+
+    try:
+        worker_adapter = adapter_get("worker")
+    except AdapterRegistryError as exc:
+        return {
+            "name": "replay",
+            "status": "error",
+            "code": ADAPTER_INTERFACE_MISMATCH_CODE,
+            "message": str(exc),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [str(exc)],
+        }
+
     policy_payload, policy_error = _resolve_policy_for_repo(repo_root, policy)
     if policy_error:
         return {
@@ -6305,7 +6872,13 @@ def _run_replay_stage(
                 capsule_id=capsule,
                 changed_materials=changed_materials,
             )
-            output, receipts = _run_codex_worker("replay", input_payload, repo_root, trace_path)
+            output, receipts = _run_codex_worker(
+                "replay",
+                input_payload,
+                repo_root,
+                trace_path,
+                adapter=worker_adapter,
+            )
             plan = _normalize_replay_plan(output)
             plan["adapter_receipts"] = receipts
             plans.append(plan)
@@ -6391,7 +6964,7 @@ def _run_replay_stage(
                 [p for p in plan.get("adapter_receipts", []) if isinstance(p, dict)],
                 status="success" if replay_status == "success" else "failed",
                 source="replay",
-                adapter_name=WORKER_ADAPTER_NAME,
+                adapter_name=str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
             )
             cert_payload["replay_context"] = {
                 "run_id": run_id,
