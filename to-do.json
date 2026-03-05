@@ -741,14 +741,328 @@
       "updated_at": "2026-03-04T10:39:05Z"
     },
     {
-      "id": "PROJECT-DONE",
-      "title": "Project done: no new tasks",
-      "priority": 5,
-      "status": "done",
-      "details": "Review completed; no new tasks were identified from the latest codebase pass.",
+      "id": "OG-SPEC-001",
+      "title": "Create SPEC-v2 conformance matrix and enforce acceptance criteria",
+      "priority": 1,
+      "status": "todo",
+      "details": "Map every MUST/SHOULD in SPEC-v2 to implementation status, owning files, and automated acceptance checks before further feature work.",
+      "steps": [
+        "Create SPEC_IMPLEMENTATION_MATRIX.md with section-by-section requirement mapping",
+        "Mark each requirement as implemented/partial/missing with concrete file pointers",
+        "Define acceptance tests and pass criteria for each missing or partial requirement",
+        "Wire matrix checks into release/readiness review workflow"
+      ],
       "tags": [
-        "project-done"
-      ]
+        "spec",
+        "governance",
+        "quality"
+      ],
+      "files": [
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "README.md",
+        "to-do.json"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-002",
+      "title": "Implement strict canonical artifact IO with schema-v2 enforcement",
+      "priority": 1,
+      "status": "todo",
+      "details": "Replace ad-hoc canonical writes with a strict artifact layer that validates schema_version, artifact_type/path mapping, and deterministic serialization.",
+      "steps": [
+        "Introduce canonical read/write APIs for artifact graph payloads",
+        "Enforce schema_version == 2 and reject mixed-version repos",
+        "Enforce path-to-artifact_type mapping for capsules/refs/decisions/claims/certificates/materials_lock",
+        "Add deterministic serialization guarantees for canonical artifacts"
+      ],
+      "tags": [
+        "schema",
+        "artifact-graph",
+        "validation"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "MIGRATION_GUIDE.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-001"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-003",
+      "title": "Materialize capsule, ref, and decision lifecycle as first-class canonical artifacts",
+      "priority": 1,
+      "status": "todo",
+      "details": "Ensure sync/apply produces and updates canonical capsule/ref/decision records rather than only claims/certificates.",
+      "steps": [
+        "Generate baseline capsule artifacts for discovered and default capsules",
+        "Generate and maintain refs that point to active capsules",
+        "Generate decisions from distill/apply outcomes with linked claims/evidence",
+        "Keep materials_lock and capsule references consistent across runs"
+      ],
+      "tags": [
+        "capsules",
+        "refs",
+        "decisions",
+        "sync"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-004",
+      "title": "Implement full sync baseline algorithm and force-full-sync controls",
+      "priority": 1,
+      "status": "todo",
+      "details": "Align change detection with SPEC section 8 baseline resolution, edge cases, and runtime path filtering semantics.",
+      "steps": [
+        "Resolve baseline using HEAD~1, then ORIG_HEAD merge-base, then empty-tree fallback",
+        "Add explicit --force-full-sync behavior",
+        "Retain runtime path filtering rules exactly as specified",
+        "Include baseline context in idempotency and sync summary payloads"
+      ],
+      "tags": [
+        "sync",
+        "diffing",
+        "runtime"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-001"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-005",
+      "title": "Implement strict policy enforcement with POLICY_DENIED contract",
+      "priority": 1,
+      "status": "todo",
+      "details": "Move from policy diagnostics to hard enforcement for autonomous actions with explicit denial payloads and exit semantics.",
+      "steps": [
+        "Load effective policy (built-in defaults or .outcomegraph/policy.yaml) and validate schema",
+        "Enforce allow/deny precedence before non-observe actions",
+        "Emit structured POLICY_DENIED payloads with category, target, and remediation",
+        "Return exit code 64 for policy misconfiguration and 1 for enforcement denials"
+      ],
+      "tags": [
+        "policy",
+        "security",
+        "autonomy"
+      ],
+      "files": [
+        "og.py",
+        "SECURITY_POLICY.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-006",
+      "title": "Build adapter registry and plugin discovery per spec contracts",
+      "priority": 2,
+      "status": "todo",
+      "details": "Implement runtime adapter registration/discovery with interface negotiation and deterministic defaults.",
+      "steps": [
+        "Add adapter_register/adapter_get/adapter_list/adapter_set_default APIs",
+        "Implement discovery from built-ins, .outcomegraph/adapters/<type>, and OG_ADAPTER_PATH",
+        "Validate manifest schema and interface_version compatibility",
+        "Emit ADAPTER_INTERFACE_MISMATCH errors with remediation"
+      ],
+      "tags": [
+        "adapters",
+        "plugins",
+        "architecture"
+      ],
+      "files": [
+        "og.py",
+        "PLUGIN_API.md",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-001"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-007",
+      "title": "Execute replay plans in isolated sandboxes with equivalence verification",
+      "priority": 2,
+      "status": "todo",
+      "details": "Upgrade replay from plan normalization to actual command execution in isolated environments and certifiable equivalence outputs.",
+      "steps": [
+        "Materialize replay sandbox/worktree under .outcomegraph/work/replay/<run>/<capsule>",
+        "Execute replay steps with timeout and expected-exit-code validation",
+        "Compute and persist equivalence evidence from observed oracle outputs",
+        "Write replay certificates only when execution and equivalence gates pass"
+      ],
+      "tags": [
+        "replay",
+        "sandbox",
+        "verification"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002",
+        "OG-SPEC-006"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-008",
+      "title": "Enforce invariants and degraded-mode behavior globally",
+      "priority": 2,
+      "status": "todo",
+      "details": "Codify non-negotiable invariants and ensure degraded-state transitions block unsafe autonomous writes while preserving valid evidence.",
+      "steps": [
+        "Enforce every claim has at least one valid receipt pointer",
+        "Preserve previous valid certificates on oracle/runtime failures",
+        "Block autonomous writes while integrity or policy state is degraded",
+        "Expose deterministic remediation details via status/drift payloads"
+      ],
+      "tags": [
+        "invariants",
+        "degraded-mode",
+        "integrity"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "RUNBOOKS.md",
+        "SECURITY_POLICY.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002",
+        "OG-SPEC-005",
+        "OG-SPEC-007"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-009",
+      "title": "Align exports and control surfaces to canonical graph state",
+      "priority": 3,
+      "status": "todo",
+      "details": "Ensure AGENTS/skill/MCP exports are deterministic projections of canonical artifacts and not alternate truth sources.",
+      "steps": [
+        "Drive export generation strictly from canonical artifact graph",
+        "Ensure deterministic ordering/content hashing for exported outputs",
+        "Validate exported resources/tools/prompts against control-surface contracts",
+        "Add drift checks for export consistency against canonical artifacts"
+      ],
+      "tags": [
+        "export",
+        "mcp",
+        "determinism"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "ARCHITECTURE.md",
+        "SPEC-v2.md",
+        "skills/outcome-steward/SKILL.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002",
+        "OG-SPEC-003"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-010",
+      "title": "Build full spec-compliance test suite and conformance gates",
+      "priority": 1,
+      "status": "todo",
+      "details": "Add end-to-end and contract tests that gate completion of full SPEC-v2 behavior with no shortcuts.",
+      "steps": [
+        "Add artifact schema/path/type conformance tests across canonical graph",
+        "Add sync baseline edge-case tests (HEAD~1, ORIG_HEAD, empty-tree, force-full-sync)",
+        "Add policy enforcement and adapter mismatch contract tests",
+        "Add replay sandbox/equivalence and degraded-mode invariants tests",
+        "Bind test results back to SPEC_IMPLEMENTATION_MATRIX completion states"
+      ],
+      "tags": [
+        "testing",
+        "compliance",
+        "quality-gate"
+      ],
+      "files": [
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "SPEC-v2.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-002",
+        "OG-SPEC-004",
+        "OG-SPEC-005",
+        "OG-SPEC-006",
+        "OG-SPEC-007",
+        "OG-SPEC-008",
+        "OG-SPEC-009"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
+    },
+    {
+      "id": "OG-SPEC-011",
+      "title": "Finalize docs, migration guidance, and dogfood validation for full-spec rollout",
+      "priority": 2,
+      "status": "todo",
+      "details": "Publish implementation decisions, migration path, and verified dogfood evidence after full-spec completion.",
+      "steps": [
+        "Update README/QUICKSTART/RUNBOOKS with final user and operator flows",
+        "Update MIGRATION_GUIDE for schema and runtime behavior transitions",
+        "Run dogfood validation in this repository and capture canonical evidence",
+        "Close matrix items only when docs and runtime behavior match"
+      ],
+      "tags": [
+        "documentation",
+        "migration",
+        "dogfood"
+      ],
+      "files": [
+        "README.md",
+        "QUICKSTART.md",
+        "RUNBOOKS.md",
+        "MIGRATION_GUIDE.md",
+        "to-do.json"
+      ],
+      "depends_on": [
+        "OG-SPEC-010"
+      ],
+      "updated_at": "2026-03-05T08:42:38Z"
     }
   ]
 }
