@@ -770,7 +770,7 @@
       "id": "OG-SPEC-002",
       "title": "Implement strict canonical artifact IO with schema-v2 enforcement",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Replace ad-hoc canonical writes with a strict artifact layer that validates schema_version, artifact_type/path mapping, and deterministic serialization.",
       "steps": [
         "Introduce canonical read/write APIs for artifact graph payloads",
@@ -785,14 +785,12 @@
       ],
       "files": [
         "og.py",
-        "SPEC-v2.md",
-        "MIGRATION_GUIDE.md",
         "to-do.json"
       ],
       "depends_on": [
         "OG-SPEC-001"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T08:48:35Z"
     },
     {
       "id": "OG-SPEC-003",

@@ -121,6 +121,24 @@ WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
 WORKER_UNAVAILABLE_ERROR = "codex executable was not found"
+CANONICAL_ARTIFACT_TYPES = {
+    "capsule",
+    "ref",
+    "decision",
+    "certificate",
+    "materials_lock",
+    "claim",
+    "prompt_pack",
+    "eval_dataset",
+    "optimization_eval_result",
+}
+CANONICAL_PATH_ARTIFACT_TYPES = {
+    "capsules": "capsule",
+    "refs": "ref",
+    "decisions": "decision",
+    "claims": "claim",
+    "certificates": "certificate",
+}
 DAEMON_SERVICE_DIR = f"{OG_ROOT}/work/daemon"
 DAEMON_SERVICE_SCRIPT = f"{DAEMON_SERVICE_DIR}/run-ogd.sh"
 DAEMON_SERVICE_STATE = f"{DAEMON_SERVICE_DIR}/state.json"
@@ -1228,9 +1246,86 @@ def _write_json_file(path: str, payload: dict) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True)
+        serialized = json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=True)
+        handle.write(serialized)
         handle.write("\n")
     os.replace(tmp, path)
+
+
+def _expected_canonical_artifact_type(relative_path: str) -> str | None:
+    normalized = relative_path.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if normalized == f"{OG_ROOT}/materials.lock":
+        return "materials_lock"
+    if not normalized.startswith(f"{OG_ROOT}/"):
+        return None
+    normalized = normalized[len(f"{OG_ROOT}/") :]
+    scope = normalized.split("/", 1)[0]
+    if not scope:
+        return None
+    return CANONICAL_PATH_ARTIFACT_TYPES.get(scope)
+
+
+def _validate_canonical_payload(
+    path: str,
+    payload: dict,
+    *,
+    expected_artifact_type: str | None = None,
+) -> dict[str, object]:
+    schema_version = payload.get("schema_version")
+    if schema_version != 2:
+        raise ValueError(
+            f"{path}: unsupported schema_version {schema_version!r}; expected 2"
+        )
+
+    artifact_type = payload.get("artifact_type")
+    if not isinstance(artifact_type, str):
+        raise ValueError(f"{path}: missing artifact_type")
+    artifact_type = artifact_type.strip()
+    if not artifact_type:
+        raise ValueError(f"{path}: missing artifact_type")
+    if artifact_type not in CANONICAL_ARTIFACT_TYPES:
+        raise ValueError(f"{path}: unsupported artifact_type '{artifact_type}'")
+
+    expected = expected_artifact_type or _expected_canonical_artifact_type(path)
+    if expected is not None and artifact_type != expected:
+        raise ValueError(
+            f"{path}: unexpected artifact_type '{artifact_type}', expected '{expected}' for this canonical path"
+        )
+
+    return payload
+
+
+def _read_canonical_artifact_payload(
+    repo_root: str,
+    relative_path: str,
+    *,
+    expected_artifact_type: str | None = None,
+) -> dict[str, object]:
+    full_path = os.path.join(repo_root, relative_path)
+    payload = _read_json_file(full_path)
+    if payload is None:
+        raise ValueError(f"{relative_path}: file is not valid JSON")
+    return _validate_canonical_payload(
+        relative_path,
+        payload,
+        expected_artifact_type=expected_artifact_type,
+    )
+
+
+def _write_canonical_artifact(
+    repo_root: str,
+    relative_path: str,
+    payload: dict[str, object],
+) -> None:
+    full_path = os.path.join(repo_root, relative_path)
+    validated = _validate_canonical_payload(
+        relative_path,
+        payload,
+        expected_artifact_type=_expected_canonical_artifact_type(relative_path),
+    )
+    _write_json_file(full_path, validated)
 
 
 def _compute_payload_hash(payload: dict[str, object]) -> str:
@@ -2548,6 +2643,48 @@ def _read_artifact_record(repo_root: str, relative_path: str) -> dict[str, objec
     }
 
 
+def _collect_canonical_artifact_files(repo_root: str) -> list[str]:
+    canonical_roots = ("capsules", "refs", "decisions", "claims", "certificates")
+    artifact_files: list[str] = []
+    for root in canonical_roots:
+        root_path = os.path.join(repo_root, OG_ROOT, root)
+        if not os.path.isdir(root_path):
+            continue
+        for dirpath, _, filenames in os.walk(root_path):
+            for filename in sorted(filenames):
+                if filename.startswith("."):
+                    continue
+                if not filename.endswith((".json", ".yaml", ".yml")):
+                    continue
+                artifact_files.append(os.path.relpath(os.path.join(dirpath, filename), repo_root).replace("\\", "/"))
+    materials_lock_path = f"{OG_ROOT}/materials.lock"
+    if os.path.exists(os.path.join(repo_root, materials_lock_path)):
+        artifact_files.append(materials_lock_path)
+    return sorted(set(artifact_files))
+
+
+def _validate_canonical_artifact_records(repo_root: str) -> None:
+    for relative_path in _collect_canonical_artifact_files(repo_root):
+        record = _read_artifact_record(repo_root, relative_path)
+        expected_type = _expected_canonical_artifact_type(relative_path)
+        artifact_type = record.get("artifact_type")
+        schema_version = record.get("schema_version")
+        if expected_type is None:
+            continue
+        if not isinstance(artifact_type, str) or not artifact_type.strip():
+            raise ValueError(
+                f"{relative_path}: missing artifact_type; expected '{expected_type}' for this path and schema_version 2"
+            )
+        if schema_version != 2:
+            raise ValueError(
+                f"{relative_path}: schema_version must be 2, detected {schema_version!r}; migrate artifact to schema_version 2"
+            )
+        if artifact_type.strip() != expected_type:
+            raise ValueError(
+                f"{relative_path}: artifact_type '{artifact_type.strip()}' does not match expected '{expected_type}' for this path"
+            )
+
+
 def _canonical_export_snapshot(repo_root: str) -> dict[str, object]:
     canonical_roots = ("constitution", "capsules", "refs", "decisions", "claims", "certificates", "datasets")
     artifact_files: list[str] = []
@@ -3056,14 +3193,14 @@ def _consume_pending(repo_root: str) -> bool:
     _write_json_file(os.path.join(repo_root, WORK_STATE_FILE), state)
     return True
 
-def _build_materials_lock_payload(created_at: str) -> str:
-    payload = {
+def _build_materials_lock_payload(created_at: str) -> dict[str, object]:
+    return {
         "schema_version": 2,
-        "created_at": created_at,
-        "material_paths": [],
-        "notes": "bootstrap-generated materials lock",
+        "artifact_type": "materials_lock",
+        "id": "materials-lock",
+        "captured_at": created_at,
+        "entries": [],
     }
-    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
 def _init_outcomegraph() -> dict[str, object]:
@@ -3084,7 +3221,6 @@ def _init_outcomegraph() -> dict[str, object]:
     created_at = _utc_timestamp()
     baseline_files = {
         f"{OG_ROOT}/constitution/default.yaml": _build_constitution_payload(created_at),
-        f"{OG_ROOT}/materials.lock": _build_materials_lock_payload(created_at),
         f"{WORK_STATE_FILE}": _build_state_payload(created_at),
         f"{WORK_LOCK_FILE}": _build_lock_payload(created_at),
         f"{OG_ROOT}/policy.yaml": _build_policy_payload(created_at),
@@ -3099,6 +3235,14 @@ def _init_outcomegraph() -> dict[str, object]:
             created_files.append(relative_path)
         else:
             existing_files.append(relative_path)
+
+    materials_lock_path = f"{OG_ROOT}/materials.lock"
+    materials_lock_full_path = os.path.join(repo_root, materials_lock_path)
+    if os.path.exists(materials_lock_full_path):
+        existing_files.append(materials_lock_path)
+    else:
+        _write_canonical_artifact(repo_root, materials_lock_path, _build_materials_lock_payload(created_at))
+        created_files.append(materials_lock_path)
 
     return {
         "status": "ok",
@@ -4697,10 +4841,16 @@ def _normalize_reference_to_id(reference: object) -> str | None:
     return os.path.splitext(os.path.basename(text))[0]
 
 
-def _collect_artifact_payloads(repo_root: str, relative_dir: str) -> list[tuple[str, dict[str, object]]]:
+def _collect_artifact_payloads(
+    repo_root: str,
+    relative_dir: str,
+    *,
+    strict: bool = False,
+) -> list[tuple[str, dict[str, object]]]:
     root = os.path.join(repo_root, relative_dir)
     if not os.path.isdir(root):
         return []
+    expected_type = _expected_canonical_artifact_type(relative_dir)
     payloads: list[tuple[str, dict[str, object]]] = []
     for dirpath, _, filenames in os.walk(root):
         for filename in sorted(filenames):
@@ -4709,9 +4859,16 @@ def _collect_artifact_payloads(repo_root: str, relative_dir: str) -> list[tuple[
             if not filename.endswith(".json"):
                 continue
             full_path = os.path.join(dirpath, filename)
-            payload = _read_json_file(full_path)
-            if not isinstance(payload, dict):
-                continue
+            if strict:
+                payload = _read_canonical_artifact_payload(
+                    repo_root,
+                    os.path.relpath(full_path, repo_root).replace("\\", "/"),
+                    expected_artifact_type=expected_type,
+                )
+            else:
+                payload = _read_json_file(full_path)
+                if not isinstance(payload, dict):
+                    continue
             relative_path = os.path.relpath(full_path, repo_root).replace("\\", "/")
             payloads.append((relative_path, payload))
     return payloads
@@ -4751,7 +4908,11 @@ def _collect_latest_sync_deltas(repo_root: str) -> tuple[list[dict[str, object]]
 
 def _collect_claim_records(repo_root: str) -> list[dict[str, object]]:
     claims: list[dict[str, object]] = []
-    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/claims"):
+    for path, payload in _collect_artifact_payloads(
+        repo_root,
+        f"{OG_ROOT}/claims",
+        strict=True,
+    ):
         claims.append(
             {
                 "path": path,
@@ -4770,7 +4931,11 @@ def _collect_claim_records(repo_root: str) -> list[dict[str, object]]:
 
 def _collect_certificate_records(repo_root: str) -> list[dict[str, object]]:
     certificates: list[dict[str, object]] = []
-    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/certificates"):
+    for path, payload in _collect_artifact_payloads(
+        repo_root,
+        f"{OG_ROOT}/certificates",
+        strict=True,
+    ):
         certificates.append(
             {
                 "path": path,
@@ -4788,7 +4953,11 @@ def _collect_certificate_records(repo_root: str) -> list[dict[str, object]]:
 
 def _collect_decision_records(repo_root: str) -> list[dict[str, object]]:
     decisions: list[dict[str, object]] = []
-    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/decisions"):
+    for path, payload in _collect_artifact_payloads(
+        repo_root,
+        f"{OG_ROOT}/decisions",
+        strict=True,
+    ):
         decisions.append(
             {
                 "path": path,
@@ -4806,7 +4975,11 @@ def _collect_decision_records(repo_root: str) -> list[dict[str, object]]:
 
 def _collect_ref_records(repo_root: str) -> list[dict[str, object]]:
     refs: list[dict[str, object]] = []
-    for path, payload in _collect_artifact_payloads(repo_root, f"{OG_ROOT}/refs"):
+    for path, payload in _collect_artifact_payloads(
+        repo_root,
+        f"{OG_ROOT}/refs",
+        strict=True,
+    ):
         refs.append(
             {
                 "path": path,
@@ -4929,6 +5102,20 @@ def _run_distill_stage(
 
 
 def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: str, mode: str) -> dict[str, object]:
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        return {
+            "name": "apply",
+            "status": "error",
+            "message": f"Canonical artifact validation failed: {exc}",
+            "mode": mode,
+            "applied_changes": 0,
+            "applied_claims": [],
+            "applied_certificates": [],
+            "errors": [f"Canonical artifact validation failed: {exc}"],
+        }
+
     if distill_result.get("status") != "ok":
         return {
             "name": "apply",
@@ -5031,7 +5218,11 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
                 )
                 claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{generated_claim['id']}.json")
                 os.makedirs(os.path.dirname(claim_path), exist_ok=True)
-                _write_json_file(claim_path, claim_payload)
+                _write_canonical_artifact(
+                    repo_root,
+                    f"{OG_ROOT}/claims/{generated_claim['id']}.json",
+                    claim_payload,
+                )
                 applied_claims.append(f"{OG_ROOT}/claims/{generated_claim['id']}.json")
                 claim_refs.append(f"{OG_ROOT}/claims/{generated_claim['id']}.json")
         except Exception as exc:
@@ -5055,7 +5246,11 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
                 raise RuntimeError("no claim refs produced")
             cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
             os.makedirs(os.path.dirname(cert_path), exist_ok=True)
-            _write_json_file(cert_path, cert_payload)
+            _write_canonical_artifact(
+                repo_root,
+                f"{OG_ROOT}/certificates/{certificate_id}.json",
+                cert_payload,
+            )
             applied_certs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
         except Exception as exc:
             errors.append(f"Failed to write certificate for {capsule_id}: {exc}")
@@ -5092,6 +5287,21 @@ def _run_replay_stage(
     mode: str,
     changed_only: bool = True,
 ) -> dict[str, object]:
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        return {
+            "name": "replay",
+            "status": "error",
+            "message": f"Canonical artifact validation failed: {exc}",
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [f"Canonical artifact validation failed: {exc}"],
+        }
+
     if not isinstance(snapshot, dict):
         return {
             "name": "replay",
@@ -5190,7 +5400,11 @@ def _run_replay_stage(
             )
             claim_path = os.path.join(repo_root, OG_ROOT, "claims", f"{claim_id}.json")
             os.makedirs(os.path.dirname(claim_path), exist_ok=True)
-            _write_json_file(claim_path, claim_payload)
+            _write_canonical_artifact(
+                repo_root,
+                f"{OG_ROOT}/claims/{claim_id}.json",
+                claim_payload,
+            )
         except Exception as exc:
             errors.append(f"Failed to write replay claim for {capsule}: {exc}")
             overall_failed = True
@@ -5220,7 +5434,11 @@ def _run_replay_stage(
             }
             certificate_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
             os.makedirs(os.path.dirname(certificate_path), exist_ok=True)
-            _write_json_file(certificate_path, cert_payload)
+            _write_canonical_artifact(
+                repo_root,
+                f"{OG_ROOT}/certificates/{certificate_id}.json",
+                cert_payload,
+            )
         except Exception as exc:
             errors.append(f"Failed to write replay certificate for {capsule}: {exc}")
             overall_failed = True
@@ -5699,7 +5917,7 @@ def _run_optimize_prompts_stage(repo_root: str, options: dict[str, object]) -> d
         result_path = f"{OG_ROOT}/datasets/{evaluation['id']}.json"
         absolute_result_path = os.path.join(repo_root, result_path)
         os.makedirs(os.path.dirname(absolute_result_path), exist_ok=True)
-        _write_json_file(absolute_result_path, evaluation)
+        _write_canonical_artifact(repo_root, result_path, evaluation)
 
         summary = {
             "dataset_id": dataset["id"],
@@ -5769,9 +5987,7 @@ def _run_optimize_prompts_stage(repo_root: str, options: dict[str, object]) -> d
                 approved_at=_utc_timestamp(),
                 result_ref=result_path,
             )
-            pack_full_path = os.path.join(repo_root, pack_path)
-            os.makedirs(os.path.dirname(pack_full_path), exist_ok=True)
-            _write_json_file(pack_full_path, pack_payload)
+            _write_canonical_artifact(repo_root, pack_path, pack_payload)
             payload["promotion"]["pack_path"] = pack_path
             payload["message"] = "Candidate prompts approved and promoted to active pack."
             summary["pack_path"] = pack_path
@@ -5821,6 +6037,20 @@ def _run_verify_stage(
     run_id: str,
     mode: str,
 ) -> dict[str, object]:
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        return {
+            "name": "verify",
+            "status": "error",
+            "message": f"Canonical artifact validation failed: {exc}",
+            "mode": mode,
+            "verified_capsules": [],
+            "receipt_pointers": {},
+            "oracle_results": {},
+            "errors": [f"Canonical artifact validation failed: {exc}"],
+        }
+
     if not changed_capsules:
         return {
             "name": "verify",
@@ -5892,7 +6122,11 @@ def _run_verify_stage(
                 receipt_pointers,
                 text=claim_text,
             )
-            _write_json_file(claim_path, claim_payload)
+            _write_canonical_artifact(
+                repo_root,
+                f"{OG_ROOT}/claims/{claim_id}.json",
+                claim_payload,
+            )
         except Exception as exc:
             error_message = f"Failed to write verify claim for {capsule}: {exc}"
             errors.append(error_message)
@@ -5917,7 +6151,11 @@ def _run_verify_stage(
             cert_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
             try:
                 os.makedirs(os.path.dirname(cert_path), exist_ok=True)
-                _write_json_file(cert_path, cert_payload)
+                _write_canonical_artifact(
+                    repo_root,
+                    f"{OG_ROOT}/certificates/{certificate_id}.json",
+                    cert_payload,
+                )
                 certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
             except Exception as exc:
                 error_message = f"Failed to write verify certificate for {capsule}: {exc}"
@@ -6064,6 +6302,43 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     snapshot = _collect_sync_snapshot(repo_root, profile, mode)
     idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
     run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
+
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        payload = {
+            "status": "error",
+            "command": "sync",
+            "subcommand": None,
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+            "snapshot": snapshot,
+            "pending": False,
+            "pending_consumed": False,
+            "short_circuit": False,
+            "steps": [
+                {
+                    "name": "validate",
+                    "status": "error",
+                    "message": f"Canonical artifact validation failed: {exc}",
+                }
+            ],
+            "message": "sync validation failed before apply.",
+            "options": {
+                "changed": options.get("changed", False),
+                "profile": profile,
+                "mode": mode,
+            },
+        }
+        _record_sync_summary_event(repo_root, payload, 0)
+        _build_work_payload(
+            repo_root,
+            status="degraded",
+            last_sync_id=run_id,
+            last_idempotency_key=idempotency_key,
+            last_message="sync failed canonical validation",
+        )
+        return payload
 
     pending = _consume_pending(repo_root)
     was_short_circuit = False
