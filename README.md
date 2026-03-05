@@ -142,9 +142,28 @@ uv run og <command>
 
 Return contract:
 
-- Every command emits a status object with at least `status`, `command`, and `message`.
-- In non-JSON mode, `message` is a human-readable summary.
-- In `--json` mode, payloads remain machine-parseable and deterministic.
+- Every command emits this top-level JSON envelope when `--json` is set:
+
+```json
+{
+  "schema_version": 1,
+  "command": "<top-level command id>",
+  "status": "ok|error|warn",
+  "run_id": "<operation identifier or null>",
+  "data": { "...": "..." },
+  "errors": [],
+  "warnings": [],
+  "metrics": {}
+}
+```
+
+- `command` is the command identifier (`init`, `sync`, `verify`, ...).
+- `status` is the command status.
+- `run_id` carries command correlation ids when available (e.g. sync/replay/verify/explain).
+- `data` contains command payload (canonical payload fields and step details).
+- `errors` and `warnings` are flat string arrays.
+- `metrics` holds command-level timing and counters.
+- In non-JSON mode, command output remains human-readable (`message` is still shown).
 - Exit codes:
   - `0` success
   - `1` runtime failure

@@ -193,9 +193,45 @@ Exit codes:
 
 Structured output:
 
-- `--json` prints parseable result/error payloads to stdout (for scripts and CI).
-- Success payload includes `status`, `command`, `subcommand`, and parsed `options`.
-- Error payload includes `status`, `code`, `command`, and `message`.
+- `--json` prints a single top-level envelope for every command and error path.
+- Envelope fields are:
+  - `schema_version` (`1`)
+  - `command`
+  - `status`
+  - `run_id` (optional, `null` when unavailable)
+  - `data`
+  - `errors`
+  - `warnings`
+  - `metrics`
+- `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
+- Command IDs are stable across help/usage, success, and failure envelopes.
+
+Example:
+
+```json
+{
+  "schema_version": 1,
+  "command": "sync",
+  "status": "ok",
+  "run_id": "sync-20260305T000000Z-abcdef1234",
+  "data": {
+    "status": "ok",
+    "command": "sync",
+    "run_id": "sync-20260305T000000Z-abcdef1234",
+    "steps": []
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "duration_ms": 1234
+  }
+}
+```
+
+Migration note:
+
+- Old command payloads that previously emitted command-specific JSON shapes now always appear under `data`.
+- Clients should treat top-level fields as the stable contract and preserve `data` as the legacy payload body.
 
 ## 6) Repository layout and tracking policy
 

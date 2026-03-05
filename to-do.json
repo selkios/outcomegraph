@@ -1123,17 +1123,18 @@
         "QUICKSTART.md",
         "README.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:49:02Z",
+      "updated_at": "2026-03-05T16:49:29Z",
       "blockers": []
     },
     {
       "id": "OG-AGENT-002",
       "title": "Adopt a single versioned JSON envelope across all commands",
       "priority": 1,
-      "status": "todo",
-      "details": "Standardize machine output so agents can parse one schema for all command results and failures. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Adopted a single JSON command envelope across all --json outputs (including help and error paths), refactored output builder, and updated README, SPEC-v2, and agent-first review artifacts for the new contract.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Define canonical envelope fields (`schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, `metrics`) and preserve deterministic key ordering",
@@ -1155,9 +1156,11 @@
         "README.md",
         "SPEC-v2.md",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:38:15Z"
+      "updated_at": "2026-03-05T16:51:29Z",
+      "blockers": []
     },
     {
       "id": "OG-AGENT-003",

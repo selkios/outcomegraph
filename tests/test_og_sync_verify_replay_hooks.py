@@ -79,6 +79,35 @@ class TestHelpContracts(TestCase):
             self.assertIn("Exit codes:", text, msg=f"missing exit codes block for {args}")
 
 
+class TestJsonEnvelopeContract(TestCase):
+    def test_json_version_contract_for_command(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(["--json", "--version"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "version")
+        self.assertEqual(payload["status"], "ok")
+        self.assertIsInstance(payload["data"], dict)
+        self.assertIn("version", payload["data"])
+
+    def test_json_errors_are_enveloped(self) -> None:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            with self.assertRaises(SystemExit) as context:
+                og.main(["--json", "--this-flag-does-not-exist"])
+        self.assertEqual(context.exception.code, 64)
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["command"], "og")
+        self.assertEqual(payload["status"], "error")
+        self.assertGreater(len(payload["errors"]), 0)
+        self.assertIn("unknown global option", payload["errors"][0])
+
+
 class TestHookLifecycle(_RepoTestCase):
     def test_autopilot_init_installs_and_disables_hooks(self) -> None:
         with self.git_root_patch():

@@ -146,6 +146,7 @@ LOCK_STATUS_LOCKED = "locked"
 LOCK_STATUS_UNLOCKED = "unlocked"
 STATUS_SCHEMA_VERSION = 1
 DRIFT_REPORT_SCHEMA_VERSION = 1
+COMMAND_RESULT_SCHEMA_VERSION = 1
 STATUS_SYNC_STALE_SECONDS = 3600
 STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
@@ -1073,29 +1074,90 @@ def _help_for_command(command: str) -> str:
     return emit_usage() + "\nUse --help with a recognized command for details."
 
 
+def _ensure_string_list(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    output: list[str] = []
+    for item in raw:
+        if isinstance(item, str):
+            output.append(item)
+        elif isinstance(item, (int, float, bool)):
+            output.append(str(item))
+        else:
+            output.append(str(item))
+    return output
+
+
+def _build_command_result_envelope(
+    command: str,
+    payload: dict[str, object] | None,
+) -> dict[str, object]:
+    if payload is None or not isinstance(payload, dict):
+        payload = {}
+    command_id = str(payload.get("command") or command).strip()
+    if not command_id:
+        command_id = "og"
+
+    status = str(payload.get("status") or "ok").lower()
+    run_id = payload.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        run_id = None
+
+    errors = _ensure_string_list(payload.get("errors"))
+    warnings = _ensure_string_list(payload.get("warnings"))
+    if status == "error" and not errors:
+        message = payload.get("message")
+        if isinstance(message, str) and message.strip():
+            errors = [message]
+
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+
+    envelope: dict[str, object] = {
+        "schema_version": COMMAND_RESULT_SCHEMA_VERSION,
+        "command": command_id,
+        "status": status,
+        "run_id": run_id,
+        "data": payload,
+        "errors": errors,
+        "warnings": warnings,
+        "metrics": metrics,
+    }
+    subcommand = payload.get("subcommand")
+    if isinstance(subcommand, str):
+        envelope["subcommand"] = subcommand
+    return envelope
+
+
 def emit_error(message: str, command: str | None, code: int, output_json: bool = False) -> None:
     if output_json:
-        payload = {
-            "status": "error",
-            "code": code,
-            "command": command,
-            "message": message,
-        }
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        emit_command_result(
+            {
+                "status": "error",
+                "code": code,
+                "command": command,
+                "message": message,
+            },
+            True,
+            command or "og",
+        )
     else:
         print(f"og: {message}", file=sys.stderr)
     sys.exit(code)
 
 
 def emit_json(payload: dict) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
 
 
-def emit_command_result(payload: dict, output_json: bool) -> None:
+def emit_command_result(payload: dict, output_json: bool, command: str | None = None) -> None:
     if output_json:
-        emit_json(payload)
+        emit_json(_build_command_result_envelope(command or "og", payload))
         return
-    print(payload["message"])
+    message = payload.get("message")
+    if isinstance(message, str):
+        print(message)
 
 
 def parse_bool_option(raw: str) -> bool:
@@ -5450,7 +5512,15 @@ def parse_command_flags(
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command(command)}, output_json)
+            emit_command_result(
+                {
+                    "command": command,
+                    "status": "ok",
+                    "message": _help_for_command(command),
+                },
+                output_json,
+                command,
+            )
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -5642,7 +5712,15 @@ def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command("clean")}, output_json)
+            emit_command_result(
+                {
+                    "command": "clean",
+                    "status": "ok",
+                    "message": _help_for_command("clean"),
+                },
+                output_json,
+                "clean",
+            )
             raise SystemExit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -5819,7 +5897,16 @@ def _parse_optimize_prompts_flags(
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command("optimize prompts")}, output_json)
+            emit_command_result(
+                {
+                    "command": "optimize",
+                    "subcommand": "prompts",
+                    "status": "ok",
+                    "message": _help_for_command("optimize prompts"),
+                },
+                output_json,
+                "optimize",
+            )
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -9680,7 +9767,15 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "optimize":
         if rest and rest[0] in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command("optimize")}, output_json)
+            emit_command_result(
+                {
+                    "command": "optimize",
+                    "status": "ok",
+                    "message": _help_for_command("optimize"),
+                },
+                output_json,
+                "optimize",
+            )
             return EXIT_SUCCESS
         if not rest:
             emit_error("missing optimize subcommand\n\nAvailable: prompts", "optimize", EXIT_USAGE, output_json)
@@ -9704,7 +9799,15 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "autopilot":
         if rest and rest[0] in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command("autopilot")}, output_json)
+            emit_command_result(
+                {
+                    "command": "autopilot",
+                    "status": "ok",
+                    "message": _help_for_command("autopilot"),
+                },
+                output_json,
+                "autopilot",
+            )
             return EXIT_SUCCESS
         if not rest:
             emit_error("missing autopilot subcommand\n\nAvailable: init, disable", "autopilot", EXIT_USAGE, output_json)
@@ -9739,7 +9842,15 @@ def run_command(args: list[str], output_json: bool) -> int:
 
     if command == "daemon":
         if rest and rest[0] in {"-h", "--help"}:
-            emit_command_result({"message": _help_for_command("daemon")}, output_json)
+            emit_command_result(
+                {
+                    "command": "daemon",
+                    "status": "ok",
+                    "message": _help_for_command("daemon"),
+                },
+                output_json,
+                "daemon",
+            )
             return EXIT_SUCCESS
         if not rest:
             emit_error("missing daemon action\n\nAvailable: install, start, stop, status, run", "daemon", EXIT_USAGE, output_json)
@@ -9810,7 +9921,15 @@ def main(argv: list[str]) -> int:
             return EXIT_SUCCESS
         if arg in {"-v", "--version"}:
             if output_json:
-                emit_json({"status": "ok", "command": "version", "version": VERSION})
+                emit_command_result(
+                    {
+                        "command": "version",
+                        "status": "ok",
+                        "version": VERSION,
+                    },
+                    output_json,
+                    "version",
+                )
             else:
                 print(f"og {VERSION}")
             return EXIT_SUCCESS

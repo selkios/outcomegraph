@@ -1,0 +1,47 @@
+# Agent-First CLI Review (OutcomeGraph `og`)
+
+Date: 2026-03-05  
+Scope: `/home/agent/outcomegraph`
+
+## Review Team
+
+1. Contract Agent: command/flag/help stability.
+2. Output Agent: machine-readable output envelope/streaming.
+3. Error Agent: typed errors and exit-code semantics.
+4. Input + Introspection Agent: payload inputs, strictness, schema discovery.
+5. Ops + Safety Agent: non-interactive usage, recovery, state/session, security, guidance, metrics.
+
+## Top Findings (Priority Order)
+
+1. `--help` contract is command-complete for top-level and nested commands.
+2. JSON output uses a single, versioned, command-level envelope for all command results and failures.
+3. Error payloads are inconsistent and do not include `class`/`retryable`.
+4. No first-class agent introspection (`schema`/`describe`) or field/pagination/stream controls.
+5. Path inputs for `optimize prompts` are not constrained to repo root.
+
+## Checklist Results
+
+| Checklist Area | Status | Evidence | Notes |
+|---|---|---|---|
+| 1) CLI surface contract | Done | `og.py` and tests in `tests/test_og_sync_verify_replay_hooks.py` | `og <command> --help` now dispatches per-command usage contracts, and nested dispatches (`optimize`, `autopilot`, `daemon`) include `help` coverage including `daemon run`. |
+| 2) Structured output + unambiguous success | Done | [`og.py`](./og.py) | `--json` now emits a single contract envelope with `schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, and `metrics` for command/help/error paths across all commands. |
+| 3) Error model + exit codes | Partial | [`og.py:846`](./og.py#L846), [`README.md:135`](./README.md#L135) | Exit codes are documented in README and used consistently (`0/1/64`), but error payload lacks stable `error_class`, `retryable`, bounded hint field. |
+| 4) Agent-oriented input design | Fail | [`og.py:5197`](./og.py#L5197), [`og.py:5583`](./og.py#L5583) | No raw request-body input path (`--params`/input JSON contract) and no CLI `--strict`. |
+| 5) Runtime introspection | Fail | [`og.py:826`](./og.py#L826), [`og.py:9231`](./og.py#L9231), [`og.py:4036`](./og.py#L4036) | No `schema`/`describe` command that emits machine-readable request/response signatures. |
+| 6) Context/window + payload controls | Fail | [`og.py:5197`](./og.py#L5197) | No `--fields`, pagination controls, or streaming list output mode. |
+| 7) Interaction traps | Partial | [`og.py:4629`](./og.py#L4629), [`og.py:4644`](./og.py#L4644) | Most commands are non-interactive; `autopilot init --force-hooks-path` can prompt and there is no global `--non-interactive`. |
+| 8) Recovery tooling | Partial | [`og.py:5405`](./og.py#L5405), [`og.py:8926`](./og.py#L8926), [`og.py:9052`](./og.py#L9052), [`og.py:4870`](./og.py#L4870) | `clean --dry-run` and sync idempotency exist; `replay` exists. Missing general `--dry-run`/`validate` split for mutating commands, `doctor` command, and CLI retry knobs (`--max-retries`, timeout flags). |
+| 9) Explicit state/session | Partial | [`og.py:9285`](./og.py#L9285), [`og.py:9510`](./og.py#L9510) | Lock/daemon state is explicit, but no declared session contract or `session_id` field on command results. |
+| 10) Security + safety for agent failure modes | Partial | [`og.py:5493`](./og.py#L5493), [`og.py:5717`](./og.py#L5717), [`og.py:5812`](./og.py#L5812) | Positive: cleanup path traversal guard. Gap: `optimize prompts` path inputs can reference outside repo via `../`; no explicit control-character/ID hardening contract. |
+| 11) Agent guidance shipped with binary | Partial | [`.outcomegraph/export/AGENTS.md`](./.outcomegraph/export/AGENTS.md), [`skills/outcome-steward/SKILL.md`](./skills/outcome-steward/SKILL.md) | Guidance exists, but it is export-generated and not a stable top-level, versioned agent contract file like `CONTEXT.md`. |
+| 12) Optional multi-surface support | Partial | [`og.py:165`](./og.py#L165), [`og.py:4036`](./og.py#L4036) | Has env-var hooks (`OG_ADAPTER_PATH`, signer env) and MCP control-surface payload command, but no env default for output mode and not a full typed stdio MCP server contract. |
+| 13) AI-native outcome metrics | Fail | [`og.py:9231`](./og.py#L9231) | Per-run timing exists, but no tracked agent-centric metrics (schema-valid rate, command-per-task, recovery rate, session churn). |
+
+## Quick Runtime Checks Performed
+
+1. `./og --help`: top-level usage shown.
+2. `./og <core-command> --help`: command-specific usage contracts with accepted options/output/exit sections.
+3. `./og daemon --help`, `./og autopilot --help`, and `./og daemon run --help`: render dedicated help contracts.
+4. `./og status --output json --json`: `--output` is rejected (exit `64`).
+5. `./og status --json`, `./og mcp-server --json`, `./og clean --scope runtime --dry-run --json`, `./og daemon status --json`: machine-readable payloads emitted.
+6. `python3 -m unittest -q tests.test_og_sync_verify_replay_hooks`: 34 tests passed.
