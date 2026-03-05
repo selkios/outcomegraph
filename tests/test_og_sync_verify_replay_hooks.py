@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import json
+import sys
+import tomllib
 from contextlib import redirect_stdout
 import subprocess
 import tempfile
@@ -218,6 +220,13 @@ class TestJsonEnvelopeContract(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIsInstance(payload["data"], dict)
         self.assertIn("version", payload["data"])
+
+    def test_runtime_version_matches_project_metadata(self) -> None:
+        pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        with pyproject_path.open("rb") as handle:
+            payload = tomllib.load(handle)
+
+        self.assertEqual(og.VERSION, payload["project"]["version"])
 
     def test_json_errors_are_enveloped(self) -> None:
         buffer = io.StringIO()
@@ -457,6 +466,14 @@ class TestHookLifecycle(_RepoTestCase):
             self.assertEqual(config_value, og.AUTOPILOT_MANAGED_HOOK_DIR)
 
 class TestDaemonLifecycle(_RepoTestCase):
+    def test_daemon_build_script_uses_current_python_module(self) -> None:
+        script = og._daemon_build_script(str(self.repo))
+
+        self.assertIn("PYTHON_BIN=", script)
+        self.assertIn(sys.executable, script)
+        self.assertIn('exec "$PYTHON_BIN" -m og daemon run "$@"', script)
+        self.assertNotIn("uvx --from", script)
+
     def test_daemon_start_stop_round_trip(self) -> None:
         with self.git_root_patch(), patch.object(
             og,
@@ -993,6 +1010,119 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["steps"][0]["name"], "short_circuit")
 
+    def test_run_sync_job_force_full_sync_bypasses_short_circuit(self) -> None:
+        snapshot = {
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_files": ["capsules/default.yaml"],
+            "changed_count": 1,
+            "has_changes": True,
+            "profile": "analyze",
+            "mode": "observe",
+            "captured_at": "2026-03-04T00:00:00Z",
+            "diff_baseline": {"strategy": "head~1"},
+        }
+        distill_result = {
+            "name": "distill",
+            "status": "ok",
+            "message": "distill ok",
+            "generated_deltas": [],
+            "affected_capsules": ["default"],
+        }
+        apply_result = {
+            "name": "apply",
+            "status": "ok",
+            "message": "apply ok",
+            "applied_changes": 0,
+            "changed_capsules": ["default"],
+            "claims_written": [],
+            "decision_ids": [],
+            "certificate_ids": [],
+            "certificate_refs": [],
+            "errors": [],
+        }
+        verify_result = {
+            "name": "verify",
+            "status": "ok",
+            "message": "verify ok",
+            "verified_capsules": ["default"],
+            "failed_capsules": [],
+            "errors": [],
+            "oracle_results": {},
+            "receipt_pointers": {},
+            "certificate_refs": [],
+        }
+        export_result = {
+            "name": "export",
+            "status": "ok",
+            "message": "export ok",
+            "updated_exports": [],
+            "unchanged_exports": [],
+            "artifact_counts": {},
+            "artifact_total": 0,
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
+            og,
+            "_compute_idempotency_key",
+            return_value="stable-key",
+        ), patch.object(og, "_read_work_state", return_value={"last_idempotency_key": "stable-key"}), patch.object(
+            og,
+            "_consume_pending",
+            return_value=False,
+        ), patch.object(
+            og,
+            "_run_distill_stage",
+            return_value=distill_result,
+        ) as run_distill, patch.object(
+            og,
+            "_run_apply_stage",
+            return_value=apply_result,
+        ), patch.object(
+            og,
+            "_run_verify_stage",
+            return_value=verify_result,
+        ), patch.object(
+            og,
+            "_run_export_stage",
+            return_value=export_result,
+        ), patch.object(
+            og,
+            "_record_sync_summary_event",
+            return_value="events/sync-2.json",
+        ):
+            payload = og._run_sync_job(
+                str(self.repo),
+                {"changed": False, "profile": "analyze", "mode": "observe", "force_full_sync": True},
+            )
+
+        self.assertFalse(payload["short_circuit"])
+        self.assertEqual(payload["status"], "ok")
+        run_distill.assert_called_once()
+
+    def test_export_refresh_remains_drift_free_when_snapshot_time_changes(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            with patch.object(
+                og,
+                "_utc_timestamp",
+                side_effect=["2026-03-05T00:00:00Z", "2026-03-05T00:01:00Z"],
+            ):
+                updated_exports, unchanged_exports, _snapshot = og._run_export_refresh(str(self.repo))
+                drift = og._collect_export_drift_check(str(self.repo))
+
+        self.assertTrue(bool(updated_exports))
+        self.assertEqual(unchanged_exports, [])
+        self.assertIsNone(drift)
+        self.assertNotIn(
+            "Generated at:",
+            (self.repo / ".outcomegraph" / "export" / "AGENTS.md").read_text(encoding="utf-8"),
+        )
+        self.assertNotIn(
+            "generated_at",
+            (self.repo / ".outcomegraph" / "export" / "mcp-resources.json").read_text(encoding="utf-8"),
+        )
+
     def test_run_distill_stage_marks_pending_when_worker_is_unavailable(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
 
@@ -1206,6 +1336,112 @@ class TestVerifyWorkflows(_RepoTestCase):
         self.assertIn("default", payload["failed_capsules"])
         self.assertEqual(payload["verified_capsules"], ["default"])
 
+    def test_run_verify_job_executes_yaml_oracle_and_does_not_issue_success_certificate(self) -> None:
+        snapshot = {
+            "changed_files": ["capsules/default.yaml"],
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_count": 1,
+            "has_changes": True,
+            "captured_at": "2026-03-05T00:00:00Z",
+        }
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot):
+            og._init_outcomegraph()
+            (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+                (
+                    "schema_version: 2\n"
+                    "mode: observe\n"
+                    "allow:\n"
+                    "  verify_commands:\n"
+                    "    - \"false\"\n"
+                    "  sandbox_operations:\n"
+                    "    - read_artifacts\n"
+                ),
+                encoding="utf-8",
+            )
+            (self.repo / ".outcomegraph" / "capsules" / "default.yaml").write_text(
+                (
+                    "schema_version: 2\n"
+                    "artifact_type: capsule\n"
+                    "id: default\n"
+                    "oracles:\n"
+                    "  - name: yaml-fail\n"
+                    "    command: \"false\"\n"
+                ),
+                encoding="utf-8",
+            )
+
+            payload = og._run_verify_job(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["oracle_results"]["default"][0]["command"], "false")
+        self.assertEqual(payload["oracle_results"]["default"][0]["status"], "fail")
+        self.assertEqual(payload["certificate_refs"], [])
+        self.assertEqual(sorted((self.repo / ".outcomegraph" / "certificates").glob("*.json")), [])
+
+    def test_run_verify_stage_reports_invalid_yaml_oracle_configuration(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            (self.repo / ".outcomegraph" / "capsules" / "default.yaml").write_text(
+                (
+                    "schema_version: 2\n"
+                    "artifact_type: capsule\n"
+                    "id: default\n"
+                    "oracles:\n"
+                    "  - name: broken\n"
+                    "    command\n"
+                ),
+                encoding="utf-8",
+            )
+
+            payload = og._run_verify_stage(
+                str(self.repo),
+                ["default"],
+                ["capsules/default.yaml"],
+                "run-verify",
+                "observe",
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("invalid oracle configuration", payload["message"])
+        self.assertIn("default", payload["failed_capsules"])
+        self.assertEqual(sorted((self.repo / ".outcomegraph" / "certificates").glob("*.json")), [])
+
+    def test_run_verify_stage_blocks_denied_certificate_writes_before_partial_mutation(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            (
+                "schema_version: 2\n"
+                "mode: observe\n"
+                "allow:\n"
+                "  sandbox_operations:\n"
+                "    - read_artifacts\n"
+                "  file_writes:\n"
+                "    - \".outcomegraph/claims/**\"\n"
+                "deny:\n"
+                "  file_writes:\n"
+                "    - \".outcomegraph/certificates/**\"\n"
+            ),
+            encoding="utf-8",
+        )
+
+        with self.git_root_patch():
+            payload = og._run_verify_stage(
+                str(self.repo),
+                ["default"],
+                ["capsules/default.yaml"],
+                "run-verify",
+                "observe",
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["category"], "file_writes")
+        self.assertEqual(sorted((self.repo / ".outcomegraph" / "claims").glob("*.json")), [])
+        self.assertEqual(sorted((self.repo / ".outcomegraph" / "certificates").glob("*.json")), [])
+
     def test_run_verify_job_with_no_changed_capsules_skips_stage(self) -> None:
         snapshot = {
             "changed_files": [],
@@ -1233,6 +1469,28 @@ class TestVerifyWorkflows(_RepoTestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["verified_capsules"], ["default"])
         self.assertEqual(payload["changed_only"], True)
+
+    def test_run_verify_job_refreshes_exports_after_writing_verify_artifacts(self) -> None:
+        snapshot = {
+            "changed_files": ["capsules/default.yaml"],
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_count": 1,
+            "has_changes": True,
+            "captured_at": "2026-03-05T00:00:00Z",
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot):
+            og._init_outcomegraph()
+            payload = og._run_verify_job(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+            drift = og._collect_export_drift_check(str(self.repo))
+
+        self.assertEqual(payload["steps"][-1]["name"], "export")
+        self.assertEqual(payload["steps"][-1]["status"], "ok")
+        self.assertIsNone(drift)
 
 
 class TestReplayWorkflows(_RepoTestCase):
@@ -1301,6 +1559,45 @@ class TestReplayWorkflows(_RepoTestCase):
         self.assertEqual(payload["replay_results"][0]["capsule_id"], "default")
         self.assertEqual(payload["replay_results"][0]["status"], "success")
         self.assertTrue(payload["certificate_ids"][0].startswith("cert-default-"))
+
+    def test_run_replay_job_refreshes_exports_after_writing_replay_artifacts(self) -> None:
+        snapshot = {
+            "changed_files": ["capsules/default.yaml"],
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_count": 1,
+            "has_changes": True,
+            "captured_at": "2026-03-05T00:00:00Z",
+        }
+        replay_plan = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-replay-export",
+            "capsule_id": "default",
+            "steps": [{"command": "echo ok"}],
+            "status": "ok",
+            "parity_results": {"match": True},
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
+            og,
+            "_run_codex_worker",
+            return_value=(replay_plan, []),
+        ), patch.object(
+            og,
+            "_collect_changed_materials",
+            return_value=[],
+        ):
+            og._init_outcomegraph()
+            payload = og._run_replay_job(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+            drift = og._collect_export_drift_check(str(self.repo))
+
+        self.assertEqual(payload["steps"][-1]["name"], "export")
+        self.assertEqual(payload["steps"][-1]["status"], "ok")
+        self.assertIsNone(drift)
 
     def test_run_replay_stage_errors_on_adapter_interface_mismatch(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
@@ -1482,6 +1779,27 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         parsed = og._parse_worker_output("distill", "\n".join(event_lines))
         self.assertEqual(parsed["schema_version"], 2)
         self.assertEqual(parsed["run_id"], "run-1")
+        self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
+
+    def test_normalize_distill_delta_accepts_capsule_id_alias(self) -> None:
+        payload = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-1",
+            "capsule_updates": [
+                {
+                    "capsule_id": "default",
+                    "status": "success",
+                    "claims": [],
+                    "decision_refs": [],
+                    "errors": [],
+                    "receipts": [],
+                    "changed_files": ["capsules/default.yaml"],
+                }
+            ],
+        }
+
+        parsed = og._normalize_distill_delta(payload)
         self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
 
     def test_run_codex_worker_prefers_output_last_message_contract(self) -> None:

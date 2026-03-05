@@ -30,6 +30,9 @@ og verify --changed
 og replay --changed
 ```
 
+Standalone `verify` and `replay` now refresh exported summaries automatically, so `og drift`
+should remain clean after either command when policy and verification both pass.
+
 Use `og explain` to inspect what changed, why, and evidence pointers.
 
 You can also discover per-command contracts at any time:
@@ -132,7 +135,7 @@ Expected outputs before rollout:
 ```text
 status: ok
 sync:  status: ok with steps [distill, apply, verify, export]
-verify: status: ok and verified_capsules present
+verify: status: ok with steps [verify, export] and verified_capsules present
 drift:  no blocking policy or certificate regressions
 ```
 

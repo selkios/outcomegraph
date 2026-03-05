@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
+import importlib.metadata
 import json
 import fnmatch
 import math
@@ -19,6 +20,7 @@ import time
 import shlex
 import tempfile
 import string
+import tomllib
 from typing import Any, TypedDict, cast
 
 import click
@@ -27,7 +29,38 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from typer.main import get_command as typer_get_command
 
 
-VERSION = "0.1.0-dev"
+def _load_runtime_version() -> str:
+    pyproject_path = os.path.join(os.path.dirname(__file__), "pyproject.toml")
+    try:
+        with open(pyproject_path, "rb") as handle:
+            payload = tomllib.load(handle)
+    except (FileNotFoundError, OSError, tomllib.TOMLDecodeError):
+        payload = None
+
+    if isinstance(payload, dict):
+        project = payload.get("project")
+        version = project.get("version") if isinstance(project, dict) else None
+        if isinstance(version, str):
+            normalized_version = version.strip()
+            if normalized_version:
+                return normalized_version
+
+    try:
+        installed_version = importlib.metadata.version("outcomegraph")
+    except importlib.metadata.PackageNotFoundError:
+        installed_version = None
+    except Exception:
+        installed_version = None
+
+    if isinstance(installed_version, str):
+        normalized_version = installed_version.strip()
+        if normalized_version:
+            return normalized_version
+
+    return "0.1.0"
+
+
+VERSION = _load_runtime_version()
 
 EXIT_SUCCESS = 0
 EXIT_USAGE = 64
@@ -2484,6 +2517,119 @@ def _read_json_file(path: str) -> dict[str, object] | None:
     return cast(dict[str, object], data) if isinstance(data, dict) else None
 
 
+class _YamlToken(TypedDict):
+    content: str
+    indent: int
+    line: int
+
+
+def _yaml_scalar(raw_value: str) -> str:
+    value = raw_value.strip()
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        return value[1:-1]
+    return value
+
+
+def _yaml_tokens(raw: str) -> list[_YamlToken]:
+    tokens: list[_YamlToken] = []
+    for line_number, raw_line in enumerate(raw.splitlines(), start=1):
+        line = raw_line.rstrip()
+        if not line or line.lstrip().startswith("#"):
+            continue
+        tokens.append(
+            {
+                "content": line.strip(),
+                "indent": len(line) - len(line.lstrip(" ")),
+                "line": line_number,
+            }
+        )
+    return tokens
+
+
+def _yaml_key_value(content: str, line_number: int) -> tuple[str, str]:
+    if ":" not in content:
+        raise ValueError(f"invalid YAML mapping entry on line {line_number}: {content!r}")
+    key, _, value = content.partition(":")
+    key = key.strip()
+    if not key:
+        raise ValueError(f"invalid YAML key on line {line_number}")
+    return key, value.strip()
+
+
+def _parse_yaml_tokens(tokens: list[_YamlToken], index: int, indent: int) -> tuple[object, int]:
+    if index >= len(tokens):
+        return {}, index
+
+    if tokens[index]["content"].startswith("-"):
+        items: list[object] = []
+        while index < len(tokens):
+            token = tokens[index]
+            if token["indent"] != indent or not token["content"].startswith("-"):
+                break
+
+            remainder = token["content"][1:].strip()
+            index += 1
+            if not remainder:
+                if index < len(tokens) and tokens[index]["indent"] > indent:
+                    child, index = _parse_yaml_tokens(tokens, index, tokens[index]["indent"])
+                    items.append(child)
+                else:
+                    items.append("")
+                continue
+
+            if remainder.startswith('"') or remainder.startswith("'"):
+                items.append(_yaml_scalar(remainder))
+                continue
+
+            if ":" not in remainder:
+                items.append(_yaml_scalar(remainder))
+                continue
+
+            key, value = _yaml_key_value(remainder, token["line"])
+            item: dict[str, object] = {}
+            if value:
+                item[key] = _yaml_scalar(value)
+            elif index < len(tokens) and tokens[index]["indent"] > indent:
+                child, index = _parse_yaml_tokens(tokens, index, tokens[index]["indent"])
+                item[key] = child
+            else:
+                item[key] = []
+
+            if index < len(tokens) and tokens[index]["indent"] > indent:
+                child, index = _parse_yaml_tokens(tokens, index, tokens[index]["indent"])
+                if not isinstance(child, dict):
+                    raise ValueError(
+                        f"invalid YAML list item continuation on line {token['line']}: expected mapping fields"
+                    )
+                item.update(child)
+
+            items.append(item)
+
+        return items, index
+
+    result: dict[str, object] = {}
+    while index < len(tokens):
+        token = tokens[index]
+        if token["indent"] != indent:
+            break
+        if token["content"].startswith("-"):
+            raise ValueError(f"unexpected YAML list item on line {token['line']}")
+
+        key, value = _yaml_key_value(token["content"], token["line"])
+        index += 1
+        if value:
+            result[key] = _yaml_scalar(value)
+            continue
+
+        if index < len(tokens) and tokens[index]["indent"] > indent:
+            child, index = _parse_yaml_tokens(tokens, index, tokens[index]["indent"])
+            result[key] = child
+        else:
+            result[key] = []
+
+    return result, index
+
+
 def _read_json_payload_source(path: str, *, command: str, output_json: bool) -> dict[str, object] | None:
     text = ""
     try:
@@ -2859,79 +3005,115 @@ def _collect_sync_freshness(sync_event: dict | None, now: datetime.datetime) -> 
 
 
 def _parse_yaml_style_fields(raw: str) -> dict[str, object]:
-    lines = raw.splitlines()
+    tokens = _yaml_tokens(raw)
+    if not tokens:
+        return {}
+    parsed, next_index = _parse_yaml_tokens(tokens, 0, tokens[0]["indent"])
+    if next_index != len(tokens):
+        raise ValueError(f"unexpected YAML content on line {tokens[next_index]['line']}")
+    if not isinstance(parsed, dict):
+        raise ValueError("top-level YAML payload must be a mapping")
+    return cast(dict[str, object], parsed)
 
-    def _normalize_scalar(raw_value: str) -> str:
-        value = raw_value.strip()
-        if (value.startswith("\"") and value.endswith("\"")) or (
-            value.startswith("'") and value.endswith("'")
-        ):
-            return value[1:-1]
-        return value
 
-    parsed: dict[str, object] = {}
-    containers: list[object] = [parsed]
-    indent_levels: list[int] = [-1]
+def _read_yaml_file(path: str) -> dict[str, object]:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw = handle.read()
+    except FileNotFoundError as exc:
+        raise exc
+    except OSError as exc:
+        raise ValueError(f"cannot read YAML file: {exc}") from exc
 
-    def _next_significant_line(index: int) -> str | None:
-        next_index = index + 1
-        while next_index < len(lines):
-            candidate = lines[next_index].strip()
-            if candidate and not candidate.lstrip().startswith("#"):
-                return candidate
-            next_index += 1
-        return None
-
-    for line_index, raw_line in enumerate(lines):
-        line = raw_line.rstrip()
-        if not line or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip(" "))
-        stripped = line.strip()
-        while indent <= indent_levels[-1] and len(containers) > 1:
-            containers.pop()
-            indent_levels.pop()
-
-        container = containers[-1]
-
-        if stripped.startswith("-"):
-            value = stripped[1:].strip()
-            if isinstance(container, list):
-                container.append(_normalize_scalar(value))
-            continue
-
-        if ":" not in line:
-            continue
-
-        key, _, value = stripped.partition(":")
-        key = key.strip()
-        value = value.strip()
-        if value:
-            if isinstance(container, dict):
-                container[key] = _normalize_scalar(value)
-            continue
-
-        next_line = _next_significant_line(line_index)
-        if next_line is None or next_line.startswith("-"):
-            if isinstance(container, dict):
-                child = []
-                container[key] = child
-                containers.append(child)
-                indent_levels.append(indent)
-            continue
-
-        if not isinstance(container, dict):
-            continue
-
-        if next_line and ":" in next_line and not next_line.startswith("-"):
-            child: object = {}
-        else:
-            child = []
-        container[key] = child
-        containers.append(child)
-        indent_levels.append(indent)
-
+    parsed = _parse_yaml_style_fields(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("top-level YAML payload must be a mapping")
     return parsed
+
+
+def _read_structured_mapping_file(path: str) -> dict[str, object]:
+    extension = os.path.splitext(path)[1].lower()
+    if extension == ".json":
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid JSON content: {exc}") from exc
+        except OSError as exc:
+            raise ValueError(f"cannot read JSON file: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("top-level JSON payload must be an object")
+        return cast(dict[str, object], payload)
+    if extension in {".yaml", ".yml"}:
+        return _read_yaml_file(path)
+    raise ValueError(f"unsupported structured file type: {extension}")
+
+
+def _command_write_targets(command: str, *, include_exports: bool = False) -> list[str]:
+    normalized = str(command).strip()
+    targets: list[str] = []
+    if normalized in {"verify", "replay"}:
+        targets.extend(
+            [
+                f"{OG_ROOT}/traces/**",
+                f"{OG_ROOT}/objects/**",
+                f"{OG_ROOT}/claims/**",
+                f"{OG_ROOT}/certificates/**",
+                f"{OG_ROOT}/events/**",
+                f"{INTEGRITY_CHECKPOINT_DIR}/**",
+                INTEGRITY_STATE_FILE,
+            ]
+        )
+    if include_exports:
+        targets.extend(sorted(EXPORT_PATHS.values()))
+    return targets
+
+
+def _event_write_targets(event_id: str) -> list[str]:
+    return [
+        f"{EVENTS_DIR}/{event_id}.json",
+        f"{EVENTS_DIR}/**",
+        f"{INTEGRITY_CHECKPOINT_DIR}/**",
+        INTEGRITY_STATE_FILE,
+    ]
+
+
+def _recorded_export_step(payload: dict[str, object]) -> dict[str, object] | None:
+    steps = payload.get("steps")
+    if not isinstance(steps, list):
+        return None
+    for raw_step in steps:
+        if isinstance(raw_step, dict) and str(raw_step.get("name") or "") == "export":
+            return cast(dict[str, object], raw_step)
+    return None
+
+
+def _append_export_refresh_step(
+    payload: dict[str, object],
+    repo_root: str,
+    mode: str,
+    policy: dict[str, object],
+) -> dict[str, object]:
+    export_step = _run_export_stage(repo_root, mode=mode, policy=policy)
+    steps = payload.get("steps")
+    if not isinstance(steps, list):
+        steps = []
+        payload["steps"] = steps
+    steps.append(export_step)
+
+    if str(export_step.get("status") or "error").lower() != "ok":
+        payload["status"] = "error"
+        payload["message"] = str(export_step.get("message") or payload.get("message") or "export refresh failed")
+        existing_errors = payload.get("errors")
+        if not isinstance(existing_errors, list):
+            existing_errors = []
+            payload["errors"] = existing_errors
+        export_errors = export_step.get("errors")
+        if isinstance(export_errors, list) and export_errors:
+            existing_errors.extend(export_errors)
+        else:
+            existing_errors.append(str(export_step.get("message") or "export refresh failed"))
+    return export_step
 
 
 def _collect_policy_checks(repo_root: str) -> dict[str, object]:
@@ -2967,7 +3149,21 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
         return payload
 
     payload["present"] = True
-    parsed = _parse_yaml_style_fields(raw)
+    try:
+        parsed = _parse_yaml_style_fields(raw)
+    except ValueError as exc:
+        payload["status"] = "error"
+        payload["message"] = f"cannot parse policy file: {exc}"
+        payload["checks"] = [
+            {
+                "type": "policy_parse",
+                "status": "error",
+                "message": payload["message"],
+                "remediation": ["Repair YAML syntax in `.outcomegraph/policy.yaml` and rerun the command."],
+            }
+        ]
+        payload["parsed"] = {}
+        return payload
     payload["parsed"] = parsed
 
     policy: dict[str, object] = _default_policy()
@@ -3534,6 +3730,13 @@ def _render_verify(payload: dict[str, object]) -> str:
         lines.append(f"failed capsules: {', '.join(sorted(failed_capsules))}")
     else:
         lines.append("failed capsules: none")
+
+    export_step = _recorded_export_step(payload)
+    if isinstance(export_step, dict):
+        updated_exports = export_step.get("updated_exports", [])
+        unchanged_exports = export_step.get("unchanged_exports", [])
+        if isinstance(updated_exports, list) and isinstance(unchanged_exports, list):
+            lines.append(f"exports refreshed: {len(updated_exports)} updated, {len(unchanged_exports)} unchanged")
 
     errors = payload.get("errors", [])
     if errors:
@@ -4481,6 +4684,8 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- interface_version must be 1\n"
             "- run_id must exactly match input.run_id\n"
             "- Emit one capsule_updates entry per input.target_capsules[].id\n"
+            "- Each capsule_updates entry must include field id copied from input.target_capsules[].id\n"
+            "- Do not emit capsule_id for capsule_updates entries\n"
             "- For each update set status='success', claims=[], decision_refs=[], errors=[], receipts=[]\n"
             "- Set changed_files to input.changed_paths\n"
             "\n"
@@ -4907,9 +5112,12 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
     for index, raw_update in enumerate(updates_raw):
         if not isinstance(raw_update, dict):
             raise WorkerAdapterError(f"capsule_updates[{index}] must be an object")
+        raw_id = raw_update.get("id")
+        if not isinstance(raw_id, str) or not raw_id.strip():
+            raw_id = raw_update.get("capsule_id")
         updates.append(
             {
-                "id": _required_str(raw_update.get("id"), f"capsule_updates[{index}].id"),
+                "id": _required_str(raw_id, f"capsule_updates[{index}].id"),
                 "status": str(raw_update.get("status") or "success"),
                 "claims": _normalize_claim_payloads(
                     raw_update.get("claims"),
@@ -5402,7 +5610,6 @@ def _render_agents_export(snapshot: dict[str, object]) -> str:
         "# AGENTS",
         "",
         "This file is generated by OutcomeGraph export stage.",
-        f"Generated at: {snapshot['generated_at']}",
         "",
         "## Command surface",
         "- og init",
@@ -5444,7 +5651,6 @@ def _render_readme_outcomes(snapshot: dict[str, object]) -> str:
         "# OutcomeGraph Export Snapshot",
         "",
         "Derived from `.outcomegraph` canonical artifacts at export time.",
-        f"Generated at: {snapshot['generated_at']}",
         "",
         f"- Total artifacts observed: {counts['total']}",
         "",
@@ -5482,7 +5688,6 @@ def _render_skill_export(snapshot: dict[str, object]) -> str:
         "# OutcomeGraph Steward Skill",
         "",
         "Scope: This skill documents canonical Steward workflows for bootstrap, sync, and control-surface updates.",
-        f"Generated at: {snapshot['generated_at']}",
         "",
         "## 1) Bootstrap",
         "- Run `og init` to create required OutcomeGraph directories and baseline metadata.",
@@ -5558,7 +5763,6 @@ def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
         "schema_version": 2,
         "artifact_type": "mcp_resource_export",
         "id": "mcp-export",
-        "generated_at": snapshot["generated_at"],
         "tools": sorted(resources[:5], key=lambda item: item["name"]),
         "resources": sorted(resources[5:], key=lambda item: item["uri"]),
         "prompts": [
@@ -6408,18 +6612,18 @@ def _daemon_running(pid: object) -> bool:
 
 
 def _daemon_build_script(repo_root: str) -> str:
+    quoted_repo_root = shlex.quote(repo_root)
+    python_bin = shlex.quote(sys.executable or "python3")
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "\n"
-        f'REPO_ROOT="{repo_root}"\n'
+        f"REPO_ROOT={quoted_repo_root}\n"
+        f"PYTHON_BIN={python_bin}\n"
         "\n"
         "cd \"$REPO_ROOT\"\n"
         'export OG_AUTOPILOT="1"\n'
-        "if command -v og >/dev/null 2>&1; then\n"
-        "  exec og daemon run \"$@\"\n"
-        "fi\n"
-        f'exec uvx --from "{DAEMON_UVX_SOURCE}" og daemon run "$@"\n'
+        'exec "$PYTHON_BIN" -m og daemon run "$@"\n'
     )
 
 
@@ -8075,9 +8279,11 @@ def _load_capsule_oracles(repo_root: str, capsule_id: str) -> list[dict[str, obj
     for candidate in (json_path, yaml_path):
         if not os.path.isfile(candidate):
             continue
-        payload = _read_json_file(candidate)
-        if not isinstance(payload, dict):
-            continue
+        try:
+            payload = _read_structured_mapping_file(candidate)
+        except ValueError as exc:
+            relative_path = os.path.relpath(candidate, repo_root).replace("\\", "/")
+            raise ValueError(f"{relative_path}: {exc}") from exc
         raw_oracles = payload.get("oracles")
         if not isinstance(raw_oracles, list):
             continue
@@ -8127,6 +8333,28 @@ def _run_oracle_check(
     command = oracle.get("command")
     command_text = command.strip() if isinstance(command, str) else None
     resolved_policy = policy or _default_policy()
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-verify.json"
+    trace_write_check = _evaluate_policy_writes(
+        resolved_policy,
+        command="verify",
+        mode=mode,
+        targets=[trace_path, f"{OG_ROOT}/objects/**"],
+    )
+    if trace_write_check is not None:
+        return {
+            **trace_write_check,
+            "schema_version": 2,
+            "oracle_name": oracle_name,
+            "capsule_id": capsule_id,
+            "run_id": run_id,
+            "mode": mode,
+            "status": "error",
+            "checked_at": _utc_timestamp(),
+            "changed_paths": changed_paths,
+            "command": command_text or "",
+            "message": trace_write_check.get("message"),
+            "trace": trace_path,
+        }
     if command_text:
         denied = _ensure_policy_action_allowed(
             resolved_policy,
@@ -8208,7 +8436,6 @@ def _run_oracle_check(
             ).encode("utf-8")
 
     result_payload["duration_ms"] = int((time.perf_counter() - start) * 1000)
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-verify.json"
     trace_full_path = os.path.join(repo_root, trace_path)
     os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
     _write_text_payload(trace_full_path, payload_bytes.decode("utf-8"))
@@ -9666,27 +9893,6 @@ def _run_replay_stage(
             **sandbox_check,
         }
 
-    write_check = _evaluate_policy_writes(
-        policy_payload,
-        command="replay",
-        mode=mode,
-        targets=[f"{OG_ROOT}/claims", f"{OG_ROOT}/certificates"],
-    )
-    if write_check is not None:
-        return {
-            "name": "replay",
-            "status": "error",
-            "code": str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
-            "message": str(write_check.get("message", "policy denied write")),
-            "mode": mode,
-            "replay_plans": [],
-            "replay_results": [],
-            "certificate_ids": [],
-            "certificate_refs": _preserve_certificate_refs(),
-            "errors": [_normalize_error_record(write_check, fallback_code=POLICY_DENIED_CODE)],
-            **write_check,
-        }
-
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
@@ -9726,6 +9932,37 @@ def _run_replay_stage(
     targets = _collect_affected_capsules(changed_files) if changed_only else _list_known_capsules(repo_root)
     if not targets:
         targets = ["default"]
+
+    predicted_write_targets = _command_write_targets("replay")
+    for capsule in targets:
+        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
+        certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
+        predicted_write_targets.extend(
+            [
+                f"{OG_ROOT}/claims/{claim_id}.json",
+                f"{OG_ROOT}/certificates/{certificate_id}.json",
+            ]
+        )
+    write_check = _evaluate_policy_writes(
+        policy_payload,
+        command="replay",
+        mode=mode,
+        targets=predicted_write_targets,
+    )
+    if write_check is not None:
+        return {
+            "name": "replay",
+            "status": "error",
+            "code": str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
+            "message": str(write_check.get("message", "policy denied write")),
+            "mode": mode,
+            "replay_plans": [],
+            "replay_results": [],
+            "certificate_ids": [],
+            "certificate_refs": _preserve_certificate_refs(),
+            "errors": [_normalize_error_record(write_check, fallback_code=POLICY_DENIED_CODE)],
+            **write_check,
+        }
 
     changed_materials = _collect_changed_materials(repo_root, changed_files if changed_only else [])
     plans: list[dict[str, object]] = []
@@ -9977,6 +10214,34 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         changed_capsules = ["default"]
 
     run_id = _build_run_id("verify", _short_hash(f"{profile}:{mode}:{'changed' if changed_only else 'all'}", 10))
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error is None:
+        follow_up_write_check = _evaluate_policy_writes(
+            policy_payload,
+            command="verify",
+            mode=mode,
+            targets=[*_event_write_targets(run_id), *sorted(EXPORT_PATHS.values())],
+        )
+        if follow_up_write_check is not None:
+            return {
+                "status": "error",
+                "command": "verify",
+                "options": options,
+                "run_id": run_id,
+                "snapshot": snapshot,
+                "steps": [],
+                "message": str(follow_up_write_check.get("message", "policy denied write")),
+                "changed_only": changed_only,
+                "changed_files": changed_files if changed_only else [],
+                "verified_capsules": [],
+                "oracle_count": 0,
+                "certificate_refs": [],
+                "receipt_pointers": {},
+                "oracle_results": {},
+                "failed_capsules": [],
+                "errors": [_normalize_error_record(follow_up_write_check, fallback_code=POLICY_DENIED_CODE)],
+                **follow_up_write_check,
+            }
 
     start_at = time.perf_counter()
     verify = _run_verify_stage(
@@ -9985,6 +10250,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         changed_paths=changed_files if changed_only else [],
         run_id=run_id,
         mode=mode,
+        policy=policy_payload if policy_error is None else None,
     )
     verify_status = str(verify.get("status") or "error").lower()
 
@@ -10015,13 +10281,70 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "errors": verify.get("errors", []),
     }
 
+    if policy_error is None:
+        _append_export_refresh_step(payload, repo_root, mode, policy_payload)
     payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
-    payload["summary_event"] = _record_verify_summary_event(
-        repo_root,
-        payload,
-        payload["duration_ms"],
-        snapshot,
+    payload["summary_event"] = _record_verify_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
+    return payload
+
+
+def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    changed_only = bool(options.get("changed"))
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    run_id = _build_run_id("replay", _short_hash(f"{profile}:{mode}:{snapshot.get('changed_count', 0)}", 8))
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error is None:
+        follow_up_write_check = _evaluate_policy_writes(
+            policy_payload,
+            command="replay",
+            mode=mode,
+            targets=[*_event_write_targets(run_id), *sorted(EXPORT_PATHS.values())],
+        )
+        if follow_up_write_check is not None:
+            return {
+                "status": "error",
+                "command": "replay",
+                "options": options,
+                "run_id": run_id,
+                "steps": [],
+                "message": str(follow_up_write_check.get("message", "policy denied write")),
+                "replay_plans": [],
+                "replay_results": [],
+                "certificate_ids": [],
+                "certificate_refs": [],
+                "errors": [_normalize_error_record(follow_up_write_check, fallback_code=POLICY_DENIED_CODE)],
+                **follow_up_write_check,
+            }
+
+    start_at = time.perf_counter()
+    replay = _run_replay_stage(
+        repo_root=repo_root,
+        snapshot=snapshot,
+        run_id=run_id,
+        profile=profile,
+        mode=mode,
+        changed_only=changed_only,
+        policy=policy_payload if policy_error is None else None,
     )
+    payload = {
+        "status": "ok" if replay.get("status") == "ok" else "error",
+        "command": "replay",
+        "options": options,
+        "run_id": run_id,
+        "steps": [replay],
+        "message": replay.get("message", "replay adapter completed"),
+        "replay_plans": replay.get("replay_plans", []),
+        "replay_results": replay.get("replay_results", []),
+        "certificate_ids": replay.get("certificate_ids", []),
+        "certificate_refs": replay.get("certificate_refs", []),
+        "errors": replay.get("errors", []),
+    }
+    if policy_error is None:
+        _append_export_refresh_step(payload, repo_root, mode, policy_payload)
+    payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
+    payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
     return payload
 
 
@@ -10607,12 +10930,21 @@ def _run_verify_stage(
             **sandbox_check,
         }
 
-    write_check = _ensure_policy_action_allowed(
+    predicted_write_targets = _command_write_targets("verify")
+    for capsule in changed_capsules:
+        claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
+        certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
+        predicted_write_targets.extend(
+            [
+                f"{OG_ROOT}/claims/{claim_id}.json",
+                f"{OG_ROOT}/certificates/{certificate_id}.json",
+            ]
+        )
+    write_check = _evaluate_policy_writes(
         policy_payload,
         command="verify",
-        category="file_writes",
-        target=f"{OG_ROOT}/claims",
         mode=mode,
+        targets=predicted_write_targets,
     )
     if write_check is not None:
         return {
@@ -10662,9 +10994,34 @@ def _run_verify_stage(
     overall_failed = False
     failed_capsules: list[str] = []
     errors: list[str] = []
+    configuration_failed = False
 
     for capsule in changed_capsules:
-        capsule_oracles = _load_capsule_oracles(repo_root, capsule)
+        try:
+            capsule_oracles = _load_capsule_oracles(repo_root, capsule)
+        except ValueError as exc:
+            error_message = f"Failed to load capsule oracle configuration for {capsule}: {exc}"
+            errors.append(error_message)
+            overall_failed = True
+            configuration_failed = True
+            failed_capsules.append(capsule)
+            receipts[capsule] = []
+            oracle_results[capsule] = [
+                {
+                    "schema_version": 2,
+                    "oracle_name": f"{_safe_slug(capsule)}-verify",
+                    "capsule_id": capsule,
+                    "run_id": run_id,
+                    "mode": mode,
+                    "status": "error",
+                    "checked_at": _utc_timestamp(),
+                    "changed_paths": normalized_changed_paths,
+                    "command": "",
+                    "message": error_message,
+                    "error": error_message,
+                }
+            ]
+            continue
         impacted_oracles = [
             oracle
             for oracle in capsule_oracles
@@ -10784,7 +11141,7 @@ def _run_verify_stage(
             break
 
     status = "warn" if overall_failed else "ok"
-    if policy_denied:
+    if policy_denied or configuration_failed:
         status = "error"
     if policy_denied and not errors and policy_denied_messages:
         errors.extend(policy_denied_messages)
@@ -10795,6 +11152,8 @@ def _run_verify_stage(
         "message": (
             "Oracle-driven verify loop blocked by policy."
             if policy_denied
+            else "Oracle-driven verify loop failed due to invalid oracle configuration."
+            if configuration_failed
             else "Oracle-driven verify loop completed with failures."
             if overall_failed
             else "Oracle-driven verify loop completed for affected capsules."
@@ -11099,7 +11458,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     steps: list[dict[str, object]] = []
     current_state = _read_work_state(repo_root)
 
-    if current_state.get("last_idempotency_key") == idempotency_key:
+    if not force_full_sync and current_state.get("last_idempotency_key") == idempotency_key:
         was_short_circuit = True
         steps.append(
             {
@@ -11487,34 +11846,7 @@ def run_command(
             default_strict=strict,
         )
         repo_root = _git_root()
-        profile = str(options.get("profile") or "analyze")
-        mode = str(options.get("mode") or "observe")
-        snapshot = _collect_sync_snapshot(repo_root, profile, mode)
-        run_id = _build_run_id("replay", _short_hash(f"{profile}:{mode}:{snapshot.get('changed_count', 0)}", 8))
-        start_at = time.perf_counter()
-        replay = _run_replay_stage(
-            repo_root=repo_root,
-            snapshot=snapshot,
-            run_id=run_id,
-            profile=profile,
-            mode=mode,
-            changed_only=bool(options.get("changed")),
-        )
-        payload = {
-            "status": "ok" if replay.get("status") == "ok" else "error",
-            "command": "replay",
-            "options": options,
-            "run_id": run_id,
-            "steps": [replay],
-            "message": replay.get("message", "replay adapter completed"),
-            "replay_plans": replay.get("replay_plans", []),
-            "replay_results": replay.get("replay_results", []),
-            "certificate_ids": replay.get("certificate_ids", []),
-            "certificate_refs": replay.get("certificate_refs", []),
-            "errors": replay.get("errors", []),
-        }
-        payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
-        payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
+        payload = _run_replay_job(repo_root, options)
         output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
         payload = _apply_output_controls(payload, options, output_mode=output_mode)
         if output_mode == OUTPUT_MODE_JSONL:

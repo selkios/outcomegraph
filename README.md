@@ -47,6 +47,9 @@ og daemon start
 og daemon status
 ```
 
+`og daemon install` now writes a launcher pinned to the current interpreter/module context.
+Daemon runtime does not fetch remote repository `HEAD` implicitly after install.
+
 ## Development (from source)
 
 ```bash
@@ -65,6 +68,7 @@ Use this repository as rollout validation:
    - `steps` include `distill`, `apply`, `verify`, and `export`
 3. `uv run og verify --changed --json` and confirm:
    - `status: "ok"`
+   - `steps` include `verify` and `export`
    - `verified_capsules` is non-empty
 4. Run `uv run og drift` to confirm policy/certificate checks are healthy.
 
@@ -94,7 +98,9 @@ Typical CI/automation loop:
 ```bash
 og status --json            # guard: if status != ok -> fail fast
 og sync --json              # performs deterministic reconciliation
-og verify --changed --json  # checks changed capsules only
+og verify --changed --json  # checks changed capsules only and refreshes exports
+og replay --changed --json  # optional stronger confirmation; also refreshes exports
+og drift --json             # should stay clean after the standalone flows above
 ```
 
 ## Core command contract
@@ -154,6 +160,9 @@ If you are running from source, prefer:
 ```bash
 uv run og <command>
 ```
+
+`og --version` uses the local `pyproject.toml` version in a source checkout and packaged metadata
+when installed elsewhere, so release metadata and runtime version output stay aligned.
 
 Return contract:
 

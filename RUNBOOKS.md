@@ -21,9 +21,9 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 1. Make code edits.
 2. Run `og sync`.
 3. Inspect summary output.
-4. Run `og verify --changed` for uncertain surfaces.
+4. Run `og verify --changed` for uncertain surfaces; it now refreshes exports before writing the verify summary.
 5. Run `og explain` when traceability is needed.
-6. If needed, run `og replay --changed` for stronger behavioral confirmation.
+6. If needed, run `og replay --changed` for stronger behavioral confirmation; it also refreshes exports before the replay summary is recorded.
 
 ### 1.3 Autonomous flow
 
@@ -36,7 +36,13 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 ### 1.4 Safe-mode checks
 
 - `.outcomegraph` and generated exports are writable in default flow.
+- `verify` and `replay` preflight all expected writes, including traces, claims, certificates, events, integrity checkpoints, and export refresh targets, before mutating canonical artifacts.
 - code writes, dependency mutators, or deployment actions require explicit autonomy mode and allowlist policy.
+
+### 1.5 Daemon provenance
+
+- `og daemon install` captures the current interpreter/module entrypoint and writes a pinned launcher script.
+- Normal daemon start/run does not fetch remote repository `HEAD` or depend on network availability after install.
 
 ## 2) Failure runbook
 

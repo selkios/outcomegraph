@@ -1540,6 +1540,167 @@
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
       "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-PROD-001",
+      "title": "Parse YAML capsule oracle definitions correctly and fail verification when configured YAML oracles fail",
+      "priority": 1,
+      "status": "done",
+      "details": "Standalone and sync verification currently ignore YAML-defined capsule oracles because `.yaml` files are routed through JSON parsing. That falls back to the synthetic no-command oracle and can emit false-green `status: ok` plus success certificates even when a configured YAML oracle command should fail.",
+      "steps": [
+        "Teach capsule loading to parse JSON and YAML with format-appropriate readers instead of sending both file types through `_read_json_file`",
+        "Preserve support for `oracles` blocks in canonical `.outcomegraph/capsules/*.yaml` artifacts and surface malformed YAML payloads as explicit verification errors",
+        "Add a regression test where a YAML capsule oracle with `command: \"false\"` causes `og verify --json` to fail and does not mint a success certificate",
+        "Re-run sync and verify dogfood flows and update docs if YAML capsules remain part of the supported contract surface"
+      ],
+      "tags": [
+        "production",
+        "verify",
+        "oracles",
+        "yaml",
+        "correctness"
+      ],
+      "depends_on": [
+        "OG-VERIFY-001",
+        "OG-SPEC-002"
+      ],
+      "files": [
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "README.md",
+        "QUICKSTART.md",
+        "SPEC-v2.md"
+      ],
+      "created_at": "2026-03-05T21:40:15Z",
+      "updated_at": "2026-03-05T21:59:35Z"
+    },
+    {
+      "id": "OG-PROD-002",
+      "title": "Enforce verify-stage policy checks for every write target, including certificates, traces, and summary artifacts",
+      "priority": 1,
+      "status": "done",
+      "details": "The verify stage currently preflights writes only for `.outcomegraph/claims` and still writes certificates after policy denial should have applied. Production policy enforcement must cover every file mutation performed by verify so restricted repositories cannot receive unauthorized canonical writes.",
+      "steps": [
+        "Enumerate all write paths in standalone verify and shared oracle execution paths, including claims, certificates, traces, verify summary events, and any CAS writes",
+        "Evaluate policy before mutating the repository and fail the command before partial writes when any required target is denied",
+        "Add a regression test proving denied certificate writes block `og verify --changed --json` and leave certificate counts unchanged",
+        "Review replay and export for the same class of write-policy gap and extract shared helpers if multiple stages need the same preflight logic"
+      ],
+      "tags": [
+        "production",
+        "policy",
+        "verify",
+        "security"
+      ],
+      "depends_on": [
+        "OG-SPEC-005",
+        "OG-VERIFY-001"
+      ],
+      "files": [
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "SPEC-v2.md",
+        "RUNBOOKS.md"
+      ],
+      "created_at": "2026-03-05T21:40:15Z",
+      "updated_at": "2026-03-05T21:59:35Z"
+    },
+    {
+      "id": "OG-PROD-003",
+      "title": "Keep exports and drift state synchronized after standalone `verify` and `replay` commands",
+      "priority": 1,
+      "status": "done",
+      "details": "README and QUICKSTART promote `og sync`, `og verify --changed`, and `og replay --changed` as a normal workflow, but standalone verification mutates canonical claims and certificates without refreshing exports. That makes `og drift` warn immediately after a documented healthy sequence and breaks the production-readiness contract.",
+      "steps": [
+        "Decide the canonical rule: either refresh exports after any command that mutates canonical artifacts or stop mutating and exporting in standalone flows",
+        "Implement the chosen behavior for standalone `verify` and `replay`, including summary events plus human and JSON output paths",
+        "Add regression coverage for `init -> sync -> verify --changed -> drift` and `init -> sync -> replay --changed -> drift` so documented workflows remain drift-free",
+        "Update README, QUICKSTART, and RUNBOOKS to match the final contract and remove any stale rollout guidance"
+      ],
+      "tags": [
+        "production",
+        "exports",
+        "drift",
+        "verify",
+        "replay",
+        "docs"
+      ],
+      "depends_on": [
+        "OG-VERIFY-002",
+        "OG-REPLAY-002",
+        "OG-EXPORT-001",
+        "OG-DRIFT-001"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "QUICKSTART.md",
+        "RUNBOOKS.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-05T21:40:15Z",
+      "updated_at": "2026-03-05T21:59:35Z"
+    },
+    {
+      "id": "OG-PROD-004",
+      "title": "Make daemon installation reproducible instead of falling back to remote `uvx` HEAD",
+      "priority": 2,
+      "status": "done",
+      "details": "The generated daemon wrapper currently shells out to `uvx --from git+https://github.com/selkios/outcomegraph ...` when `og` is missing from `PATH`. That can execute a different revision from the one installed, tested, or reviewed locally, which is not acceptable for a production background process.",
+      "steps": [
+        "Replace the remote fallback with a pinned local interpreter and module path or a version-pinned install artifact captured at `daemon install` time",
+        "Ensure daemon start, stop, and status remain functional for both source checkouts and installed CLI usage without network access",
+        "Add tests covering generated daemon script contents and startup behavior when `og` is absent from `PATH`",
+        "Document the runtime provenance guarantees for daemon mode in README and runbooks"
+      ],
+      "tags": [
+        "production",
+        "daemon",
+        "release",
+        "reproducibility"
+      ],
+      "depends_on": [
+        "OG-DAEMON-001"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "RUNBOOKS.md",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-05T21:40:15Z",
+      "updated_at": "2026-03-05T21:59:35Z"
+    },
+    {
+      "id": "OG-PROD-005",
+      "title": "Unify package metadata and runtime version reporting from one authoritative source",
+      "priority": 2,
+      "status": "done",
+      "details": "The published package metadata reports `0.1.0` while the CLI constant and `og --version` report `0.1.0-dev`. Release artifacts, support logs, and rollout checks need one authoritative version string so installed binaries can be traced back to the exact build that produced them.",
+      "steps": [
+        "Choose a single source of truth for versioning across packaging metadata, runtime constants, and `--version` output",
+        "Update entrypoints and build configuration so installed `og` and `ogd` report the packaged release version consistently",
+        "Add regression coverage for version parity between `pyproject.toml` and CLI output",
+        "Document the release and versioning workflow so future tags cannot drift silently"
+      ],
+      "tags": [
+        "production",
+        "release",
+        "versioning",
+        "packaging"
+      ],
+      "depends_on": [
+        "OG-CLI-001"
+      ],
+      "files": [
+        "og.py",
+        "pyproject.toml",
+        "README.md",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-05T21:40:15Z",
+      "updated_at": "2026-03-05T21:59:35Z"
     }
   ]
 }
