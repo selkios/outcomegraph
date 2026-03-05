@@ -125,6 +125,7 @@ DAEMON_SERVICE_DIR = f"{OG_ROOT}/work/daemon"
 DAEMON_SERVICE_SCRIPT = f"{DAEMON_SERVICE_DIR}/run-ogd.sh"
 DAEMON_SERVICE_STATE = f"{DAEMON_SERVICE_DIR}/state.json"
 DAEMON_SERVICE_LOG = f"{DAEMON_SERVICE_DIR}/daemon.log"
+DAEMON_UVX_SOURCE = "git+https://github.com/selkios/outcomegraph"
 DAEMON_SYNC_TIMEOUT_SECONDS = 300
 DAEMON_WATCH_INTERVAL_SECONDS = 2
 DAEMON_WATCH_IGNORE_PREFIXES = (
@@ -3444,7 +3445,10 @@ def _daemon_build_script(repo_root: str) -> str:
         "\n"
         "cd \"$REPO_ROOT\"\n"
         'export OG_AUTOPILOT="1"\n'
-        "exec uv run og daemon run \"$@\"\n"
+        "if command -v og >/dev/null 2>&1; then\n"
+        "  exec og daemon run \"$@\"\n"
+        "fi\n"
+        f'exec uvx --from "{DAEMON_UVX_SOURCE}" og daemon run "$@"\n'
     )
 
 
@@ -3623,7 +3627,10 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
     started = time.perf_counter()
     env = os.environ.copy()
     env["OG_AUTOPILOT"] = "1"
-    cmd = ["uv", "run", "--directory", repo_root, "og", "sync", "--json"]
+    if shutil.which("og"):
+        cmd = ["og", "sync", "--json"]
+    else:
+        cmd = ["uvx", "--from", DAEMON_UVX_SOURCE, "og", "sync", "--json"]
     try:
         process = subprocess.run(
             cmd,
