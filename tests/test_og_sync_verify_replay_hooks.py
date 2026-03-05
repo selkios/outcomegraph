@@ -459,7 +459,7 @@ class TestVerifyWorkflows(_RepoTestCase):
                     "observe",
                 )
 
-        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(payload["status"], "error")
         self.assertIn("default", payload["failed_capsules"])
         self.assertEqual(payload["verified_capsules"], ["default"])
 

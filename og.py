@@ -320,13 +320,19 @@ def _enforce_policy_action(
     rules = policy.get("allow") if isinstance(policy.get("allow"), dict) else {}
     deny_rules = policy.get("deny") if isinstance(policy.get("deny"), dict) else {}
     normalized_target = _normalize_repo_relative_path(str(target))
+    match_targets = [normalized_target]
+    og_prefix = f"{OG_ROOT}/"
+    if normalized_target.startswith(og_prefix):
+        trimmed = normalized_target[len(og_prefix) :]
+        if trimmed:
+            match_targets.append(trimmed)
 
     for deny in _policy_string_list(deny_rules.get(category)) if isinstance(deny_rules, dict) else []:
-        if _policy_pattern_matches(deny, normalized_target):
+        if any(_policy_pattern_matches(deny, candidate) for candidate in match_targets):
             return _build_policy_deny_payload(command, mode, category, normalized_target)
 
     for allow in _policy_string_list(rules.get(category)) if isinstance(rules, dict) else []:
-        if _policy_pattern_matches(allow, normalized_target):
+        if any(_policy_pattern_matches(allow, candidate) for candidate in match_targets):
             return None
 
     return _build_policy_deny_payload(command, mode, category, normalized_target)
@@ -4943,22 +4949,20 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
         parse_error_output = raw_stdout.strip()
 
     if process.returncode != 0:
-        if isinstance(parsed, dict):
-            parsed["status"] = "error"
-        if not parsed:
-            parsed = {
-                "status": "error",
-                "command": "sync",
-                "message": parse_error_output or "sync subprocess failed",
-            }
+        parsed["status"] = "error"
     elif not parsed.get("status"):
         message = parse_error_output or "sync subprocess returned malformed JSON payload"
-        parsed = {
-            "status": "error",
-            "command": "sync",
-            "message": message,
-            **parsed,
-        }
+        parsed["status"] = "error"
+        message_value = parsed.get("message")
+        if not isinstance(message_value, str) or not message_value.strip():
+            parsed["message"] = message
+    command_value = parsed.get("command")
+    if not isinstance(command_value, str) or not command_value.strip():
+        parsed["command"] = "sync"
+    if str(parsed.get("status") or "").lower() == "error":
+        message_value = parsed.get("message")
+        if not isinstance(message_value, str) or not message_value.strip():
+            parsed["message"] = parse_error_output or "sync subprocess failed"
     parsed["runtime"] = {
         "daemon_sync_exit_code": process.returncode,
         "duration_ms": duration_ms,
@@ -5709,7 +5713,8 @@ def _evaluate_prompts(
 
 def _collect_all_non_runtime_files(repo_root: str) -> list[str]:
     tracked = _run_git(repo_root, ["ls-files"]).stdout
-    raw = _normalize_path_list(tracked)
+    untracked = _run_git(repo_root, ["ls-files", "--others", "--exclude-standard"]).stdout
+    raw = _normalize_path_list(tracked + "\n" + untracked)
     normalized: list[str] = []
     for path in raw:
         candidate = _normalize_repo_relative_path(path)
@@ -6193,6 +6198,7 @@ def _run_replay_step(
     trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-{_safe_slug(capsule_id)}-replay-step-{step_index}.json"
     trace_payload_bytes = json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     full_trace_path = os.path.join(repo_root, trace_path)
+    os.makedirs(os.path.dirname(full_trace_path), exist_ok=True)
     _write_text_payload(full_trace_path, trace_payload_bytes.decode("utf-8"))
     result_payload["trace"] = trace_path
     result_payload["receipt_pointers"] = [
@@ -8922,10 +8928,15 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     )
     steps.append(export)
 
+    step_statuses = {
+        str(item.get("status") or "").lower()
+        for item in steps
+        if isinstance(item, dict)
+    }
     run_status = "ok"
-    if any(item.get("status") == "error" for item in steps):
+    if step_statuses.intersection({"error", "pending", "failed", "fail"}):
         run_status = "error"
-    elif any(item.get("status") == "warn" for item in steps):
+    elif "warn" in step_statuses:
         run_status = "warn"
     sync_message = "sync workflow completed"
     if run_status == "warn":

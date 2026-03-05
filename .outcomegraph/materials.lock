@@ -1,0 +1,166 @@
+{
+  "artifact_type": "materials_lock",
+  "captured_at": "2026-03-05T11:14:54Z",
+  "created_at": "2026-03-05T08:29:03Z",
+  "entries": [
+    {
+      "digest": "sha256:dd63671a161cc1dd487ed2caa34403e05c785f7f0aa4a77327372deaabb48a90",
+      "kind": "file",
+      "path": ".outcomegraph/.gitignore",
+      "size": 79
+    },
+    {
+      "digest": "sha256:886f293936b6f8bdc40fcab11cff38e77a9879184c2b9c71b39fda20f8a11bc0",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-default-5a380b2656.json",
+      "size": 1230
+    },
+    {
+      "digest": "sha256:b7bb402a082141f2cf54f87a83fcca3d611afc2e2261fb0f0c16fe4054e24d61",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-default-b19c6b8a8a.json",
+      "size": 1196
+    },
+    {
+      "digest": "sha256:292d5b637fc8376a7a5b197a3bf40c8b08a72480d563450bcbfbcd3201597d45",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-materials-1e91d16473.json",
+      "size": 1240
+    },
+    {
+      "digest": "sha256:7d261b9e76eef2ad86fdb7539a6e8e1940868c1fe9941f540c40c1216be1dbaa",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-materials-c6e33ed9d8.json",
+      "size": 1202
+    },
+    {
+      "digest": "sha256:ca77b4f50c1ef7131bf269373dbde563d7f26eece9f8daf1223dedde12e26cd4",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-default-5a380b2656.json",
+      "size": 1441
+    },
+    {
+      "digest": "sha256:cfceacd16a34ceb5d029720fe582fc9d141cf196501b68aed4af8c26bb50d291",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-default-ecb70e4bed.json",
+      "size": 1007
+    },
+    {
+      "digest": "sha256:f38989ef5a97a721910b89457a0997bee9a5fa02009b49e326cc591435068407",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-materials-1e91d16473.json",
+      "size": 1451
+    },
+    {
+      "digest": "sha256:03838abbf7050c611274427476a07c9813e37bbe7ddf9ea07c61563429dc926d",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-materials-c83318e4fe.json",
+      "size": 1013
+    },
+    {
+      "digest": "sha256:6c8936a7569b677ec34b7c9a8776cb560c611a6b6a953991529bfc6c6f7c1412",
+      "kind": "file",
+      "path": ".outcomegraph/config.yaml",
+      "size": 144
+    },
+    {
+      "digest": "sha256:643a93e150d13b6213f4ce5a15d73643e37108b4fe94d59e584e6567cbb6acdf",
+      "kind": "file",
+      "path": ".outcomegraph/constitution/default.yaml",
+      "size": 257
+    },
+    {
+      "digest": "sha256:7f0b757b9b5e5109aceadd091349a46cfdc2c3b62a1455981ada044801346060",
+      "kind": "file",
+      "path": ".outcomegraph/export/AGENTS.md",
+      "size": 913
+    },
+    {
+      "digest": "sha256:824e7e459a8cec516876c32817b3c7a3e6e2566ece0ea793dfc2914a8e00a0a6",
+      "kind": "file",
+      "path": ".outcomegraph/export/README_OUTCOMES.md",
+      "size": 1480
+    },
+    {
+      "digest": "sha256:573e8fbdb48e906df36126005a63aa813ea474a7af3f323513af18a524982b61",
+      "kind": "file",
+      "path": ".outcomegraph/export/mcp-resources.json",
+      "size": 3234
+    },
+    {
+      "digest": "sha256:739163bdf81ae490166260e31614e118f1b5afb0cff2e20195b04ace5a6eb878",
+      "kind": "file",
+      "path": ".outcomegraph/materials.lock",
+      "size": 176
+    },
+    {
+      "digest": "sha256:3112048bdd217100da1808fe7cfae28763904693e6fa9abd75b009464100de3e",
+      "kind": "file",
+      "path": ".outcomegraph/policy.yaml",
+      "size": 259
+    },
+    {
+      "digest": "sha256:5c4463d2a437452e149df6b2a828ae06db9278e9ad5636b2d52482d7ab421c48",
+      "kind": "file",
+      "path": "__pycache__/og.cpython-312.pyc",
+      "size": 373424
+    },
+    {
+      "digest": "sha256:c7248edb8c51adde966635176849f1a2ac6ff796351e4397fd9b144bb070913a",
+      "kind": "file",
+      "path": "__pycache__/og.cpython-314.pyc",
+      "size": 438728
+    },
+    {
+      "digest": "sha256:152b5ed422153b1c3263a0ba51b8a5098d4358fdb50916f79e0cfe94b19f9a9f",
+      "kind": "file",
+      "path": "og.py",
+      "size": 358047
+    },
+    {
+      "digest": "sha256:80c6cbb0d415708c5bbf5b069a7b7ee927cf9c41ca373dcc6e6cae0920a2b24e",
+      "kind": "file",
+      "path": "skills/outcome-steward/SKILL.md",
+      "size": 1349
+    },
+    {
+      "digest": "sha256:57a6b1f0ce8a841539e5f03e0e52cec63ec3f20c8ff7a93bbe6fed7faa746f04",
+      "kind": "file",
+      "path": "tests/__pycache__/conftest.cpython-314-pytest-9.0.2.pyc",
+      "size": 708
+    },
+    {
+      "digest": "sha256:7b53f19834a9c8616b8b7f1ccae6b3fe9800d1dfd5512f389028f106f7cbe544",
+      "kind": "file",
+      "path": "tests/__pycache__/test_og_sync_verify_replay_hooks.cpython-314-pytest-9.0.2.pyc",
+      "size": 35452
+    },
+    {
+      "digest": "sha256:1d2a6e91768b0d6d74762199a133c76183098a979da5f703df201f12389daaeb",
+      "kind": "file",
+      "path": "tests/__pycache__/test_og_sync_verify_replay_hooks.cpython-314.pyc",
+      "size": 76592
+    },
+    {
+      "digest": "sha256:31823e4716011e20a55ef4fa6b715d276ae6f5cf6acce9357e20ce94a8674e42",
+      "kind": "file",
+      "path": "tests/test_og_sync_verify_replay_hooks.py",
+      "size": 48025
+    },
+    {
+      "digest": "sha256:59b3c2285403e8e205fe421ad33ab6bec71b37258cac394a4d811e81417ac377",
+      "kind": "file",
+      "path": "to-do.json",
+      "size": 36152
+    },
+    {
+      "digest": "sha256:852a15eff55b70ffb7f4954487dfd9a2c0262c09ba231eb89ccc9c975ede72e8",
+      "kind": "file",
+      "path": "uv.lock",
+      "size": 133
+    }
+  ],
+  "id": "materials-lock",
+  "schema_version": 2,
+  "updated_at": "2026-03-05T11:14:54Z"
+}
