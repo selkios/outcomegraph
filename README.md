@@ -12,21 +12,55 @@ boundary for humans, agents, CI, and MCP clients.
 - `work`, `events`, and `objects` are written as immutable evidence for replay and audit.
 - Runtime errors are surfaced with structured status payloads so callers can branch safely.
 
-## Quick start
+## Quick start (recommended)
+
+Run from your project repository root (no install required):
 
 ```bash
-git init .
-uv run og init
-uv run og status --json
-uv run og sync --json
+uvx --from git+https://github.com/selkios/outcomegraph og init
+uvx --from git+https://github.com/selkios/outcomegraph og sync --json
+uvx --from git+https://github.com/selkios/outcomegraph og status --json
+```
+
+Install once and run as `og` everywhere:
+
+```bash
+uv tool install --from git+https://github.com/selkios/outcomegraph outcomegraph
+og init
+og sync --json
+og status --json
+```
+
+Optional: enable daemon mode with `uvx` (no install):
+
+```bash
+uvx --from git+https://github.com/selkios/outcomegraph og daemon install
+uvx --from git+https://github.com/selkios/outcomegraph og daemon start
+uvx --from git+https://github.com/selkios/outcomegraph og daemon status
+```
+
+Optional: enable daemon mode with installed `og`:
+
+```bash
+og daemon install
+og daemon start
+og daemon status
+```
+
+## Development (from source)
+
+```bash
+git clone https://github.com/selkios/outcomegraph.git
+cd outcomegraph
+uv run og <command>
 ```
 
 Typical CI/automation loop:
 
 ```bash
-uv run og status --json           # guard: if status != ok -> fail fast
-uv run og sync --json             # performs deterministic reconciliation
-uv run og verify --changed --json  # checks changed capsules only
+og status --json            # guard: if status != ok -> fail fast
+og sync --json              # performs deterministic reconciliation
+og verify --changed --json  # checks changed capsules only
 ```
 
 ## Core command contract
