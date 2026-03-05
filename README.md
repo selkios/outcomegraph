@@ -161,7 +161,13 @@ Return contract:
 - `status` is the command status.
 - `run_id` carries command correlation ids when available (e.g. sync/replay/verify/explain).
 - `data` contains command payload (canonical payload fields and step details).
-- `errors` and `warnings` are flat string arrays.
+- `errors` are typed records with:
+  - `error_class`: stable machine class (`usage`, `policy`, `integrity`, `adapter`, `runtime`)
+  - `error_code`: stable code identifier
+  - `message`: human-readable summary
+  - `retryable`: boolean retryability hint
+  - `hint`: bounded short remediation hint
+- `warnings` are strings and remain informational.
 - `metrics` holds command-level timing and counters.
 - In non-JSON mode, command output remains human-readable (`message` is still shown).
 - Exit codes:

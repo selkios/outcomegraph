@@ -15,7 +15,7 @@ Scope: `/home/agent/outcomegraph`
 
 1. `--help` contract is command-complete for top-level and nested commands.
 2. JSON output uses a single, versioned, command-level envelope for all command results and failures.
-3. Error payloads are inconsistent and do not include `class`/`retryable`.
+3. Error payloads are now typed with `error_class`, `error_code`, and bounded `retryable`/`hint` metadata.
 4. No first-class agent introspection (`schema`/`describe`) or field/pagination/stream controls.
 5. Path inputs for `optimize prompts` are not constrained to repo root.
 
@@ -25,7 +25,7 @@ Scope: `/home/agent/outcomegraph`
 |---|---|---|---|
 | 1) CLI surface contract | Done | `og.py` and tests in `tests/test_og_sync_verify_replay_hooks.py` | `og <command> --help` now dispatches per-command usage contracts, and nested dispatches (`optimize`, `autopilot`, `daemon`) include `help` coverage including `daemon run`. |
 | 2) Structured output + unambiguous success | Done | [`og.py`](./og.py) | `--json` now emits a single contract envelope with `schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, and `metrics` for command/help/error paths across all commands. |
-| 3) Error model + exit codes | Partial | [`og.py:846`](./og.py#L846), [`README.md:135`](./README.md#L135) | Exit codes are documented in README and used consistently (`0/1/64`), but error payload lacks stable `error_class`, `retryable`, bounded hint field. |
+| 3) Error model + exit codes | Done | [`og.py:1169`](./og.py#L1169), [`README.md:135`](./README.md#L135), [`SPEC-v2.md:198`](./SPEC-v2.md#L198), [`tests/test_og_sync_verify_replay_hooks.py:670`](./tests/test_og_sync_verify_replay_hooks.py#L670) | Error payload now includes stable typed metadata (`error_class`, `error_code`, `retryable`, `hint`), envelope rendering normalizes `errors` to object records, and exit mapping uses `error_class` semantics. |
 | 4) Agent-oriented input design | Fail | [`og.py:5197`](./og.py#L5197), [`og.py:5583`](./og.py#L5583) | No raw request-body input path (`--params`/input JSON contract) and no CLI `--strict`. |
 | 5) Runtime introspection | Fail | [`og.py:826`](./og.py#L826), [`og.py:9231`](./og.py#L9231), [`og.py:4036`](./og.py#L4036) | No `schema`/`describe` command that emits machine-readable request/response signatures. |
 | 6) Context/window + payload controls | Fail | [`og.py:5197`](./og.py#L5197) | No `--fields`, pagination controls, or streaming list output mode. |

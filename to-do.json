@@ -1166,8 +1166,8 @@
       "id": "OG-AGENT-003",
       "title": "Implement rigorous typed error model with retryability",
       "priority": 1,
-      "status": "todo",
-      "details": "Upgrade error payloads to include stable machine fields so agents can branch safely without text parsing. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Upgrade error payloads to include stable machine fields so agents can branch safely without text parsing, plus exit-class mapping and retryability contracts.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Define error taxonomy (`error_class`, stable `error_code`, `retryable`, bounded `hint`) and map existing codes into the taxonomy",
@@ -1191,7 +1191,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:01:22Z"
     },
     {
       "id": "OG-AGENT-004",

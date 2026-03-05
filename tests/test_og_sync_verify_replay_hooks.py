@@ -105,7 +105,11 @@ class TestJsonEnvelopeContract(TestCase):
         self.assertEqual(payload["command"], "og")
         self.assertEqual(payload["status"], "error")
         self.assertGreater(len(payload["errors"]), 0)
-        self.assertIn("unknown global option", payload["errors"][0])
+        first_error = payload["errors"][0]
+        self.assertEqual(first_error.get("error_code"), og.USAGE_ERROR_CODE)
+        self.assertIn("unknown global option", first_error.get("message", ""))
+        self.assertEqual(first_error.get("error_class"), og.ERROR_CLASS_USAGE)
+        self.assertFalse(first_error.get("retryable"))
 
 
 class TestHookLifecycle(_RepoTestCase):
@@ -387,8 +391,55 @@ class TestSyncWorkflows(_RepoTestCase):
             payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
 
         self.assertEqual(payload["status"], "pending")
-        self.assertEqual(payload["errors"], ["codex executable was not found"])
+        self.assertEqual(payload["code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertEqual(payload["errors"][0]["error_code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertIn("codex executable was not found", payload["errors"][0]["message"])
         set_pending.assert_called_once()
+
+    def test_run_distill_worker_unavailable_errors_are_retryable_in_envelope(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(
+            og, "_run_codex_worker", side_effect=og.WorkerAdapterError("codex executable was not found")
+        ), patch.object(og, "_set_pending_state", return_value={"status": "ok"}):
+            payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
+
+        envelope = og._build_command_result_envelope("distill", payload)
+        distill_error = envelope["errors"][0]
+        self.assertEqual(distill_error["error_code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertTrue(bool(distill_error["retryable"]))
+
+    def test_run_distill_runtime_error_is_not_retryable_in_envelope(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(og, "_run_codex_worker", side_effect=og.WorkerAdapterError("executor crashed")):
+            payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
+
+        envelope = og._build_command_result_envelope("distill", payload)
+        distill_error = envelope["errors"][0]
+        self.assertEqual(distill_error["error_code"], og.RUNTIME_ERROR_CODE)
+        self.assertFalse(bool(distill_error["retryable"]))
+
+    def test_build_envelope_normalizes_legacy_string_errors(self) -> None:
+        envelope = og._build_command_result_envelope(
+            "sync",
+            {
+                "status": "error",
+                "command": "sync",
+                "message": "worker crashed",
+                "errors": ["worker crashed during sync"],
+            },
+        )
+
+        self.assertEqual(len(envelope["errors"]), 1)
+        first_error = envelope["errors"][0]
+        self.assertEqual(first_error["error_code"], og.RUNTIME_ERROR_CODE)
+        self.assertEqual(first_error["message"], "worker crashed during sync")
+        self.assertFalse(first_error["retryable"])
 
     def test_run_sync_job_sets_failed_message_when_any_stage_errors(self) -> None:
         snapshot = {
@@ -636,7 +687,89 @@ class TestReplayWorkflows(_RepoTestCase):
 
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["replay_results"][0]["status"], "error")
-        self.assertIn("schema_version must be 2", payload["errors"][0])
+        self.assertEqual(payload["code"], og.RUNTIME_ERROR_CODE)
+        self.assertIn("schema_version must be 2", payload["errors"][0]["message"])
+
+    def test_run_replay_stage_worker_unavailable_errors_are_retryable_in_envelope(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(og, "_collect_changed_materials", return_value=[]), patch.object(
+            og, "_run_codex_worker", side_effect=og.WorkerAdapterError("codex executable was not found")
+        ), patch.object(og, "_set_pending_state", return_value={"status": "ok"}):
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "observe",
+                changed_only=True,
+            )
+
+        envelope = og._build_command_result_envelope("replay", payload)
+        self.assertEqual(payload["code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertEqual(payload["replay_results"][0]["status"], "pending")
+        self.assertEqual(envelope["errors"][0]["error_code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertTrue(bool(envelope["errors"][0]["retryable"]))
+
+    def test_run_replay_stage_runtime_errors_are_not_retryable_in_envelope(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(og, "_collect_changed_materials", return_value=[]), patch.object(
+            og, "_run_codex_worker", side_effect=og.WorkerAdapterError("executor crashed")
+        ):
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "observe",
+                changed_only=True,
+            )
+
+        envelope = og._build_command_result_envelope("replay", payload)
+        self.assertEqual(payload["code"], og.RUNTIME_ERROR_CODE)
+        self.assertEqual(payload["replay_results"][0]["status"], "error")
+        self.assertEqual(envelope["errors"][0]["error_code"], og.RUNTIME_ERROR_CODE)
+        self.assertFalse(bool(envelope["errors"][0]["retryable"]))
+
+    def test_exit_code_maps_error_class_semantics(self) -> None:
+        self.assertEqual(
+            og._command_exit_code(
+                {
+                    "status": "error",
+                    "errors": [{"error_code": og.USAGE_ERROR_CODE, "message": "bad flags"}],
+                }
+            ),
+            og.EXIT_USAGE,
+        )
+        self.assertEqual(
+            og._command_exit_code(
+                {
+                    "status": "error",
+                    "errors": [
+                        {
+                            "error_code": og.POLICY_CONFIG_ERROR_CODE,
+                            "error_class": og.ERROR_CLASS_POLICY,
+                            "message": "policy failed",
+                        }
+                    ],
+                }
+            ),
+            og.EXIT_USAGE,
+        )
+        self.assertEqual(
+            og._command_exit_code(
+                {
+                    "status": "error",
+                    "errors": [{"error_code": og.RUNTIME_ERROR_CODE, "message": "worker crashed"}],
+                }
+            ),
+            og.EXIT_RUNTIME,
+        )
 
 
 class TestAdapterCompatibilityAndPolicy(_RepoTestCase):

@@ -24,10 +24,81 @@ VERSION = "0.1.0-dev"
 EXIT_SUCCESS = 0
 EXIT_USAGE = 64
 EXIT_RUNTIME = 1
+USAGE_ERROR_CODE = "USAGE_ERROR"
+RUNTIME_ERROR_CODE = "RUNTIME_ERROR"
+WORKER_RUNTIME_UNAVAILABLE_CODE = "WORKER_RUNTIME_UNAVAILABLE"
+INTEGRITY_CHECK_FAILED_CODE = "INTEGRITY_CHECK_FAILED"
+ADAPTER_MANIFEST_INVALID_CODE = "ADAPTER_MANIFEST_INVALID"
+ADAPTER_DUPLICATE_CODE = "ADAPTER_DUPLICATE"
 POLICY_SCHEMA_VERSION = 2
 POLICY_DENIED_CODE = "POLICY_DENIED"
 POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
 AUTONOMOUS_WRITE_BLOCKED_CODE = "AUTONOMOUS_WRITE_BLOCKED"
+ERROR_CLASS_USAGE = "usage"
+ERROR_CLASS_POLICY = "policy"
+ERROR_CLASS_INTEGRITY = "integrity"
+ERROR_CLASS_ADAPTER = "adapter"
+ERROR_CLASS_RUNTIME = "runtime"
+DEFAULT_ERROR_CLASS = ERROR_CLASS_RUNTIME
+ERROR_HINT_MAX_LENGTH = 180
+ERROR_HINT_DEFAULT = "Inspect command-specific errors for next-step remediation and retry decision."
+ERROR_CLASS_BY_CODE: dict[str, dict[str, object]] = {
+    USAGE_ERROR_CODE: {
+        "error_class": ERROR_CLASS_USAGE,
+        "retryable": False,
+        "hint": "Adjust command arguments/options to satisfy validation.",
+    },
+    POLICY_DENIED_CODE: {
+        "error_class": ERROR_CLASS_POLICY,
+        "retryable": False,
+        "hint": "Review policy allowlist and rerun in an allowed mode with explicit policy configuration.",
+    },
+    POLICY_CONFIG_ERROR_CODE: {
+        "error_class": ERROR_CLASS_POLICY,
+        "retryable": False,
+        "hint": "Repair .outcomegraph/policy.yaml and rerun the command.",
+    },
+    AUTONOMOUS_WRITE_BLOCKED_CODE: {
+        "error_class": ERROR_CLASS_POLICY,
+        "retryable": False,
+        "hint": "Wait for policy/integrity remediation before attempting writes in autonomous mode.",
+    },
+    ADAPTER_INTERFACE_MISMATCH_CODE: {
+        "error_class": ERROR_CLASS_ADAPTER,
+        "retryable": False,
+        "hint": "Install or update adapters to satisfy required interface versions.",
+    },
+    CONTROL_SURFACE_MISMATCH_CODE: {
+        "error_class": ERROR_CLASS_RUNTIME,
+        "retryable": False,
+        "hint": "Regenerate control-surface artifacts and rerun sync.",
+    },
+    ADAPTER_MANIFEST_INVALID_CODE: {
+        "error_class": ERROR_CLASS_ADAPTER,
+        "retryable": False,
+        "hint": "Validate adapter manifest syntax and manifest fields.",
+    },
+    ADAPTER_DUPLICATE_CODE: {
+        "error_class": ERROR_CLASS_ADAPTER,
+        "retryable": False,
+        "hint": "Resolve duplicate adapter registrations in plugin directories.",
+    },
+    INTEGRITY_CHECK_FAILED_CODE: {
+        "error_class": ERROR_CLASS_INTEGRITY,
+        "retryable": False,
+        "hint": "Repair integrity state and rerun sync.",
+    },
+    WORKER_RUNTIME_UNAVAILABLE_CODE: {
+        "error_class": ERROR_CLASS_RUNTIME,
+        "retryable": True,
+        "hint": "Retry after worker runtime service becomes available.",
+    },
+    RUNTIME_ERROR_CODE: {
+        "error_class": ERROR_CLASS_RUNTIME,
+        "retryable": False,
+        "hint": "Retry only after correcting the underlying runtime issue.",
+    },
+}
 POLICY_ALLOW_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations"}
 POLICY_DENY_CATEGORIES = {"file_writes", "verify_commands", "sandbox_operations", "network", "dependencies", "deployment"}
 
@@ -628,7 +699,7 @@ def _read_and_register_adapter(
     if payload is None:
         warnings.append({
             "status": "error",
-            "code": "ADAPTER_MANIFEST_INVALID",
+            "code": ADAPTER_MANIFEST_INVALID_CODE,
             "path": path,
             "message": f"unable to read adapter manifest: {path}",
         })
@@ -652,7 +723,7 @@ def _read_and_register_adapter(
         warnings.append(
             {
                 "status": "error",
-                "code": "ADAPTER_MANIFEST_INVALID",
+                "code": ADAPTER_MANIFEST_INVALID_CODE,
                 "path": path,
                 "message": str(exc),
             }
@@ -665,7 +736,7 @@ def _read_and_register_adapter(
         warnings.append(
             {
                 "status": "error",
-                "code": "ADAPTER_DUPLICATE",
+                "code": ADAPTER_DUPLICATE_CODE,
                 "path": path,
                 "type": adapter_type,
                 "name": adapter_name,
@@ -1074,7 +1145,7 @@ def _help_for_command(command: str) -> str:
     return emit_usage() + "\nUse --help with a recognized command for details."
 
 
-def _ensure_string_list(raw: object) -> list[str]:
+def _ensure_text_list(raw: object) -> list[str]:
     if not isinstance(raw, list):
         return []
     output: list[str] = []
@@ -1088,12 +1159,139 @@ def _ensure_string_list(raw: object) -> list[str]:
     return output
 
 
+def _bounded_hint(text: object) -> str:
+    hint = str(text or ERROR_HINT_DEFAULT)
+    if len(hint) > ERROR_HINT_MAX_LENGTH:
+        hint = f"{hint[:ERROR_HINT_MAX_LENGTH - 3]}..."
+    return hint
+
+
+def _error_class_for_code(code: str) -> str:
+    mapping = ERROR_CLASS_BY_CODE.get(code)
+    if isinstance(mapping, dict):
+        return str(mapping.get("error_class") or DEFAULT_ERROR_CLASS)
+    return DEFAULT_ERROR_CLASS
+
+
+def _error_retryable_for_code(code: str, fallback_retryable: object | None = None) -> bool:
+    if isinstance(fallback_retryable, bool):
+        return fallback_retryable
+    mapping = ERROR_CLASS_BY_CODE.get(code)
+    if isinstance(mapping, dict) and isinstance(mapping.get("retryable"), bool):
+        return bool(mapping.get("retryable"))
+    return False
+
+
+def _error_hint_for_code(code: str, fallback_hint: object | None = None) -> str:
+    mapping = ERROR_CLASS_BY_CODE.get(code)
+    if isinstance(fallback_hint, str) and fallback_hint.strip():
+        return _bounded_hint(fallback_hint)
+    if isinstance(mapping, dict):
+        return _bounded_hint(mapping.get("hint"))
+    return ERROR_HINT_DEFAULT
+
+
+def _normalize_error_code(raw: object | None, default_code: str | None = None) -> str:
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    if default_code:
+        return default_code
+    return RUNTIME_ERROR_CODE
+
+
+def _normalize_error_record(
+    raw: object,
+    fallback_code: str | None = None,
+    fallback_message: str | None = None,
+) -> dict[str, object]:
+    if isinstance(raw, dict):
+        code = _normalize_error_code(raw.get("error_code") or raw.get("code"), fallback_code)
+        message = str(raw.get("message") or raw.get("detail") or raw.get("text") or fallback_message or "").strip()
+        if not message:
+            message = "operation failed"
+        error_payload: dict[str, object] = {
+            "error_class": _error_class_for_code(code),
+            "error_code": code,
+            "message": message,
+            "retryable": _error_retryable_for_code(code, raw.get("retryable")),
+            "hint": _error_hint_for_code(code, raw.get("hint")),
+        }
+        for key in ["command", "subcommand", "category", "target", "mode", "type", "name", "path", "remediation"]:
+            if key in raw:
+                error_payload[key] = raw[key]
+        return error_payload
+
+    message = str(raw).strip() if raw is not None else str(fallback_message or "").strip()
+    if not message:
+        message = str(fallback_message or "").strip() or "operation failed"
+    code = _normalize_error_code(None, fallback_code or RUNTIME_ERROR_CODE)
+    return {
+        "error_class": _error_class_for_code(code),
+        "error_code": code,
+        "message": message,
+        "retryable": _error_retryable_for_code(code),
+        "hint": _error_hint_for_code(code),
+    }
+
+
+def _normalize_error_list(
+    raw: object,
+    fallback_code: str | None = None,
+    fallback_message: str | None = None,
+) -> list[dict[str, object]]:
+    if not isinstance(raw, list):
+        if raw is None:
+            return []
+        return [_normalize_error_record(raw, fallback_code=fallback_code, fallback_message=fallback_message)]
+
+    output: list[dict[str, object]] = []
+    for item in raw:
+        output.append(_normalize_error_record(item, fallback_code=fallback_code, fallback_message=fallback_message))
+    return output
+
+
+def _normalize_errors_recursive(
+    raw: object,
+    fallback_code: str | None = None,
+    fallback_message: str | None = None,
+) -> object:
+    if isinstance(raw, dict):
+        status = str(raw.get("status") or "").lower()
+        normalized: dict[str, object] = {}
+        message_hint = str(raw.get("message") or fallback_message or "")
+        code_hint = _normalize_error_code(raw.get("error_code") or raw.get("code"), fallback_code)
+        for key, value in raw.items():
+            if key == "errors":
+                normalized[key] = _normalize_error_list(
+                    value,
+                    fallback_code=code_hint,
+                    fallback_message=message_hint,
+                )
+            elif key == "warnings":
+                normalized[key] = _ensure_text_list(value)
+            elif isinstance(value, (dict, list)):
+                normalized[key] = _normalize_errors_recursive(
+                    value,
+                    fallback_code=code_hint,
+                    fallback_message=message_hint,
+                )
+            else:
+                normalized[key] = value
+        if status == "error" and not normalized.get("errors"):
+            normalized["errors"] = _normalize_error_list([], fallback_code=code_hint, fallback_message=message_hint)
+        return normalized
+    if isinstance(raw, list):
+        return [_normalize_errors_recursive(item, fallback_code=fallback_code, fallback_message=fallback_message) for item in raw]
+    return raw
+
+
 def _build_command_result_envelope(
     command: str,
     payload: dict[str, object] | None,
 ) -> dict[str, object]:
     if payload is None or not isinstance(payload, dict):
         payload = {}
+    payload = _normalize_errors_recursive(payload)
     command_id = str(payload.get("command") or command).strip()
     if not command_id:
         command_id = "og"
@@ -1103,12 +1301,23 @@ def _build_command_result_envelope(
     if not isinstance(run_id, str) or not run_id.strip():
         run_id = None
 
-    errors = _ensure_string_list(payload.get("errors"))
-    warnings = _ensure_string_list(payload.get("warnings"))
-    if status == "error" and not errors:
-        message = payload.get("message")
-        if isinstance(message, str) and message.strip():
-            errors = [message]
+    errors = payload.get("errors")
+    status_message = str(payload.get("message") or "")
+    fallback_code = str(payload.get("error_code") or payload.get("code") or RUNTIME_ERROR_CODE)
+    if isinstance(errors, list):
+        errors = _normalize_error_list(
+            errors,
+            fallback_code=fallback_code,
+            fallback_message=status_message,
+        )
+    else:
+        errors = _normalize_error_list(
+            [],
+            fallback_code=fallback_code,
+            fallback_message=status_message,
+        ) if status == "error" else []
+
+    warnings = _ensure_text_list(payload.get("warnings"))
 
     metrics = payload.get("metrics")
     if not isinstance(metrics, dict):
@@ -1130,14 +1339,37 @@ def _build_command_result_envelope(
     return envelope
 
 
-def emit_error(message: str, command: str | None, code: int, output_json: bool = False) -> None:
+def _error_code_for_exit_code(exit_code: int) -> str:
+    if exit_code == EXIT_USAGE:
+        return USAGE_ERROR_CODE
+    if exit_code == EXIT_SUCCESS:
+        return ""
+    return RUNTIME_ERROR_CODE
+
+
+def emit_error(
+    message: str,
+    command: str | None,
+    code: int,
+    output_json: bool = False,
+    *,
+    error_code: str | None = None,
+) -> None:
+    payload_error_code = error_code or _error_code_for_exit_code(code)
     if output_json:
         emit_command_result(
             {
                 "status": "error",
-                "code": code,
+                "code": payload_error_code,
+                "error_code": payload_error_code,
                 "command": command,
                 "message": message,
+                "errors": [
+                    {
+                        "error_code": payload_error_code,
+                        "message": message,
+                    }
+                ],
             },
             True,
             command or "og",
@@ -7397,15 +7629,21 @@ def _run_distill_stage(
         error_message = str(exc)
         if _is_worker_unavailable_error(error_message):
             _set_pending_state(repo_root, f"worker runtime unavailable during distill: {error_message}")
+            error_code = WORKER_RUNTIME_UNAVAILABLE_CODE
+            status = "pending"
+        else:
+            error_code = RUNTIME_ERROR_CODE
+            status = "error"
         return {
             "name": "distill",
-            "status": "pending" if _is_worker_unavailable_error(error_message) else "error",
+            "status": status,
+            "code": error_code,
             "message": error_message,
             "profile": profile,
             "mode": mode,
             "affected_capsules": changed_capsules,
             "generated_deltas": [],
-            "errors": [error_message],
+            "errors": [{"error_code": error_code, "message": error_message}],
             "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         }
     return {
@@ -7440,7 +7678,7 @@ def _run_apply_stage(
             "applied_capsules": [],
             "applied_refs": [],
             "applied_decisions": [],
-            "errors": [policy_error.get("message", "policy configuration is invalid")],
+            "errors": [_normalize_error_record(policy_error, fallback_code=POLICY_CONFIG_ERROR_CODE)],
         }
 
     autonomous_block = _build_autonomous_write_block_payload(
@@ -7477,6 +7715,7 @@ def _run_apply_stage(
         deny_payload = {
             **deny_payload,
             "name": "apply",
+            "code": deny_payload.get("error_code") or deny_payload.get("code") or POLICY_DENIED_CODE,
             "mode": mode,
             "applied_changes": 0,
             "applied_claims": [],
@@ -7484,7 +7723,7 @@ def _run_apply_stage(
             "applied_capsules": [],
             "applied_refs": [],
             "applied_decisions": [],
-            "errors": [str(deny_payload.get("message", "policy denied write"))],
+            "errors": [_normalize_error_record(deny_payload, fallback_code=POLICY_DENIED_CODE)],
             "message": str(deny_payload.get("message", "policy denied apply action")),
         }
         return deny_payload
@@ -7492,15 +7731,17 @@ def _run_apply_stage(
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
+        error_message = f"Canonical artifact validation failed: {exc}"
         return {
             "name": "apply",
             "status": "error",
-            "message": f"Canonical artifact validation failed: {exc}",
+            "code": RUNTIME_ERROR_CODE,
+            "message": error_message,
             "mode": mode,
             "applied_changes": 0,
             "applied_claims": [],
             "applied_certificates": [],
-            "errors": [f"Canonical artifact validation failed: {exc}"],
+            "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": error_message}],
         }
 
     if distill_result.get("status") != "ok":
@@ -7513,13 +7754,21 @@ def _run_apply_stage(
         }
     deltas = distill_result.get("generated_deltas") or []
     if not isinstance(deltas, list):
+        error_message = "Distill result contained malformed deltas."
         return {
             "name": "apply",
             "status": "error",
-            "message": "Distill result contained malformed deltas.",
+            "code": RUNTIME_ERROR_CODE,
+            "message": error_message,
             "mode": mode,
             "applied_changes": 0,
-            "errors": ["Invalid generated_deltas format"],
+            "errors": [
+                {
+                    "error_code": RUNTIME_ERROR_CODE,
+                    "message": error_message,
+                    "hint": "Review worker output and retry after fixing distill artifact schema.",
+                }
+            ],
         }
 
     affected_capsules = _safe_string_list(distill_result.get("affected_capsules"))
@@ -7930,13 +8179,14 @@ def _run_replay_stage(
         return {
             "name": "replay",
             "status": "error",
+            "code": str(sandbox_check.get("error_code") or sandbox_check.get("code") or POLICY_DENIED_CODE),
             "message": str(sandbox_check.get("message", "policy denied sandbox operation")),
             "mode": mode,
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
             "certificate_refs": _preserve_certificate_refs(),
-            "errors": [str(sandbox_check.get("message", "policy denied sandbox operation"))],
+            "errors": [_normalize_error_record(sandbox_check, fallback_code=POLICY_DENIED_CODE)],
             **sandbox_check,
         }
 
@@ -7950,42 +8200,47 @@ def _run_replay_stage(
         return {
             "name": "replay",
             "status": "error",
+            "code": str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
             "message": str(write_check.get("message", "policy denied write")),
             "mode": mode,
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
             "certificate_refs": _preserve_certificate_refs(),
-            "errors": [str(write_check.get("message", "policy denied write"))],
+            "errors": [_normalize_error_record(write_check, fallback_code=POLICY_DENIED_CODE)],
             **write_check,
         }
 
     try:
         _validate_canonical_artifact_records(repo_root)
     except ValueError as exc:
+        error_message = f"Canonical artifact validation failed: {exc}"
         return {
             "name": "replay",
             "status": "error",
-            "message": f"Canonical artifact validation failed: {exc}",
+            "code": RUNTIME_ERROR_CODE,
+            "message": error_message,
             "mode": mode,
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
             "certificate_refs": _preserve_certificate_refs(),
-            "errors": [f"Canonical artifact validation failed: {exc}"],
+            "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": error_message}],
         }
 
     if not isinstance(snapshot, dict):
+        error_message = "Invalid snapshot payload"
         return {
             "name": "replay",
             "status": "error",
-            "message": "Invalid snapshot payload",
+            "code": RUNTIME_ERROR_CODE,
+            "message": error_message,
             "mode": mode,
             "replay_plans": [],
             "replay_results": [],
             "certificate_ids": [],
             "certificate_refs": _preserve_certificate_refs(),
-            "errors": ["Invalid snapshot payload"],
+            "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": error_message}],
         }
     changed_files = snapshot.get("changed_files")
     if not isinstance(changed_files, list):
@@ -8004,6 +8259,7 @@ def _run_replay_stage(
     failed_capsules: list[str] = []
     errors: list[str] = []
     overall_failed = False
+    replay_error_code: str | None = None
 
     for capsule in targets:
         trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-replay.json"
@@ -8029,13 +8285,18 @@ def _run_replay_stage(
             error_message = str(exc)
             if _is_worker_unavailable_error(error_message):
                 _set_pending_state(repo_root, f"worker runtime unavailable during replay: {error_message}")
+                replay_error_code = WORKER_RUNTIME_UNAVAILABLE_CODE
+                replay_status = "pending"
+            else:
+                replay_error_code = RUNTIME_ERROR_CODE
+                replay_status = "error"
             errors.append(error_message)
             overall_failed = True
             failed_capsules.append(capsule)
             replay_results.append(
                 {
                     "capsule_id": capsule,
-                    "status": "pending" if _is_worker_unavailable_error(error_message) else "error",
+                    "status": replay_status,
                     "plan_status": "error",
                     "certificate_id": None,
                     "trace": trace_path,
@@ -8210,6 +8471,7 @@ def _run_replay_stage(
     return {
         "name": "replay",
         "status": "error" if overall_failed else "ok",
+        "code": replay_error_code or (RUNTIME_ERROR_CODE if overall_failed else None),
         "message": "Replay adapter completed with failures." if overall_failed else "Replay adapter produced executable plans.",
         "mode": mode,
         "replay_plans": plans,
@@ -8217,7 +8479,7 @@ def _run_replay_stage(
         "certificate_ids": certificate_ids,
         "certificate_refs": sorted(final_certificate_refs),
         "failed_capsules": sorted(set(failed_capsules)),
-        "errors": errors,
+        "errors": [{"error_code": replay_error_code or RUNTIME_ERROR_CODE, "message": error} for error in errors] if errors else [],
     }
 
 
@@ -8533,10 +8795,12 @@ def _run_explain_stage(
 
     if not selected_claims and not selected_certificates_payload and not selected_decisions and not filtered_deltas:
         if requested_capsules or requested_refs or requested_certificates:
+            message = "No explain data found for requested filters."
             return {
                 "name": "explain",
                 "status": "error",
-                "message": "No explain data found for requested filters.",
+                "code": RUNTIME_ERROR_CODE,
+                "message": message,
                 "mode": mode,
                 "profile": profile,
                 "run_id": run_id,
@@ -8544,7 +8808,7 @@ def _run_explain_stage(
                 "certificates": [],
                 "decisions": [],
                 "deltas": [],
-                "errors": ["No explain artifacts matched the requested filters."],
+                "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": message}],
                 "target_capsules": sorted(target_capsules),
                 "filters": {
                     "capsule": capsule_filters,
@@ -9531,12 +9795,47 @@ def build_payload(
 def _payload_has_code(payload: dict[str, object], code: str) -> bool:
     if str(payload.get("code") or "") == code:
         return True
-    steps = payload.get("steps")
-    if isinstance(steps, list):
-        for raw_step in steps:
-            if isinstance(raw_step, dict) and str(raw_step.get("code") or "") == code:
+    target = str(code)
+    if str(payload.get("error_code") or "") == target:
+        return True
+
+    for value in payload.values():
+        if isinstance(value, dict):
+            if _payload_has_code(value, code):
                 return True
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and _payload_has_code(item, code):
+                    return True
     return False
+
+
+def _payload_has_error_class(payload: dict[str, object], error_class: str) -> bool:
+    target = str(error_class)
+    if str(payload.get("error_class") or _error_class_for_code(str(payload.get("error_code") or payload.get("code") or ""))) == target:
+        return True
+    for key in ["code", "error_code"]:
+        if key in payload and str(payload.get("error_class") or _error_class_for_code(str(payload.get(key) or ""))) == target:
+            return True
+    for value in payload.values():
+        if isinstance(value, dict):
+            if _payload_has_error_class(value, error_class):
+                return True
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and _payload_has_error_class(item, error_class):
+                    return True
+    return False
+
+
+def _command_exit_code(payload: dict[str, object]) -> int:
+    if str(payload.get("status") or "").lower() != "error":
+        return EXIT_SUCCESS
+    if _payload_has_error_class(payload, ERROR_CLASS_USAGE):
+        return EXIT_USAGE
+    if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
+        return EXIT_USAGE
+    return EXIT_RUNTIME
 
 
 def run_command(args: list[str], output_json: bool) -> int:
@@ -9585,14 +9884,14 @@ def run_command(args: list[str], output_json: bool) -> int:
                 payload = {
                     "status": "error",
                     "command": "sync",
-                    "code": "INTEGRITY_CHECK_FAILED",
+                    "code": INTEGRITY_CHECK_FAILED_CODE,
                     "options": options,
                     "integrity": integrity,
                     "repair": repair,
                     "message": f"integrity check failed: {integrity.get('message', 'ledger validation error')}",
                 }
                 emit_command_result(payload, output_json)
-                return EXIT_RUNTIME
+                return _command_exit_code(payload)
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
@@ -9613,9 +9912,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             payload = _run_sync_job(repo_root, options)
             payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload}
             emit_command_result(payload, output_json)
-            if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
-                return EXIT_USAGE
-            return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+            return _command_exit_code(payload)
         finally:
             _release_work_lock(repo_root, holder)
         return EXIT_SUCCESS
@@ -9627,9 +9924,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json:
             payload["message"] = _render_verify(payload)
         emit_command_result(payload, output_json)
-        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
-            return EXIT_USAGE
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "replay":
         options, _ = parse_command_flags(rest, "replay", True, True, True, output_json)
@@ -9663,9 +9958,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
         payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
         emit_command_result(payload, output_json)
-        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
-            return EXIT_USAGE
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "status":
         options, _ = parse_command_flags(rest, "status", False, False, False, output_json)
@@ -9674,7 +9967,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json:
             payload["message"] = _render_status(payload)
         emit_command_result(payload, output_json)
-        return EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "export":
         options, _ = parse_command_flags(rest, "export", False, False, False, output_json)
@@ -9694,9 +9987,7 @@ def run_command(args: list[str], output_json: bool) -> int:
             "artifact_counts": export.get("artifact_counts", {}),
         }
         emit_command_result(payload, output_json)
-        if _payload_has_code(payload, POLICY_CONFIG_ERROR_CODE):
-            return EXIT_USAGE
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "explain":
         options, _ = parse_command_flags(
@@ -9740,7 +10031,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json:
             payload["message"] = _render_explain(payload)
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "drift":
         options, _ = parse_command_flags(rest, "drift", False, False, False, output_json)
@@ -9754,7 +10045,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json:
             payload["message"] = _render_drift(payload)
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "mcp-server":
         options, _ = parse_command_flags(rest, "mcp-server", False, False, False, output_json)
@@ -9763,7 +10054,7 @@ def run_command(args: list[str], output_json: bool) -> int:
         if not output_json and payload.get("status") == "ok":
             payload["message"] = _render_mcp_server(payload)
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "optimize":
         if rest and rest[0] in {"-h", "--help"}:
@@ -9795,7 +10086,7 @@ def run_command(args: list[str], output_json: bool) -> int:
                 "message", "optimize prompts execution failed"
             )
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "autopilot":
         if rest and rest[0] in {"-h", "--help"}:
@@ -9876,25 +10167,25 @@ def run_command(args: list[str], output_json: bool) -> int:
             payload = _daemon_start()
             payload["options"] = options
             emit_command_result(payload, output_json)
-            return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+            return _command_exit_code(payload)
         if sub == "stop":
             options, _ = parse_command_flags(rest[1:], "daemon stop", False, False, False, output_json)
             payload = _daemon_stop()
             payload["options"] = options
             emit_command_result(payload, output_json)
-            return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+            return _command_exit_code(payload)
         options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json)
         payload = _daemon_status()
         payload["options"] = options
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     if command == "clean":
         options = _parse_clean_flags(rest, output_json)
         repo_root = _git_root()
         payload = _run_clean_job(repo_root, options)
         emit_command_result(payload, output_json)
-        return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
+        return _command_exit_code(payload)
 
     emit_error(f"unknown command '{command}'\n\n" + emit_usage(), None, EXIT_USAGE, output_json)
     return EXIT_USAGE

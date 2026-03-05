@@ -200,7 +200,7 @@ Structured output:
   - `status`
   - `run_id` (optional, `null` when unavailable)
   - `data`
-  - `errors`
+  - `errors` (typed list of error objects with `error_class`, `error_code`, `message`, `retryable`, `hint`)
   - `warnings`
   - `metrics`
 - `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
@@ -970,7 +970,10 @@ Violations are first-class `og` errors with action and remediations:
 ```json
 {
   "status": "error",
-  "code": "POLICY_DENIED",
+  "error_class": "policy",
+  "error_code": "POLICY_DENIED",
+  "retryable": false,
+  "hint": "Review policy allowlist and rerun in an allowed mode with explicit policy configuration.",
   "command": "sync",
   "mode": "observe",
   "category": "file_writes",
