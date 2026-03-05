@@ -1310,19 +1310,20 @@
         "OG-AGENT-002"
       ],
       "files": [
-        "og.py",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
         "SPEC-v2.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T17:15:36Z"
+      "updated_at": "2026-03-05T17:16:01Z"
     },
     {
       "id": "OG-AGENT-008",
       "title": "Remove interaction traps with explicit non-interactive controls",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Guarantee automation-safe behavior by defaulting away from prompts and requiring explicit opt-in for interactive flows. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1347,7 +1348,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-05T17:17:38Z"
     },
     {
       "id": "OG-AGENT-009",

@@ -41,7 +41,8 @@ class TestHelpContracts(TestCase):
     def test_top_level_help_includes_global_contract(self) -> None:
         code, text = self._run_main(["--help"])
         self.assertEqual(code, 0)
-        self.assertIn("Usage: og [--json] [--strict] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>", text)
+        self.assertIn("Usage: og [--json] [--strict] [--non-interactive] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>", text)
+        self.assertIn("--non-interactive", text)
         self.assertIn("Use: og <command> --help for command-specific contracts.", text)
         self.assertIn("Core commands:", text)
 
@@ -115,16 +116,22 @@ class TestCommandIntrospectionContracts(TestCase):
             self.assertIn("response", signature)
             self.assertIn("known_error_codes", signature)
             self.assertIn("envelope_schema_version", signature["response"])
+            request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
             if command_name == "optimize prompts":
-                request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
                 self.assertIn("--params", request_field_names)
                 self.assertIn("--strict", request_field_names)
             if command_name in {"verify", "replay", "explain", "mcp-server"}:
-                request_field_names = {field["name"] for field in signature["request"]["fields"] if isinstance(field, dict)}
                 response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
                 for flag_name in {"--output", "--fields", "--limit", "--offset"}:
                     self.assertIn(flag_name, request_field_names, msg=f"missing request field {flag_name} for {command_name}")
                 self.assertIn("list_window", response_field_names, msg=f"missing list_window response field for {command_name}")
+            self.assertIn("--non-interactive", request_field_names)
+
+        autopilot_init_signature = signatures["autopilot init"]
+        autopilot_init_fields = {
+            field["name"] for field in autopilot_init_signature["request"]["fields"] if isinstance(field, dict)
+        }
+        self.assertIn("--yes", autopilot_init_fields)
 
     def test_describe_command_resolves_signature(self) -> None:
         buffer = io.StringIO()
@@ -247,6 +254,65 @@ class TestHookLifecycle(_RepoTestCase):
                 "#!/usr/bin/env bash\necho pre-commit-existing\n",
             )
 
+    def test_autopilot_init_force_path_requires_yes_for_confirmation(self) -> None:
+        hooks_dir = self.repo / "existing-hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        with self.git_root_patch():
+            subprocess.run(
+                ["git", "-C", str(self.repo), "config", "core.hooksPath", str(hooks_dir)],
+                check=True,
+            )
+
+            for non_interactive in (False, True):
+                for tty in (False, True):
+                    with self.subTest(non_interactive=non_interactive, tty=tty):
+                        args = ["--json", "autopilot", "init", "--force-hooks-path"]
+                        if non_interactive:
+                            args.insert(1, "--non-interactive")
+                        buffer = io.StringIO()
+                        with redirect_stdout(buffer):
+                            with patch.object(og.sys.stdin, "isatty", return_value=tty):
+                                with patch("builtins.input", side_effect=AssertionError("unexpected prompt")):
+                                    with self.assertRaises(SystemExit):
+                                        code = og.main(args)
+                        self.assertEqual(code, 64)
+                        payload = json.loads(buffer.getvalue())
+                            self.assertEqual(payload["status"], "error")
+                            self.assertEqual(payload["command"], "autopilot")
+                            self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
+                            self.assertIn("autopilot init requires --yes", payload["errors"][0]["message"])
+
+    def test_autopilot_init_force_path_with_yes_is_accepted(self) -> None:
+        hooks_dir = self.repo / "existing-hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        with self.git_root_patch():
+            subprocess.run(
+                ["git", "-C", str(self.repo), "config", "core.hooksPath", str(hooks_dir)],
+                check=True,
+            )
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(
+                    [
+                        "--json",
+                        "--non-interactive",
+                        "autopilot",
+                        "init",
+                        "--force-hooks-path",
+                        "--yes",
+                    ]
+                )
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["command"], "autopilot")
+            config_value = subprocess.run(
+                ["git", "-C", str(self.repo), "config", "--get", "core.hooksPath"],
+                text=True,
+                capture_output=True,
+                check=False,
+            ).stdout.strip()
+            self.assertEqual(config_value, og.AUTOPILOT_MANAGED_HOOK_DIR)
 
 class TestDaemonLifecycle(_RepoTestCase):
     def test_daemon_start_stop_round_trip(self) -> None:

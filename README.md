@@ -133,6 +133,7 @@ Common flags:
 
 - `--json` / `--json=true|false`
 - `--output json|jsonl|human` (jsonl streams list-like fields in order)
+- `--non-interactive` disable interactive prompts and require explicit confirmation flags for privileged operations
 - `--fields <field>[,<field>...]` (top-level payload projection)
 - `--limit <n>` / `--offset <n>` (pagination for list-like fields)
 - `--strict` / `--strict=true|false`

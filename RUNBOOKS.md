@@ -28,9 +28,10 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 ### 1.3 Autonomous flow
 
 1. Run `og autopilot init` once.
-2. Verify hooks/daemon install.
-3. Use `ogd start` or keep CI-triggered hooks in place.
-4. Run `og status` on cadence and on alert.
+2. When running in non-interactive environments, use `og autopilot init --non-interactive --force-hooks-path --yes` if an existing `core.hooksPath` must be replaced.
+3. Verify hooks/daemon install.
+4. Use `ogd start` or keep CI-triggered hooks in place.
+5. Run `og status` on cadence and on alert.
 
 ### 1.4 Safe-mode checks
 

@@ -903,7 +903,7 @@ class WorkerAdapterError(ValueError):
 
 
 def emit_usage() -> str:
-    return """Usage: og [--json] [--strict] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
+    return """Usage: og [--json] [--strict] [--non-interactive] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
 
 Core commands:
   og init
@@ -1130,13 +1130,14 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "autopilot init":
         return _command_help(
-            "og autopilot init [--force-hooks-path[=true|false]]",
+            "og autopilot init [--force-hooks-path[=true|false]] [--yes]",
             "Install outcomegraph-managed git hooks for lifecycle integration.",
             [
                 "--force-hooks-path[=true|false]",
+                "--yes[=true|false]",
                 "--json",
             ],
-            ["og autopilot init", "og autopilot init --force-hooks-path --json"],
+            ["og autopilot init", "og autopilot init --force-hooks-path --yes --json"],
         )
     if normalized == "autopilot disable":
         return _command_help(
@@ -1251,6 +1252,15 @@ def _command_signature_entry(
                 "--strict",
                 "boolean",
                 "Reject unknown fields, implicit defaults, and lossy coercions in request payload mode.",
+                default=False,
+            )
+        )
+    if not any(entry.get("name") == "--non-interactive" for entry in request_fields_with_strict):
+        request_fields_with_strict.append(
+            _command_schema_field(
+                "--non-interactive",
+                "boolean",
+                "Disable interactive prompting and require explicit confirmation flags.",
                 default=False,
             )
         )
@@ -1567,6 +1577,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
                 _command_schema_field("--force-hooks-path", "boolean", "Allow hook path override when hooks are already configured."),
+                _command_schema_field("--yes", "boolean", "Confirm privileged hook-path changes."),
             ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
@@ -1574,7 +1585,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("installed_hooks", "array", "Hooks managed during install."),
             ],
             [USAGE_ERROR_CODE, POLICY_DENIED_CODE, RUNTIME_ERROR_CODE],
-            examples=["og autopilot init", "og autopilot init --force-hooks-path --json"],
+            examples=["og autopilot init", "og autopilot init --force-hooks-path --yes --json"],
         ),
         _command_signature_entry(
             "autopilot disable",
@@ -5996,7 +6007,13 @@ def _confirm(message: str) -> bool:
         print("Please answer y or n.")
 
 
-def _init_autopilot(force_hooks_path: bool) -> dict[str, object]:
+def _init_autopilot(
+    force_hooks_path: bool,
+    confirmed: bool = False,
+    *,
+    non_interactive: bool = False,
+    output_json: bool = False,
+) -> dict[str, object]:
     repo_root = _git_root()
 
     existing_path = _hooks_path(repo_root)
@@ -6010,8 +6027,20 @@ def _init_autopilot(force_hooks_path: bool) -> dict[str, object]:
         _set_hooks_path(repo_root, target)
         wrote_config = True
     elif existing_path != AUTOPILOT_MANAGED_HOOK_DIR:
-        if force_hooks_path and not _confirm(f"core.hooksPath is already set to '{existing_path}'. Replace it with '{AUTOPILOT_MANAGED_HOOK_DIR}'?"):
-            emit_error("aborted by user", "autopilot", EXIT_USAGE, False)
+        if force_hooks_path and not confirmed:
+            if non_interactive:
+                emit_error(
+                    "autopilot init requires --yes with --force-hooks-path when --non-interactive is set",
+                    "autopilot",
+                    EXIT_USAGE,
+                    output_json,
+                )
+            emit_error(
+                f"autopilot init requires --yes to replace existing core.hooksPath '{existing_path}'",
+                "autopilot",
+                EXIT_USAGE,
+                output_json,
+            )
         if force_hooks_path:
             target = AUTOPILOT_MANAGED_HOOK_DIR
             mode = "force-managed-path"
@@ -6562,6 +6591,7 @@ def parse_command_flags(
     allow_ref_filter: bool = False,
     allow_certificate_filter: bool = False,
     allow_output_controls: bool = False,
+    allow_yes: bool = False,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
@@ -6576,6 +6606,7 @@ def parse_command_flags(
     output_mode = OUTPUT_MODE_JSON if output_json else OUTPUT_MODE_HUMAN
     fields: list[str] | None = None
     limit: int | None = None
+    confirmed = False
     offset = 0
 
     def normalize_identifier_csv(raw_value: str, field: str) -> list[str]:
@@ -6721,6 +6752,21 @@ def parse_command_flags(
                 changed = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --changed value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--yes":
+            if not allow_yes:
+                emit_error(f"{command} does not accept --yes", command, EXIT_USAGE, output_json)
+            confirmed = True
+            i += 1
+            continue
+        if arg.startswith("--yes="):
+            if not allow_yes:
+                emit_error(f"{command} does not accept --yes", command, EXIT_USAGE, output_json)
+            try:
+                confirmed = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --yes value: {exc}", command, EXIT_USAGE, output_json)
             i += 1
             continue
         if arg == "--profile":
@@ -6887,6 +6933,8 @@ def parse_command_flags(
         options["limit"] = limit
     if offset:
         options["offset"] = offset
+    if confirmed:
+        options["yes"] = confirmed
     return options, []
 
 
@@ -10961,7 +11009,12 @@ def _command_exit_code(payload: dict[str, object]) -> int:
     return EXIT_RUNTIME
 
 
-def run_command(args: list[str], output_json: bool, strict: bool = False) -> int:
+def run_command(
+    args: list[str],
+    output_json: bool,
+    strict: bool = False,
+    non_interactive: bool = False,
+) -> int:
     if not args:
         emit_error("missing command\n\n" + emit_usage(), None, EXIT_USAGE, output_json)
 
@@ -11291,10 +11344,16 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
             False,
             output_json,
             allow_force_hooks_path=sub == "init",
+            allow_yes=sub == "init",
             default_strict=strict,
         )
         if sub == "init":
-            state = _init_autopilot(bool(options.get("force_hooks_path", False)))
+            state = _init_autopilot(
+                bool(options.get("force_hooks_path", False)),
+                bool(options.get("yes", False)),
+                non_interactive=non_interactive,
+                output_json=output_json,
+            )
             state["message"] = "autopilot init command executed."
             emit_command_result(state, output_json)
             return EXIT_SUCCESS
@@ -11457,6 +11516,7 @@ def run_command(args: list[str], output_json: bool, strict: bool = False) -> int
 def main(argv: list[str]) -> int:
     output_json = False
     strict = False
+    non_interactive = False
     i = 0
     while i < len(argv):
         arg = argv[i]
@@ -11482,6 +11542,17 @@ def main(argv: list[str]) -> int:
                 emit_error(f"invalid --strict value: {exc}", None, EXIT_USAGE, output_json)
             i += 1
             continue
+        if arg == "--non-interactive":
+            non_interactive = True
+            i += 1
+            continue
+        if arg.startswith("--non-interactive="):
+            try:
+                non_interactive = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --non-interactive value: {exc}", None, EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg in {"-h", "--help"}:
             print(emit_usage())
             return EXIT_SUCCESS
@@ -11504,7 +11575,7 @@ def main(argv: list[str]) -> int:
         break
 
     command_args = argv[i:]
-    return run_command(command_args, output_json, strict)
+    return run_command(command_args, output_json, strict, non_interactive)
 
 
 def og_cli() -> None:
