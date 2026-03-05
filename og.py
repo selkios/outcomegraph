@@ -3193,13 +3193,38 @@ def _consume_pending(repo_root: str) -> bool:
     _write_json_file(os.path.join(repo_root, WORK_STATE_FILE), state)
     return True
 
-def _build_materials_lock_payload(created_at: str) -> dict[str, object]:
+def _build_materials_lock_payload(
+    created_at: str,
+    entries: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    normalized_entries: list[dict[str, object]] = []
+    for raw_entry in entries or []:
+        if not isinstance(raw_entry, dict):
+            continue
+        path = str(raw_entry.get("path") or "").strip()
+        digest = str(raw_entry.get("digest") or "").strip()
+        if not path or not digest:
+            continue
+        entry = {
+            "path": path,
+            "digest": digest,
+        }
+        kind = str(raw_entry.get("kind") or "file").strip() or "file"
+        if kind:
+            entry["kind"] = kind
+        size = raw_entry.get("size")
+        if isinstance(size, int) and size >= 0:
+            entry["size"] = size
+        normalized_entries.append(entry)
+
     return {
         "schema_version": 2,
         "artifact_type": "materials_lock",
         "id": "materials-lock",
         "captured_at": created_at,
-        "entries": [],
+        "created_at": created_at,
+        "updated_at": created_at,
+        "entries": normalized_entries,
     }
 
 
@@ -5025,6 +5050,294 @@ def _collect_changed_materials(repo_root: str, changed_files: list[str]) -> list
     return materials
 
 
+def _collect_changed_material_updates(
+    repo_root: str,
+    changed_files: list[str],
+) -> tuple[list[dict[str, object]], list[str]]:
+    updates: dict[str, dict[str, object]] = {}
+    removed: list[str] = []
+    for path in changed_files:
+        normalized = _normalize_repo_relative_path(str(path))
+        digest = _file_sha256(normalized, repo_root)
+        if digest is None:
+            if normalized:
+                removed.append(normalized)
+            continue
+        absolute_path = os.path.join(repo_root, normalized)
+        try:
+            size = os.path.getsize(absolute_path)
+        except OSError:
+            size = None
+        updates[normalized] = {
+            "path": normalized,
+            "kind": "file",
+            "digest": digest,
+        }
+        if isinstance(size, int) and size >= 0:
+            updates[normalized]["size"] = size
+
+    return sorted(updates.values(), key=lambda item: item["path"]), sorted(set(removed))
+
+
+def _normalize_canonical_artifact_reference(raw: str, scope: str) -> str:
+    normalized = str(raw or "").strip().replace("\\", "/")
+    if normalized.startswith(f"{OG_ROOT}/"):
+        normalized = normalized[len(f"{OG_ROOT}/") :]
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    normalized = "/".join(part for part in normalized.split("/") if part and part not in {"."})
+    if not normalized:
+        return ""
+    if not normalized.startswith(f"{scope}/") and "/" not in normalized:
+        normalized = f"{scope}/{normalized}"
+    base, extension = os.path.splitext(normalized)
+    if extension.lower() not in {".json", ".yaml", ".yml"}:
+        normalized = f"{base}.json"
+    return normalized
+
+
+def _read_material_lock_records(repo_root: str) -> tuple[dict[str, dict[str, object]], str]:
+    path = os.path.join(repo_root, OG_ROOT, "materials.lock")
+    payload = _read_json_file(path)
+    created_at = _utc_timestamp()
+    if not isinstance(payload, dict):
+        return {}, created_at
+
+    existing_created_at = payload.get("created_at")
+    if isinstance(existing_created_at, str):
+        created_at = existing_created_at
+    elif isinstance(payload.get("captured_at"), str):
+        created_at = payload.get("captured_at")
+
+    records: dict[str, dict[str, object]] = {}
+    raw_entries = payload.get("entries") if isinstance(payload.get("entries"), list) else payload.get("material_paths")
+    if not isinstance(raw_entries, list):
+        return records, created_at
+
+    if isinstance(payload.get("entries"), list):
+        source = payload.get("entries")
+    else:
+        source = payload.get("material_paths")
+
+    for raw_entry in source or []:
+        if isinstance(raw_entry, dict):
+            path = str(raw_entry.get("path") or "").strip()
+            digest = str(raw_entry.get("digest") or "").strip()
+            if not path or not digest:
+                continue
+            normalized = _normalize_repo_relative_path(path)
+            if not normalized:
+                continue
+            entry = {
+                "path": normalized,
+                "digest": digest,
+                "kind": str(raw_entry.get("kind") or "file").strip() or "file",
+            }
+            size = raw_entry.get("size")
+            if isinstance(size, int) and size >= 0:
+                entry["size"] = size
+            records[normalized] = entry
+            continue
+        if isinstance(raw_entry, str):
+            normalized = _normalize_repo_relative_path(raw_entry)
+            if not normalized:
+                continue
+            digest = _file_sha256(normalized, repo_root)
+            if not digest:
+                continue
+            absolute_path = os.path.join(repo_root, normalized)
+            entry = {
+                "path": normalized,
+                "digest": digest,
+                "kind": "file",
+            }
+            try:
+                entry["size"] = os.path.getsize(absolute_path)
+            except OSError:
+                pass
+            records[normalized] = entry
+    return records, created_at
+
+
+def _merge_materials_lock_records(
+    existing: dict[str, dict[str, object]],
+    updated: list[dict[str, object]],
+    removed: list[str],
+) -> dict[str, dict[str, object]]:
+    merged = dict(existing)
+    for path in removed:
+        merged.pop(path, None)
+    for item in updated:
+        path = str(item.get("path") or "").strip()
+        if not path:
+            continue
+        digest = str(item.get("digest") or "").strip()
+        if not digest:
+            continue
+        record = {
+            "path": path,
+            "digest": digest,
+            "kind": str(item.get("kind") or "file").strip() or "file",
+        }
+        size = item.get("size")
+        if isinstance(size, int) and size >= 0:
+            record["size"] = size
+        merged[path] = record
+    return merged
+
+
+def _materials_lock_state_is_valid(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("schema_version") != 2:
+        return False
+    if str(payload.get("artifact_type") or "") != "materials_lock":
+        return False
+    if not isinstance(payload.get("entries"), list):
+        return False
+    return True
+
+
+def _material_lock_path() -> str:
+    return f"{OG_ROOT}/materials.lock"
+
+
+def _read_json_file_dict(path: str) -> dict[str, object] | None:
+    payload = _read_json_file(path)
+    return payload if isinstance(payload, dict) else None
+
+
+def _build_capsule_payload(
+    capsule_id: str,
+    changed_files: list[str],
+    decision_refs: list[str],
+    existing_payload: dict[str, object] | None,
+    created_at_default: str,
+    status: str = "active",
+) -> dict[str, object]:
+    now = _utc_timestamp()
+    existing = existing_payload or {}
+    existing_scope = _safe_string_list(existing.get("scope")) if isinstance(existing, dict) else []
+    scope = existing_scope if existing_scope else []
+    if not scope:
+        for item in _safe_string_list(changed_files):
+            normalized = _normalize_repo_relative_path(item)
+            if normalized.startswith(f"{OG_ROOT}/"):
+                continue
+            if not normalized:
+                continue
+            top = normalized.split("/", 1)[0]
+            if top and top not in scope:
+                scope.append(top)
+    if not scope:
+        scope = ["."]
+
+    existing_oracles = _safe_object_list(existing.get("oracles"))
+    oracles = existing_oracles if existing_oracles else [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+    if not isinstance(existing_oracles, list) or not existing_oracles:
+        oracles = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+
+    merged_decision_refs = _normalize_artifact_path_refs(existing.get("decision_refs"), "decisions") if isinstance(existing, dict) else []
+    merged_decision_refs.extend(_safe_string_list(decision_refs))
+    merged_decision_refs = sorted({item for item in merged_decision_refs if isinstance(item, str)})
+    created_at = str(existing.get("created_at") or created_at_default)
+    return {
+        "schema_version": 2,
+        "artifact_type": "capsule",
+        "id": _safe_slug(capsule_id),
+        "goal": str(existing.get("goal") or f"OutcomeGraph capsule for {capsule_id}"),
+        "scope": scope,
+        "oracles": oracles,
+        "materials_lock_ref": f"{OG_ROOT}/materials.lock",
+        "decision_refs": merged_decision_refs,
+        "lineage": existing.get("lineage") or {},
+        "status": str(existing.get("status") or status),
+        "created_at": created_at,
+        "updated_at": now,
+    }
+
+
+def _normalize_artifact_path_refs(raw_refs: object, scope: str) -> list[str]:
+    normalized: list[str] = []
+    if not isinstance(raw_refs, list):
+        return normalized
+    for raw_ref in raw_refs:
+        item = _normalize_canonical_artifact_reference(str(raw_ref), scope)
+        if item and item not in normalized:
+            normalized.append(item)
+    return normalized
+
+
+def _build_ref_payload(
+    ref_id: str,
+    capsule_id: str,
+    existing_payload: dict[str, object] | None,
+) -> dict[str, object]:
+    now = _utc_timestamp()
+    existing = existing_payload or {}
+    created_at = str(existing.get("created_at") or now)
+    return {
+        "schema_version": 2,
+        "artifact_type": "ref",
+        "id": _safe_slug(ref_id),
+        "capsule_id": _safe_slug(capsule_id),
+        "created_at": created_at,
+        "updated_at": now,
+    }
+
+
+def _build_decision_payload(
+    decision_id: str,
+    capsule_id: str,
+    claim_refs: list[str],
+    evidence_refs: list[str],
+    existing_payload: dict[str, object] | None,
+) -> dict[str, object]:
+    now = _utc_timestamp()
+    existing = existing_payload or {}
+    created_at = str(existing.get("created_at") or now)
+    merged_claim_refs = sorted(set(_safe_string_list(existing.get("claim_refs")) + [item for item in claim_refs if item]))
+    merged_evidence_refs = sorted(set(_safe_string_list(existing.get("evidence_refs")) + [item for item in evidence_refs if item]))
+    return {
+        "schema_version": 2,
+        "artifact_type": "decision",
+        "id": _safe_slug(decision_id),
+        "capsule_id": _safe_slug(capsule_id),
+        "statement": str(existing.get("statement") or f"Decision for {capsule_id} derived from sync outcome."),
+        "rationale": str(existing.get("rationale") or "Computed from distill/apply stage evidence."),
+        "claim_refs": merged_claim_refs,
+        "status": str(existing.get("status") or "accepted"),
+        "evidence_refs": merged_evidence_refs,
+        "created_at": created_at,
+        "updated_at": now,
+    }
+
+
+def _repair_materials_lock(repo_root: str, changed_files: list[str] | None = None) -> str:
+    changed_files = changed_files or []
+    normalized_changed = sorted({_normalize_repo_relative_path(str(item)) for item in changed_files if str(item).strip()})
+    updates, removed = _collect_changed_material_updates(repo_root, changed_files)
+    existing_records, created_at = _read_material_lock_records(repo_root)
+    merged_records = _merge_materials_lock_records(existing_records, updates, removed)
+    existing_payload = _read_json_file_dict(os.path.join(repo_root, _material_lock_path()))
+    needs_repair = not _materials_lock_state_is_valid(existing_payload)
+    if not normalized_changed and not updates and not removed and not needs_repair:
+        if existing_payload is None:
+            needs_repair = True
+        else:
+            return _material_lock_path()
+
+    entries = [record for record in merged_records.values()]
+    entries.sort(key=lambda item: item.get("path") or "")
+    payload = _build_materials_lock_payload(_utc_timestamp(), entries)
+    payload["created_at"] = created_at
+    payload["updated_at"] = _utc_timestamp()
+    payload["captured_at"] = payload["updated_at"]
+    relative_path = _material_lock_path()
+    _write_canonical_artifact(repo_root, relative_path, payload)
+    return relative_path
+
+
 def _run_distill_stage(
     repo_root: str,
     snapshot: dict[str, object],
@@ -5135,15 +5448,55 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
             "errors": ["Invalid generated_deltas format"],
         }
 
+    affected_capsules = _safe_string_list(distill_result.get("affected_capsules"))
+    if not affected_capsules:
+        affected_capsules = ["default"]
+
     applied_claims: list[str] = []
     applied_certs: list[str] = []
+    applied_capsules: list[str] = []
+    applied_refs: list[str] = []
+    applied_decisions: list[str] = []
+    processed_capsules: set[str] = set()
     errors: list[str] = []
+
+    def _normalize_capsule_id(raw: object, fallback: str = "default") -> str:
+        if not isinstance(raw, str):
+            return fallback
+        text = raw.strip()
+        if not text:
+            return fallback
+        slug = _safe_slug(text)
+        return slug if slug else fallback
+
+    def _safe_evidence_refs(raw: object) -> list[str]:
+        seen: set[str] = set()
+        refs: list[str] = []
+        if not isinstance(raw, list):
+            return refs
+        for pointer in raw:
+            if isinstance(pointer, str):
+                value = pointer.strip()
+                if value and value not in seen:
+                    seen.add(value)
+                    refs.append(value)
+                continue
+            if isinstance(pointer, dict):
+                target = pointer.get("target")
+                if isinstance(target, str):
+                    value = target.strip()
+                    if value and value not in seen:
+                        seen.add(value)
+                        refs.append(value)
+        return refs
+
+    normalized_discovered_capsules = sorted({_normalize_capsule_id(capsule_id) for capsule_id in affected_capsules})
 
     for delta in deltas:
         if not isinstance(delta, dict):
             errors.append("Invalid delta entry")
             continue
-        capsule_id = str(delta.get("capsule_id") or "default")
+        capsule_id = _normalize_capsule_id(delta.get("capsule_id"), "default")
         if str(delta.get("status") or "success") != "success":
             delta_errors = delta.get("errors")
             if isinstance(delta_errors, list):
@@ -5160,18 +5513,22 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
             if isinstance(pointer, dict):
                 receipt_pointers.append(pointer)
         receipt_paths = []
-        for pointer in sorted(receipt_pointers, key=lambda item: json.dumps(item, sort_keys=True)):
+        for pointer in sorted(receipt_pointers, key=lambda item: json.dumps(item, sort_keys=True, default=str)):
             if isinstance(pointer, dict):
                 receipt_paths.append(pointer)
 
         changed_files = delta.get("changed_files")
         if not isinstance(changed_files, list):
             changed_files = []
+        normalized_changed_files = [str(path) for path in changed_files]
         claims = delta.get("claims")
         if isinstance(claims, list):
             raw_claims = claims
         else:
             raw_claims = []
+
+        decision_ref_candidates = _normalize_artifact_path_refs(delta.get("decision_refs"), "decisions")
+
         try:
             claim_refs = []
             if not raw_claims:
@@ -5190,17 +5547,23 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
                 for claim in raw_claims:
                     if not isinstance(claim, dict):
                         continue
-                    if claim.get("capsule_id") and claim.get("capsule_id") != capsule_id:
+                    claim_capsule = _safe_slug(str(claim.get("capsule_id") or capsule_id))
+                    if claim.get("capsule_id") and claim_capsule != capsule_id:
                         continue
                     generated_claims.append(
                         {
-                        "id": str(claim.get("id") or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"),
-                        "capsule_id": str(claim.get("capsule_id") or capsule_id),
-                        "category": str(claim.get("category") or "behavior"),
-                        "text": str(claim.get("text") or f"Synthetic claim for {capsule_id} from distill stage."),
-                        "receipt_pointers": claim.get("receipt_pointers") if isinstance(claim.get("receipt_pointers"), list) else [],
-                    }
-                )
+                            "id": str(
+                                claim.get("id")
+                                or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"
+                            ),
+                            "capsule_id": claim_capsule,
+                            "category": str(claim.get("category") or "behavior"),
+                            "text": str(claim.get("text") or f"Synthetic claim for {capsule_id} from distill stage."),
+                            "receipt_pointers": claim.get("receipt_pointers")
+                            if isinstance(claim.get("receipt_pointers"), list)
+                            else [],
+                        }
+                    )
             for generated_claim in generated_claims:
                 claim_payload = _build_claim_payload(
                     str(generated_claim["id"]),
@@ -5230,6 +5593,63 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
             continue
 
         try:
+            decision_id = f"dec-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(applied_decisions)}')}"
+            decision_path = f"{OG_ROOT}/decisions/{decision_id}.json"
+            decision_payload = _build_decision_payload(
+                decision_id,
+                capsule_id,
+                claim_refs,
+                list(_safe_evidence_refs(receipt_paths)),
+                _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "decisions", f"{decision_id}.json")),
+            )
+            os.makedirs(os.path.dirname(os.path.join(repo_root, OG_ROOT, "decisions", f"{decision_id}.json")), exist_ok=True)
+            _write_canonical_artifact(
+                repo_root,
+                decision_path,
+                decision_payload,
+            )
+            decision_ref = _normalize_canonical_artifact_reference(decision_path, "decisions")
+            applied_decisions.append(decision_ref)
+        except Exception as exc:
+            errors.append(f"Failed to write decision for {capsule_id}: {exc}")
+            continue
+
+        try:
+            capsule_path = f"{OG_ROOT}/capsules/{capsule_id}.json"
+            decision_refs = list(dict.fromkeys([*decision_ref_candidates, decision_ref]))
+            existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
+            capsule_payload = _build_capsule_payload(
+                capsule_id,
+                normalized_changed_files,
+                decision_refs,
+                existing_payload,
+                _utc_timestamp(),
+            )
+            _write_canonical_artifact(
+                repo_root,
+                capsule_path,
+                capsule_payload,
+            )
+            applied_capsules.append(capsule_path)
+            processed_capsules.add(capsule_id)
+
+            ref_path = f"{OG_ROOT}/refs/{capsule_id}.json"
+            ref_payload = _build_ref_payload(
+                capsule_id,
+                capsule_id,
+                _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "refs", f"{capsule_id}.json")),
+            )
+            _write_canonical_artifact(
+                repo_root,
+                ref_path,
+                ref_payload,
+            )
+            applied_refs.append(ref_path)
+        except Exception as exc:
+            errors.append(f"Failed to write capsule/ref state for {capsule_id}: {exc}")
+            continue
+
+        try:
             certificate_id = f"cert-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:certificate')}"
             cert_receipts = list(receipt_paths)
             cert_payload = _build_certificate_payload(
@@ -5255,6 +5675,44 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
         except Exception as exc:
             errors.append(f"Failed to write certificate for {capsule_id}: {exc}")
 
+    baseline_capsules = normalized_discovered_capsules or ["default"]
+    if "default" not in baseline_capsules:
+        baseline_capsules.append("default")
+    for capsule_id in sorted(set(baseline_capsules)):
+        if capsule_id in processed_capsules:
+            continue
+        try:
+            existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
+            capsule_payload = _build_capsule_payload(
+                capsule_id,
+                [],
+                [],
+                existing_payload,
+                _utc_timestamp(),
+            )
+            capsule_path = f"{OG_ROOT}/capsules/{capsule_id}.json"
+            _write_canonical_artifact(
+                repo_root,
+                capsule_path,
+                capsule_payload,
+            )
+            applied_capsules.append(capsule_path)
+
+            ref_payload = _build_ref_payload(
+                capsule_id,
+                capsule_id,
+                _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "refs", f"{capsule_id}.json")),
+            )
+            ref_path = f"{OG_ROOT}/refs/{capsule_id}.json"
+            _write_canonical_artifact(
+                repo_root,
+                ref_path,
+                ref_payload,
+            )
+            applied_refs.append(ref_path)
+        except Exception as exc:
+            errors.append(f"Failed to materialize baseline capsule state for {capsule_id}: {exc}")
+
     if errors:
         return {
             "name": "apply",
@@ -5264,6 +5722,9 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
             "applied_changes": len(applied_claims),
             "applied_claims": applied_claims,
             "applied_certificates": applied_certs,
+            "applied_capsules": applied_capsules,
+            "applied_refs": applied_refs,
+            "applied_decisions": applied_decisions,
             "errors": errors,
         }
 
@@ -5275,6 +5736,9 @@ def _run_apply_stage(repo_root: str, distill_result: dict[str, object], run_id: 
         "applied_changes": len(applied_claims),
         "applied_claims": applied_claims,
         "applied_certificates": applied_certs,
+        "applied_capsules": applied_capsules,
+        "applied_refs": applied_refs,
+        "applied_decisions": applied_decisions,
         "applied_deltas": deltas,
     }
 
@@ -6305,6 +6769,10 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
 
     try:
         _validate_canonical_artifact_records(repo_root)
+        changed_files = snapshot.get("changed_files")
+        if not isinstance(changed_files, list):
+            changed_files = []
+        snapshot["materials_lock_ref"] = _repair_materials_lock(repo_root, [str(item) for item in changed_files])
     except ValueError as exc:
         payload = {
             "status": "error",
@@ -6337,6 +6805,40 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             last_sync_id=run_id,
             last_idempotency_key=idempotency_key,
             last_message="sync failed canonical validation",
+        )
+        return payload
+    except Exception as exc:
+        payload = {
+            "status": "error",
+            "command": "sync",
+            "subcommand": None,
+            "run_id": run_id,
+            "idempotency_key": idempotency_key,
+            "snapshot": snapshot,
+            "pending": False,
+            "pending_consumed": False,
+            "short_circuit": False,
+            "steps": [
+                {
+                    "name": "materials_lock",
+                    "status": "error",
+                    "message": f"Failed to repair materials lock: {exc}",
+                }
+            ],
+            "message": "sync failed during materials lock repair.",
+            "options": {
+                "changed": options.get("changed", False),
+                "profile": profile,
+                "mode": mode,
+            },
+        }
+        _record_sync_summary_event(repo_root, payload, 0)
+        _build_work_payload(
+            repo_root,
+            status="degraded",
+            last_sync_id=run_id,
+            last_idempotency_key=idempotency_key,
+            last_message="sync failed materials lock repair",
         )
         return payload
 

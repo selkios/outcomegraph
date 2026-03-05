@@ -790,13 +790,13 @@
       "depends_on": [
         "OG-SPEC-001"
       ],
-      "updated_at": "2026-03-05T08:48:35Z"
+      "updated_at": "2026-03-05T08:49:02Z"
     },
     {
       "id": "OG-SPEC-003",
       "title": "Materialize capsule, ref, and decision lifecycle as first-class canonical artifacts",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Ensure sync/apply produces and updates canonical capsule/ref/decision records rather than only claims/certificates.",
       "steps": [
         "Generate baseline capsule artifacts for discovered and default capsules",
@@ -819,7 +819,7 @@
       "depends_on": [
         "OG-SPEC-002"
       ],
-      "updated_at": "2026-03-05T08:42:38Z"
+      "updated_at": "2026-03-05T08:53:48Z"
     },
     {
       "id": "OG-SPEC-004",
