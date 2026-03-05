@@ -839,8 +839,238 @@ Core commands:
   og mcp-server
   og optimize prompts
   og autopilot init|disable
-  og daemon install|start|stop|status
+  og daemon install|start|stop|status|run
+
+Use: og <command> --help for command-specific contracts.
 """
+
+
+def _command_contract_help() -> str:
+    return """Output modes:
+  default   human-readable payload/message output
+  --json    machine-readable JSON payload output
+
+Exit codes:
+  0        success
+  1        runtime failure
+  64       usage / validation failure
+"""
+
+
+def _command_help(usage: str, summary: str, options: list[str], examples: list[str], notes: list[str] | None = None) -> str:
+    lines = [f"Usage: {usage}", "", summary, "", "Accepted options:"]
+    if options:
+        lines.extend(f"  {item}" for item in options)
+    else:
+        lines.append("  none")
+    lines.extend(["", "Examples:"])
+    if examples:
+        lines.extend(f"  {item}" for item in examples)
+    if notes:
+        lines.extend(["", "Notes:"])
+        lines.extend(f"  {item}" for item in notes)
+    lines.append("")
+    lines.append(_command_contract_help())
+    return "\n".join(lines)
+
+
+def _help_for_command(command: str) -> str:
+    normalized = " ".join(command.split())
+    if normalized == "init":
+        return _command_help(
+            "og init",
+            "Initialize .outcomegraph state and default policy files.",
+            ["--json"],
+            ["og init"],
+        )
+    if normalized == "sync":
+        return _command_help(
+            "og sync [--profile analyze|propose|apply] [--mode observe|autonomous] [--force-full-sync[=true|false]]",
+            "Collect changes, distill/categorize them, apply artifacts, verify, and export outputs.",
+            [
+                "--json",
+                "--profile analyze|propose|apply",
+                "--mode observe|autonomous",
+                "--force-full-sync[=true|false]",
+            ],
+            [
+                "og sync",
+                "og sync --profile propose --mode autonomous",
+                "og sync --force-full-sync=true",
+            ],
+        )
+    if normalized == "verify":
+        return _command_help(
+            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "Run verification for known or changed capsules and emit verification artifacts.",
+            ["--json", "--changed[=true|false]", "--profile analyze|propose|apply", "--mode observe|autonomous"],
+            ["og verify", "og verify --changed", "og verify --changed=false --json"],
+        )
+    if normalized == "replay":
+        return _command_help(
+            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
+            ["--json", "--changed[=true|false]", "--profile analyze|propose|apply", "--mode observe|autonomous"],
+            ["og replay", "og replay --changed", "og replay --json"],
+        )
+    if normalized == "status":
+        return _command_help(
+            "og status",
+            "Show freshness, lock, verification, and daemon/autopilot state.",
+            ["--json"],
+            ["og status", "og status --json"],
+        )
+    if normalized == "export":
+        return _command_help(
+            "og export",
+            "Render configured export surfaces from canonical artifacts.",
+            ["--json"],
+            ["og export", "og export --json"],
+        )
+    if normalized == "clean":
+        return _command_help(
+            "og clean [--scope runtime|generated|all] [--dry-run[=true|false]] [--yes]",
+            "Remove runtime and/or generated outcomegraph state.",
+            [
+                "--scope runtime|generated|all",
+                "--dry-run[=true|false]",
+                "--yes[=true|false]",
+                "--json",
+            ],
+            [
+                "og clean --scope runtime",
+                "og clean --scope all --dry-run",
+                "og clean --scope generated --yes",
+            ],
+        )
+    if normalized == "explain":
+        return _command_help(
+            "og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]] [--profile analyze|propose|apply] [--mode observe|autonomous]",
+            "Explain artifact provenance and proof chain for selected capsules, refs, and certificates.",
+            [
+                "--json",
+                "--capsule <id>[,<id>...]",
+                "--ref <id>[,<id>...]",
+                "--certificate <id>[,<id>...]",
+                "--profile analyze|propose|apply",
+                "--mode observe|autonomous",
+            ],
+            [
+                "og explain",
+                "og explain --capsule default",
+                "og explain --json --capsule default --ref ref-1",
+            ],
+        )
+    if normalized == "drift":
+        return _command_help(
+            "og drift",
+            "Run canonical drift checks for policy and certificate health.",
+            ["--json"],
+            ["og drift", "og drift --json"],
+        )
+    if normalized == "mcp-server":
+        return _command_help(
+            "og mcp-server",
+            "Render MCP server control surface definitions (tools/resources/prompts).",
+            ["--json"],
+            ["og mcp-server", "og mcp-server --json"],
+        )
+    if normalized == "optimize":
+        return _command_help(
+            "og optimize",
+            "Command group for optimization workflows.",
+            ["subcommand: prompts"],
+            ["og optimize --help", "og optimize prompts --help"],
+            ["subcommand aliases are currently not supported"],
+        )
+    if normalized == "optimize prompts":
+        return _command_help(
+            "og optimize prompts --dataset <path> --candidate <path> --baseline <path> [--metric contains|exact] [--min-improvement <float>] [--approve[=true|false]]",
+            "Run dataset-based prompt optimization and optionally activate a candidate when it passes thresholds.",
+            [
+                "--dataset <path>",
+                "--candidate <path>",
+                "--baseline <path>",
+                "--metric contains|exact",
+                "--min-improvement <float>",
+                "--approve[=true|false]",
+                "--json",
+            ],
+            [
+                "og optimize prompts --dataset .outcomegraph/datasets/bugfix.json --candidate next.txt --baseline base.txt",
+                "og optimize prompts --dataset ds.json --candidate next.txt --baseline base.txt --approve",
+            ],
+        )
+    if normalized == "autopilot":
+        return _command_help(
+            "og autopilot",
+            "Command group for hook bootstrap/teardown.",
+            ["subcommand: init | disable"],
+            ["og autopilot --help", "og autopilot init --help", "og autopilot disable --help"],
+        )
+    if normalized == "autopilot init":
+        return _command_help(
+            "og autopilot init [--force-hooks-path[=true|false]]",
+            "Install outcomegraph-managed git hooks for lifecycle integration.",
+            [
+                "--force-hooks-path[=true|false]",
+                "--json",
+            ],
+            ["og autopilot init", "og autopilot init --force-hooks-path --json"],
+        )
+    if normalized == "autopilot disable":
+        return _command_help(
+            "og autopilot disable",
+            "Remove outcomegraph-managed hooks and restore prior hook state where available.",
+            ["--json"],
+            ["og autopilot disable", "og autopilot disable --json"],
+        )
+    if normalized == "daemon":
+        return _command_help(
+            "og daemon",
+            "Command group for watcher lifecycle.",
+            ["subcommand: install | start | stop | status | run"],
+            ["og daemon --help", "og daemon status --help", "og daemon install --help", "og daemon run --help"],
+        )
+    if normalized == "daemon install":
+        return _command_help(
+            "og daemon install",
+            "Install the long-running watcher wrapper under .outcomegraph/work/daemon.",
+            ["--json"],
+            ["og daemon install", "og daemon install --json"],
+        )
+    if normalized == "daemon start":
+        return _command_help(
+            "og daemon start",
+            "Start the managed watcher process and persist runtime status.",
+            ["--json"],
+            ["og daemon start", "og daemon start --json"],
+        )
+    if normalized == "daemon stop":
+        return _command_help(
+            "og daemon stop",
+            "Stop the managed watcher process.",
+            ["--json"],
+            ["og daemon stop", "og daemon stop --json"],
+        )
+    if normalized == "daemon status":
+        return _command_help(
+            "og daemon status",
+            "Read watcher install/runtime and last-sync status.",
+            ["--json"],
+            ["og daemon status", "og daemon status --json"],
+        )
+    if normalized == "daemon run":
+        return _command_help(
+            "og daemon run",
+            "Internal run loop entrypoint. This command is used by the installed watcher wrapper.",
+            ["none"],
+            ["og daemon run"],
+            [
+                "This command blocks while polling repository changes; no JSON payload is emitted.",
+            ],
+        )
+    return emit_usage() + "\nUse --help with a recognized command for details."
 
 
 def emit_error(message: str, command: str | None, code: int, output_json: bool = False) -> None:
@@ -5220,7 +5450,7 @@ def parse_command_flags(
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": emit_usage() + "\nUse --help with a specific command for details."}, output_json)
+            emit_command_result({"message": _help_for_command(command)}, output_json)
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -5401,13 +5631,7 @@ def parse_command_flags(
 
 
 def _clean_usage() -> str:
-    return (
-        "Usage: og clean [--scope runtime|generated|all] [--dry-run] [--yes]\n\n"
-        "Scopes:\n"
-        "  runtime   remove transient runtime state under .outcomegraph (work/cache/events/objects/traces)\n"
-        "  generated remove generated canonical/export artifacts (capsules/refs/decisions/claims/certificates/export/materials.lock)\n"
-        "  all       remove .outcomegraph and managed skill/symlink outputs in this repository\n"
-    )
+    return _help_for_command("clean")
 
 
 def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
@@ -5418,7 +5642,7 @@ def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": _clean_usage()}, output_json)
+            emit_command_result({"message": _help_for_command("clean")}, output_json)
             raise SystemExit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -5595,7 +5819,7 @@ def _parse_optimize_prompts_flags(
     while i < len(args):
         arg = args[i]
         if arg in {"-h", "--help"}:
-            emit_command_result({"message": emit_usage() + "\nUse --help with a specific command for details."}, output_json)
+            emit_command_result({"message": _help_for_command("optimize prompts")}, output_json)
             sys.exit(EXIT_SUCCESS)
         if arg == "--json":
             output_json = True
@@ -9455,6 +9679,9 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
     if command == "optimize":
+        if rest and rest[0] in {"-h", "--help"}:
+            emit_command_result({"message": _help_for_command("optimize")}, output_json)
+            return EXIT_SUCCESS
         if not rest:
             emit_error("missing optimize subcommand\n\nAvailable: prompts", "optimize", EXIT_USAGE, output_json)
         sub = rest[0]
@@ -9476,6 +9703,9 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
 
     if command == "autopilot":
+        if rest and rest[0] in {"-h", "--help"}:
+            emit_command_result({"message": _help_for_command("autopilot")}, output_json)
+            return EXIT_SUCCESS
         if not rest:
             emit_error("missing autopilot subcommand\n\nAvailable: init, disable", "autopilot", EXIT_USAGE, output_json)
         sub = rest[0]
@@ -9508,12 +9738,15 @@ def run_command(args: list[str], output_json: bool) -> int:
         return EXIT_SUCCESS
 
     if command == "daemon":
+        if rest and rest[0] in {"-h", "--help"}:
+            emit_command_result({"message": _help_for_command("daemon")}, output_json)
+            return EXIT_SUCCESS
         if not rest:
-            emit_error("missing daemon action\n\nAvailable: install, start, stop, status", "daemon", EXIT_USAGE, output_json)
+            emit_error("missing daemon action\n\nAvailable: install, start, stop, status, run", "daemon", EXIT_USAGE, output_json)
         sub = rest[0]
         if sub not in {"install", "start", "stop", "status", "run"}:
             emit_error(
-                f"unknown daemon action '{sub}'\n\nAvailable: install, start, stop, status",
+                f"unknown daemon action '{sub}'\n\nAvailable: install, start, stop, status, run",
                 "daemon",
                 EXIT_USAGE,
                 output_json,

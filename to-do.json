@@ -5,10 +5,11 @@
     "root": "."
   },
   "source_files": [
-    "README.md",
-    "SPEC-v2.md",
+    "AGENT_FIRST_CLI_REVIEW.md",
     "ARCHITECTURE.md",
-    "QUICKSTART.md"
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md"
   ],
   "tasks": [
     {
@@ -1084,9 +1085,453 @@
       ],
       "files": [
         "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
+      ],
+      "updated_at": "2026-03-05T09:26:18Z"
+    },
+    {
+      "id": "PROJECT-DONE",
+      "title": "Project done: no new tasks",
+      "priority": 5,
+      "status": "done",
+      "details": "Final review found no new action items from the required source-file pass.",
+      "tags": [
+        "project-done"
+      ]
+    },
+    {
+      "id": "OG-AGENT-001",
+      "title": "Make `--help` a stable, command-specific contract for every command",
+      "priority": 1,
+      "status": "done",
+      "details": "Implemented stable, per-command --help contracts for top-level and nested commands, including optimize prompts, autopilot, and daemon (with daemon run). Updated docs and help-contract tests.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Add dedicated help renderers for every top-level and nested command (`optimize prompts`, `autopilot`, `daemon`) and make `--help` return exit code 0 everywhere",
+        "Ensure help text lists every implemented subcommand (including `daemon run`) and every accepted flag for that command",
+        "Document stable output mode behavior and exit code meanings directly in each command help section",
+        "Add tests that snapshot help output shape and guard against accidental contract drift"
+      ],
+      "tags": [
+        "cli",
+        "help",
+        "agent-contract"
+      ],
+      "files": [
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "QUICKSTART.md",
+        "README.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py"
       ],
-      "updated_at": "2026-03-05T09:26:11Z"
+      "updated_at": "2026-03-05T16:49:02Z",
+      "blockers": []
+    },
+    {
+      "id": "OG-AGENT-002",
+      "title": "Adopt a single versioned JSON envelope across all commands",
+      "priority": 1,
+      "status": "todo",
+      "details": "Standardize machine output so agents can parse one schema for all command results and failures. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Define canonical envelope fields (`schema_version`, `command`, `status`, `run_id`, `data`, `errors`, `warnings`, `metrics`) and preserve deterministic key ordering",
+        "Refactor every command path to emit the shared envelope in `--json` mode, including usage and internal-error paths",
+        "Add explicit success payload markers even when no data is returned",
+        "Document breaking-change migration guidance and update examples in docs."
+      ],
+      "tags": [
+        "cli",
+        "json",
+        "schema",
+        "agent-contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-001"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:38:15Z"
+    },
+    {
+      "id": "OG-AGENT-003",
+      "title": "Implement rigorous typed error model with retryability",
+      "priority": 1,
+      "status": "todo",
+      "details": "Upgrade error payloads to include stable machine fields so agents can branch safely without text parsing. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Define error taxonomy (`error_class`, stable `error_code`, `retryable`, bounded `hint`) and map existing codes into the taxonomy",
+        "Ensure all failures return typed errors in the shared envelope (usage, policy, integrity, adapter, runtime)",
+        "Document and test exit-code mapping against error classes for stable branching behavior",
+        "Add retryability tests for transient vs non-transient failures"
+      ],
+      "tags": [
+        "cli",
+        "errors",
+        "exit-codes",
+        "agent-contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-002"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-004",
+      "title": "Add machine introspection commands (`schema` and `describe`)",
+      "priority": 1,
+      "status": "todo",
+      "details": "Provide runtime-discoverable command signatures and request/response schemas so agents do not need prompt-embedded docs. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Implement `og schema` and `og describe <command>` returning JSON-only introspection payloads",
+        "Include flags, parameter types, required fields, response envelope shape, and known error codes",
+        "Version introspection payloads and keep them aligned with CLI behavior using golden tests",
+        "Reference introspection commands in README/QUICKSTART as the preferred agent bootstrap path"
+      ],
+      "tags": [
+        "cli",
+        "introspection",
+        "schema",
+        "agent-contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-002"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "QUICKSTART.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-005",
+      "title": "Harden path and identifier validation for agent-supplied inputs",
+      "priority": 1,
+      "status": "todo",
+      "details": "Treat agent input as adversarial and enforce strict path/ID validation to prevent traversal, encoding tricks, and control-character abuse. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Constrain dataset/prompt file inputs to repository-safe roots and reject traversal (`..`) and absolute escapes where not explicitly allowed",
+        "Reject control characters and malformed percent-encoding in identifier-like inputs",
+        "Normalize and validate IDs against a strict allowlist character set before use in paths/receipts",
+        "Add dedicated negative tests for traversal, control chars, double-encoding, and malformed IDs"
+      ],
+      "tags": [
+        "security",
+        "validation",
+        "agent-safety"
+      ],
+      "files": [
+        "og.py",
+        "SECURITY_POLICY.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-006",
+      "title": "Add first-class raw payload input mode and CLI strictness",
+      "priority": 1,
+      "status": "todo",
+      "details": "Support full request payload submission for complex actions and provide `--strict` to forbid silent defaults/fallbacks in production automation. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Introduce `--params <json-file|->` (or equivalent) for commands with complex input sets",
+        "Define precedence rules when both convenience flags and raw payload are provided",
+        "Implement global `--strict` that fails on unknown fields, implicit defaults, and lossy coercions",
+        "Document strict-mode behavior and add contract conformance tests."
+      ],
+      "tags": [
+        "cli",
+        "input",
+        "strict-mode",
+        "agent-contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-002",
+        "OG-AGENT-003"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:38:15Z"
+    },
+    {
+      "id": "OG-AGENT-007",
+      "title": "Add payload shaping and streaming controls for large outputs",
+      "priority": 2,
+      "status": "todo",
+      "details": "Reduce token/context waste by letting agents request only needed fields and paged/streamed lists. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Add `--fields` field-mask support to list/read-style commands",
+        "Introduce pagination controls (`--limit`, cursor or offset semantics) with stable ordering",
+        "Add `--output jsonl` for streaming list-like responses and long-running result sets",
+        "Cover output-shaping and pagination determinism with tests"
+      ],
+      "tags": [
+        "cli",
+        "output",
+        "streaming",
+        "agent-efficiency"
+      ],
+      "depends_on": [
+        "OG-AGENT-002"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-008",
+      "title": "Remove interaction traps with explicit non-interactive controls",
+      "priority": 2,
+      "status": "todo",
+      "details": "Guarantee automation-safe behavior by defaulting away from prompts and requiring explicit opt-in for interactive flows. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Add global `--non-interactive` and ensure prompting paths fail with typed errors instead of hanging",
+        "Ensure destructive/privileged actions accept explicit confirmation flags (`--yes`) and never require terminal prompts",
+        "Update autopilot and related flows so CI/local environment differences do not change command contract",
+        "Add integration tests for TTY and non-TTY behavior parity"
+      ],
+      "tags": [
+        "cli",
+        "non-interactive",
+        "automation"
+      ],
+      "depends_on": [
+        "OG-AGENT-001",
+        "OG-AGENT-003"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "RUNBOOKS.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-009",
+      "title": "Expand recovery tooling (`validate`, `doctor`, retries, and timeout controls)",
+      "priority": 2,
+      "status": "todo",
+      "details": "Shift from best-effort execution to explicit validate-before-mutate and bounded auto-recovery controls. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Add validate/dry-run modes for mutating commands beyond `clean`",
+        "Implement `og doctor` for machine-readable diagnostics and remediation hints",
+        "Expose bounded retry and timeout knobs (`--max-retries`, timeout flags) where subprocess/network-like operations occur",
+        "Report retryability in error payloads and capture recovery outcomes in summary events"
+      ],
+      "tags": [
+        "recovery",
+        "doctor",
+        "retries",
+        "reliability"
+      ],
+      "depends_on": [
+        "OG-AGENT-003"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "RUNBOOKS.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-010",
+      "title": "Define explicit session/state policy and emit `session_id`",
+      "priority": 2,
+      "status": "todo",
+      "details": "Make long-running or resumable behavior explicit so agents can reason about lifecycle, expiry, and conflict handling. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Define session model for lock/daemon/autopilot flows (ephemeral vs resumable) and document lifecycle rules",
+        "Emit `session_id` in relevant command envelopes and event summaries",
+        "Add typed session errors for expiry, contention, and invalid resume attempts",
+        "Add tests for session continuity and conflict semantics"
+      ],
+      "tags": [
+        "session",
+        "state",
+        "agent-contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-002",
+        "OG-AGENT-003"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "SPEC-v2.md",
+        "RUNBOOKS.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-011",
+      "title": "Ship a top-level versioned agent guidance contract",
+      "priority": 2,
+      "status": "todo",
+      "details": "Publish stable agent operating guidance alongside the binary instead of relying only on generated exports. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Create top-level `CONTEXT.md` (or root `AGENTS.md`) with invariants for safe automation",
+        "Document mandatory patterns: fields filtering, dry-run for writes, confirmation for destructive actions, strict mode expectations",
+        "Version this guide and tie it to CLI/schema versions",
+        "Keep exported guidance in sync with canonical top-level guidance via CI checks"
+      ],
+      "tags": [
+        "docs",
+        "agent-guidance",
+        "contract"
+      ],
+      "depends_on": [
+        "OG-AGENT-001",
+        "OG-AGENT-002"
+      ],
+      "files": [
+        "README.md",
+        "SPEC-v2.md",
+        "CONTEXT.md",
+        ".outcomegraph/export/AGENTS.md",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-012",
+      "title": "Add environment-variable defaults for headless machine usage",
+      "priority": 3,
+      "status": "todo",
+      "details": "Support non-flag configuration for CI/agent environments (default output mode, profile/mode, and credential/config paths). Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Define and implement env vars for default output format, profile, mode, and optional config file locations",
+        "Document precedence order: CLI flags > env vars > config defaults",
+        "Ensure env-driven behavior is deterministic and reflected in command metadata",
+        "Add tests for precedence and environment parity"
+      ],
+      "tags": [
+        "cli",
+        "headless",
+        "configuration"
+      ],
+      "depends_on": [
+        "OG-AGENT-002"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "QUICKSTART.md",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
+    },
+    {
+      "id": "OG-AGENT-013",
+      "title": "Unify CLI and typed tool surfaces from one source of truth",
+      "priority": 3,
+      "status": "todo",
+      "details": "Prevent behavior drift between CLI and MCP/typed integrations by generating both contracts from shared definitions. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Create shared command metadata model that drives CLI parser/help/introspection and MCP tool/resource descriptors",
+        "Ensure control-surface generation preserves identical command semantics and error contracts",
+        "Add contract tests that compare CLI introspection output with MCP definitions",
+        "Document the generation workflow and single-source contract guarantees."
+      ],
+      "tags": [
+        "mcp",
+        "cli",
+        "contract",
+        "generation"
+      ],
+      "depends_on": [
+        "OG-AGENT-004"
+      ],
+      "files": [
+        "og.py",
+        "SPEC-v2.md",
+        "README.md",
+        ".outcomegraph/export/mcp-resources.json",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:38:15Z"
+    },
+    {
+      "id": "OG-AGENT-014",
+      "title": "Track and report agent-native reliability metrics",
+      "priority": 3,
+      "status": "todo",
+      "details": "Add first-class metrics to evaluate AI-native usability and recovery effectiveness. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "steps": [
+        "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
+        "Define metric schema for commands-per-successful-task, schema-valid output rate, retry auto-recovery rate, and session churn",
+        "Instrument command execution and summary events to emit these metrics in machine-readable form",
+        "Expose metric snapshots via status/introspection surfaces",
+        "Add tests and runbook guidance for interpreting and regressing metric quality"
+      ],
+      "tags": [
+        "metrics",
+        "observability",
+        "agent-experience"
+      ],
+      "depends_on": [
+        "OG-AGENT-002",
+        "OG-AGENT-003",
+        "OG-AGENT-009",
+        "OG-AGENT-010"
+      ],
+      "files": [
+        "og.py",
+        "README.md",
+        "RUNBOOKS.md",
+        "SPEC-v2.md",
+        "AGENT_FIRST_CLI_REVIEW.md"
+      ],
+      "updated_at": "2026-03-05T16:37:41Z"
     }
   ]
 }

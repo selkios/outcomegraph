@@ -32,6 +32,15 @@ og replay --changed
 
 Use `og explain` to inspect what changed, why, and evidence pointers.
 
+You can also discover per-command contracts at any time:
+
+```bash
+og --help
+og sync --help
+og daemon --help
+og daemon run --help
+```
+
 ## 2b) Experimental prompt optimization
 
 `og optimize prompts` compares two prompt files using an evaluation dataset and writes an optimization result under `.outcomegraph/datasets/`.

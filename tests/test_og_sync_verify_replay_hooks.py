@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+from contextlib import redirect_stdout
 import subprocess
 import tempfile
 import warnings
@@ -27,6 +29,54 @@ class _RepoTestCase(TestCase):
 
     def _git_completed(self, returncode: int, stdout: str = "", stderr: str = ""):
         return subprocess.CompletedProcess(args=["git"], returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+class TestHelpContracts(TestCase):
+    def _run_main(self, args: list[str]) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = og.main(args)
+        return code, buffer.getvalue()
+
+    def test_top_level_help_includes_global_contract(self) -> None:
+        code, text = self._run_main(["--help"])
+        self.assertEqual(code, 0)
+        self.assertIn("Usage: og [--json] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>", text)
+        self.assertIn("Use: og <command> --help for command-specific contracts.", text)
+        self.assertIn("Core commands:", text)
+
+    def test_command_specific_help_contracts_are_rendered(self) -> None:
+        test_cases = [
+            (["init", "--help"], "Usage: og init"),
+            (["sync", "--help"], "Usage: og sync"),
+            (["verify", "--help"], "Usage: og verify"),
+            (["replay", "--help"], "Usage: og replay"),
+            (["status", "--help"], "Usage: og status"),
+            (["export", "--help"], "Usage: og export"),
+            (["clean", "--help"], "Usage: og clean"),
+            (["explain", "--help"], "Usage: og explain"),
+            (["drift", "--help"], "Usage: og drift"),
+            (["mcp-server", "--help"], "Usage: og mcp-server"),
+            (["optimize", "--help"], "Usage: og optimize"),
+            (["optimize", "prompts", "--help"], "Usage: og optimize prompts"),
+            (["autopilot", "--help"], "Usage: og autopilot"),
+            (["autopilot", "init", "--help"], "Usage: og autopilot init"),
+            (["autopilot", "disable", "--help"], "Usage: og autopilot disable"),
+            (["daemon", "--help"], "Usage: og daemon"),
+            (["daemon", "install", "--help"], "Usage: og daemon install"),
+            (["daemon", "start", "--help"], "Usage: og daemon start"),
+            (["daemon", "stop", "--help"], "Usage: og daemon stop"),
+            (["daemon", "status", "--help"], "Usage: og daemon status"),
+            (["daemon", "run", "--help"], "Usage: og daemon run"),
+        ]
+
+        for args, expected_usage in test_cases:
+            code, text = self._run_main(args)
+            self.assertEqual(code, 0, msg=f"help command failed for {args}")
+            self.assertIn(expected_usage, text, msg=f"missing usage block for {args}")
+            self.assertIn("Accepted options:", text, msg=f"missing options block for {args}")
+            self.assertIn("Output modes:", text, msg=f"missing output modes block for {args}")
+            self.assertIn("Exit codes:", text, msg=f"missing exit codes block for {args}")
 
 
 class TestHookLifecycle(_RepoTestCase):

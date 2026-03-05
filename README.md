@@ -114,12 +114,25 @@ og verify --changed --json  # checks changed capsules only
 - `autopilot init|disable`
 - `daemon install|start|stop|status|run`
 
+Every top-level command supports `--help` as a stable contract surface:
+
+- `og <command> --help` prints command-specific usage and accepted options.
+- `og daemon --help` and `og daemon run --help` are valid contract entrypoints.
+
 Common flags:
 
 - `--json` / `--json=true|false`
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
 - `--changed` (for focused sync/verify/replay behavior)
+
+Command help contracts also list output modes and exit semantics:
+
+- `default`: human-readable output
+- `--json`: machine-readable output
+- exit `0`: success
+- exit `1`: runtime failure
+- exit `64`: usage/validation failure
 
 If you are running from source, prefer:
 
