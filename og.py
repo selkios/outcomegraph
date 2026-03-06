@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import ContextVar
 import importlib.metadata
 import json
@@ -220,6 +221,21 @@ CLEAN_ALL_TARGETS = (
     ".agents/skills/og",
     ".claude/skills/og",
 )
+SYNC_GENERATED_IGNORE_PREFIXES = (
+    f"{OG_ROOT}/capsules/",
+    f"{OG_ROOT}/refs/",
+    f"{OG_ROOT}/decisions/",
+    f"{OG_ROOT}/claims/",
+    f"{OG_ROOT}/certificates/",
+    f"{OG_ROOT}/export/",
+    "skills/outcome-steward/",
+    ".agents/skills/og/",
+    ".claude/skills/og/",
+)
+SYNC_GENERATED_IGNORE_PATHS = (
+    f"{OG_ROOT}/materials.lock",
+    OUTCOME_GITIGNORE,
+)
 MCP_CONTROL_TOOL_DEFS = (
     {
         "uri": "outcomegraph://tools/sync",
@@ -281,6 +297,14 @@ EXPORTER_ADAPTER_NAME = "canonical"
 WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+WORKER_ADAPTER_COMPLEX_TIMEOUT_FILE_COUNT = 6
+WORKER_ADAPTER_COMPLEX_TIMEOUT_BYTES = 12_000
+WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS = frozenset(
+    {".c", ".cc", ".cpp", ".cs", ".go", ".h", ".hpp", ".java", ".js", ".jsx", ".php", ".py", ".rb", ".rs", ".sh", ".ts", ".tsx"}
+)
+WORKER_ADAPTER_DISTILL_BATCH_SIZE = 1
+WORKER_ADAPTER_DISTILL_MAX_WORKERS = 4
+WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
 ADAPTER_SCHEMA_VERSION = 2
 ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
@@ -1553,7 +1577,12 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                     "Operational mode.",
                     enum=sorted(MODE_VALUES),
                 ),
-                _command_schema_field("--force-full-sync", "boolean", "Skip runtime-only change short-circuiting.", default=False),
+                _command_schema_field(
+                    "--force-full-sync",
+                    "boolean",
+                    "Rebuild from all non-runtime files instead of the current git diff baseline.",
+                    default=False,
+                ),
             ],
             [
                 _command_schema_field("status", "string", "Command status (`ok`, `error`, or `warn`)."),
@@ -2903,12 +2932,18 @@ def _collect_verification_state(
         status_text = status if isinstance(status, str) else "unknown"
         status_lower = status_text.lower()
 
-        if status_lower == "error":
+        if status_lower in {"error", "failed", "fail"}:
             state = "degraded"
             if step_name == "replay":
                 message = "replay failures detected in last replay event"
             else:
                 message = "verification failures detected in last sync"
+        elif status_lower == "warn":
+            state = "warn"
+            if step_name == "replay":
+                message = "replay completed with warnings"
+            else:
+                message = "verification completed with warnings"
         elif status_lower == "ok":
             state = "fresh" if (age is None or age <= STATUS_VERIFY_STALE_SECONDS) else "stale"
             message = "verification recently completed"
@@ -3577,6 +3612,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         overall_status = "error"
     elif (
         sync["state"] in {"stale", "unknown"}
+        or verification["state"] == "warn"
         or verification["state"] in {"stale", "unknown"}
         or certificates["state"] in {"stale", "unknown"}
         or drift["state"] in {"warn", "error"}
@@ -3597,6 +3633,8 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         issues.append({"type": "sync_error", "message": sync["message"]})
     if verification["state"] == "degraded":
         issues.append({"type": "verify_error", "message": verification["message"]})
+    elif verification["state"] == "warn":
+        issues.append({"type": "verify_warning", "message": verification["message"]})
     elif verification["state"] == "stale":
         issues.append({"type": "stale_verification", "message": verification["message"]})
     elif verification["state"] == "unknown":
@@ -4437,6 +4475,15 @@ def _normalize_repo_relative_path(path: str) -> str:
     return normalized
 
 
+def _is_sync_managed_generated_path(path: str) -> bool:
+    normalized = _normalize_repo_relative_path(path)
+    if not normalized:
+        return False
+    if normalized in SYNC_GENERATED_IGNORE_PATHS:
+        return True
+    return any(normalized.startswith(prefix) for prefix in SYNC_GENERATED_IGNORE_PREFIXES)
+
+
 def _is_worker_unavailable_error(error: str) -> bool:
     lowered = error.lower()
     return WORKER_UNAVAILABLE_ERROR in lowered or "timed out" in lowered
@@ -4605,10 +4652,84 @@ def _store_get(repo_root: str, content_hash: str) -> bytes | None:
         return None
 
 
+def _worker_receipt_pointer_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["schema_version", "type", "target", "hash", "media_type", "size"],
+        "properties": {
+            "schema_version": {"type": "integer", "const": WORKER_SCHEMA_VERSION},
+            "type": {"type": "string", "enum": [TRACKED_EVIDENCE_TAG, UNTRACKED_EVIDENCE_TAG]},
+            "target": {"type": "string", "minLength": 1},
+            "hash": {"type": ["string", "null"]},
+            "media_type": {"type": ["string", "null"]},
+            "size": {"type": ["integer", "null"], "minimum": 0},
+        },
+    }
+
+
+def _worker_oracle_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["name", "command", "scope"],
+        "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "command": {"type": ["string", "null"]},
+            "scope": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        },
+    }
+
+
+def _worker_claim_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["id", "capsule_id", "category", "text", "receipt_pointers", "source_paths"],
+        "properties": {
+            "id": {"type": ["string", "null"]},
+            "capsule_id": {"type": ["string", "null"]},
+            "category": {"type": "string", "minLength": 1},
+            "text": {"type": "string", "minLength": 1},
+            "receipt_pointers": {
+                "type": "array",
+                "items": _worker_receipt_pointer_schema(),
+            },
+            "source_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        },
+    }
+
+
+def _worker_decision_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["statement", "rationale", "status"],
+        "properties": {
+            "statement": {"type": "string", "minLength": 1},
+            "rationale": {"type": "string", "minLength": 1},
+            "status": {"type": "string", "minLength": 1},
+        },
+    }
+
+
+def _worker_lineage_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["parent_capsule_ids"],
+        "properties": {
+            "parent_capsule_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        },
+    }
+
+
 def _build_worker_output_schema(role: str) -> dict[str, object]:
     if role == "distill":
         return {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
+            "additionalProperties": False,
             "required": ["schema_version", "interface_version", "run_id", "capsule_updates"],
             "properties": {
                 "schema_version": {"type": "integer", "const": WORKER_SCHEMA_VERSION},
@@ -4619,28 +4740,66 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                     "minItems": 1,
                     "items": {
                         "type": "object",
-                        "required": ["id", "status", "claims", "decision_refs", "errors", "receipts", "changed_files"],
+                        "additionalProperties": False,
+                        "required": [
+                            "id",
+                            "status",
+                            "goal",
+                            "scope",
+                            "constraints",
+                            "oracles",
+                            "claims",
+                            "decision",
+                            "lineage",
+                            "errors",
+                            "receipts",
+                            "changed_files",
+                        ],
                         "properties": {
                             "id": {"type": "string", "minLength": 1},
                             "status": {
                                 "type": "string",
                                 "enum": ["success", "ok", "warn", "error", "pending"],
                             },
-                            "claims": {"type": "array", "maxItems": 0},
-                            "decision_refs": {"type": "array", "items": {"type": "string"}},
-                            "errors": {"type": "array", "items": {"type": "string"}},
-                            "receipts": {"type": "array", "maxItems": 0},
-                            "changed_files": {"type": "array", "items": {"type": "string"}},
+                            "goal": {"type": "string", "minLength": 1},
+                            "scope": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {"type": "string", "minLength": 1},
+                            },
+                            "constraints": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                            "oracles": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": _worker_oracle_schema(),
+                            },
+                            "claims": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": _worker_claim_schema(),
+                            },
+                            "decision": _worker_decision_schema(),
+                            "lineage": _worker_lineage_schema(),
+                            "errors": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                            "receipts": {
+                                "type": "array",
+                                "items": _worker_receipt_pointer_schema(),
+                            },
+                            "changed_files": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {"type": "string", "minLength": 1},
+                            },
                         },
-                        "additionalProperties": True,
                     },
                 },
             },
-            "additionalProperties": True,
         }
     if role == "replay":
         return {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
+            "additionalProperties": False,
             "required": [
                 "schema_version",
                 "interface_version",
@@ -4661,24 +4820,23 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "required": ["command"],
+                        "additionalProperties": False,
+                        "required": ["command", "expected_exit_code", "timeout_s", "cwd"],
                         "properties": {
                             "command": {"type": "string", "minLength": 1},
-                            "expected_exit_code": {"type": "integer"},
-                            "timeout_s": {"type": "integer", "minimum": 1},
-                            "cwd": {"type": "string", "minLength": 1},
+                            "expected_exit_code": {"type": ["integer", "null"]},
+                            "timeout_s": {"type": ["integer", "null"], "minimum": 1},
+                            "cwd": {"type": ["string", "null"]},
                         },
-                        "additionalProperties": True,
                     },
                 },
                 "status": {"type": "string", "minLength": 1},
                 "message": {"type": "string"},
-                "failures": {"type": "array", "items": {"type": "string"}},
+                "failures": {"type": "array", "items": {"type": "string", "minLength": 1}},
                 "parity_results": {
                     "type": ["object", "array", "string", "number", "boolean", "null"],
                 },
             },
-            "additionalProperties": True,
         }
     raise WorkerAdapterError(f"unsupported worker role '{role}'")
 
@@ -4690,16 +4848,27 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "You are the OutcomeGraph distill worker adapter.\n"
             "Do not run shell commands.\n"
             "Return exactly one JSON object and nothing else.\n"
-            "Use only the input payload below.\n"
+            "Produce a reusable capsule record that would help another agent understand and regenerate the same capability.\n"
             "Rules:\n"
             "- schema_version must be 2\n"
             "- interface_version must be 1\n"
             "- run_id must exactly match input.run_id\n"
             "- Emit one capsule_updates entry per input.target_capsules[].id\n"
             "- Each capsule_updates entry must include field id copied from input.target_capsules[].id\n"
-            "- Do not emit capsule_id for capsule_updates entries\n"
-            "- For each update set status='success', claims=[], decision_refs=[], errors=[], receipts=[]\n"
-            "- Set changed_files to input.changed_paths\n"
+            "- Use repo-relative paths only\n"
+            "- Use input.target_capsules[].changed_file_snapshots as the primary source of file context\n"
+            "- Use only the input payload below\n"
+            "- Fill goal, scope, constraints, oracles, claims, decision, receipts, and changed_files from actual repository evidence\n"
+            "- Set lineage.parent_capsule_ids to an array, using [] when there is no parent lineage\n"
+            "- Each claim must include id, capsule_id, category, text, receipt_pointers, and source_paths; use null for id/capsule_id only when unknown, and [] for empty lists\n"
+            "- Each receipt pointer must include schema_version, type, target, hash, media_type, and size; use null for hash/media_type/size when unknown\n"
+            "- Every successful update must include at least one claim and at least one oracle\n"
+            "- Prefer concrete validation commands already used in this repository when they fit the capsule, including repo-native wrappers such as `uv run ...` when the repository uses them\n"
+            "- Do not turn documentation examples, allowlists, or generic command catalogs into live oracle commands unless repository evidence shows they are the capsule's actual verification contract\n"
+            "- When a command is only mentioned as an example or policy allowance, emit command=null and explain the gap instead of inventing an executable oracle\n"
+            "- Prefer status='success' when you can capture the current observable capsule state with concrete claims, even if broader context is incomplete\n"
+            "- Use status='warn' when the capsule is materially useful but still missing important supporting context\n"
+            "- Use status='pending' only when repository evidence is too thin to produce a reusable capsule record\n"
             "\n"
             "Input payload JSON:\n"
             f"{payload_json}\n"
@@ -4709,14 +4878,18 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "You are the OutcomeGraph replay worker adapter.\n"
             "Do not run shell commands.\n"
             "Return exactly one JSON object and nothing else.\n"
-            "Use only the input payload below.\n"
+            "Produce a replay plan that can run inside an isolated sandbox for the capsule.\n"
             "Rules:\n"
             "- schema_version must be 2\n"
             "- interface_version must be 1\n"
             "- run_id must exactly match input.run_id\n"
             "- capsule_id must exactly match input.capsule_id\n"
-            "- Return steps=[]\n"
-            "- Return status='ok', message='replay plan generated', failures=[], parity_results=null\n"
+            "- Use only the input payload below\n"
+            "- When status is 'ok', return one or more concrete shell steps that rebuild or validate the capsule in the sandbox\n"
+            "- Each step must include command, expected_exit_code, timeout_s, and cwd; use null for optional fields and '.' for the sandbox root\n"
+            "- Prefer commands from capsule oracles when they are usable for replay\n"
+            "- Do not use destructive commands or network access\n"
+            "- If no safe replay plan exists, return status='pending', steps=[], and explain the gap in failures\n"
             "\n"
             "Input payload JSON:\n"
             f"{payload_json}\n"
@@ -4832,14 +5005,14 @@ def _build_worker_command_variants(entrypoint: str, schema_path: str, last_messa
             *normalized,
             "exec",
             "--json",
+            "--sandbox",
+            "read-only",
             "--output-schema",
             schema_path,
             "--output-last-message",
             last_message_path,
             "-",
-        ],
-        [*normalized, "exec", "--json", "-"],
-        [*normalized, "exec", "-"],
+        ]
     ]
 
 
@@ -4866,6 +5039,7 @@ def _run_codex_worker(
     worker_schema = _build_worker_output_schema(role)
     last_error = "codex executable was not found"
     output = ""
+    candidate_output = ""
     error_output = ""
     parsed: dict[str, object] | None = None
     selected_command: list[str] = []
@@ -4880,89 +5054,70 @@ def _run_codex_worker(
             schema_path,
             last_message_path,
         )
+        command = command_variants[0]
+        start = time.perf_counter()
+        try:
+            proc = subprocess.run(
+                command,
+                input=worker_prompt,
+                text=True,
+                capture_output=True,
+                cwd=repo_root,
+                timeout=timeout_seconds,
+            )
+        except FileNotFoundError:
+            raise WorkerAdapterError("codex executable was not found") from None
+        except subprocess.TimeoutExpired as exc:
+            raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
 
-        for command in command_variants:
-            if os.path.exists(last_message_path):
-                try:
-                    os.remove(last_message_path)
-                except OSError:
-                    pass
-            start = time.perf_counter()
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        output = proc.stdout or ""
+        error_output = proc.stderr or ""
+        if proc.returncode != 0:
+            worker_error = _extract_worker_exec_error(output, error_output)
+            if worker_error:
+                last_error = f"codex exec failed for {role}: {worker_error}"
+            else:
+                last_error = f"codex exec failed for {role}: rc={proc.returncode}"
+            raise WorkerAdapterError(last_error)
+
+        if os.path.exists(last_message_path):
             try:
-                proc = subprocess.run(
-                    command,
-                    input=worker_prompt,
-                    text=True,
-                    capture_output=True,
-                    cwd=repo_root,
-                    timeout=timeout_seconds,
-                )
-            except FileNotFoundError:
-                last_error = "codex executable was not found"
-                continue
-            except subprocess.TimeoutExpired as exc:
-                raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
-
-            duration_ms = int((time.perf_counter() - start) * 1000)
-            output = proc.stdout or ""
-            error_output = proc.stderr or ""
-
-            if proc.returncode != 0:
-                worker_error = _extract_worker_exec_error(output, error_output)
-                if worker_error:
-                    last_error = f"codex exec failed for {role}: {worker_error}"
-                else:
-                    last_error = f"codex exec failed for {role}: rc={proc.returncode}"
-                continue
-
+                with open(last_message_path, "r", encoding="utf-8") as handle:
+                    candidate_output = handle.read()
+            except OSError:
+                candidate_output = ""
+        if not candidate_output.strip():
             candidate_output = output
-            if os.path.exists(last_message_path):
-                try:
-                    with open(last_message_path, "r", encoding="utf-8") as handle:
-                        last_message = handle.read()
-                except OSError:
-                    last_message = ""
-                if last_message.strip():
-                    candidate_output = last_message
+        parsed = _parse_worker_output(role, candidate_output)
+        selected_command = command
 
-            try:
-                parsed = _parse_worker_output(role, candidate_output)
-            except WorkerAdapterError as exc:
-                if candidate_output is not output:
-                    try:
-                        parsed = _parse_worker_output(role, output)
-                    except WorkerAdapterError:
-                        last_error = str(exc)
-                        continue
-                else:
-                    last_error = str(exc)
-                    continue
-
-            selected_command = command
-            break
-
-    if parsed is None:
-        raise WorkerAdapterError(last_error)
-
-    trace_payload = {
+    trace_base = trace_path.rsplit(".", 1)[0] if "." in trace_path else trace_path
+    trace_input_path = f"{trace_base}-input.json"
+    trace_result_path = f"{trace_base}-result.json"
+    request_payload = {
         "schema_version": WORKER_SCHEMA_VERSION,
-        "status": "ok",
         "role": role,
         "adapter": manifest.get("name"),
-        "input": payload,
         "command": selected_command,
         "duration_ms": duration_ms,
-        "returncode": 0,
-        "stdout": output,
-        "stderr": error_output,
+        "input": payload,
+        "prompt": worker_prompt,
     }
-    trace_text = json.dumps(trace_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-    full_trace_path = os.path.join(repo_root, trace_path)
-    _write_text_payload(full_trace_path, trace_text)
-    trace_bytes = trace_text.encode("utf-8")
+    request_text = json.dumps(request_payload, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
+    request_bytes = request_text.encode("utf-8")
+    output_bytes = output.encode("utf-8")
+    result_bytes = candidate_output.encode("utf-8")
+    _write_text_payload(os.path.join(repo_root, trace_input_path), request_text)
+    _write_text_payload(os.path.join(repo_root, trace_path), output)
+    _write_text_payload(os.path.join(repo_root, trace_result_path), candidate_output)
     return parsed, [
-        _build_file_pointer(trace_path, trace_bytes, "application/json"),
-        _store_put(repo_root, trace_bytes, "application/json"),
+        _build_file_pointer(trace_input_path, request_bytes, "application/json"),
+        _store_put(repo_root, request_bytes, "application/json"),
+        _build_file_pointer(trace_path, output_bytes, "application/x-ndjson"),
+        _store_put(repo_root, output_bytes, "application/x-ndjson"),
+        _build_file_pointer(trace_result_path, result_bytes, "application/json"),
+        _store_put(repo_root, result_bytes, "application/json"),
     ]
 
 
@@ -5079,7 +5234,13 @@ def _normalize_receipt_pointers(raw: object, *, field: str, required: bool = Fal
     return pointers
 
 
-def _normalize_claim_payloads(raw: object, *, field: str) -> list[dict[str, object]]:
+def _normalize_claim_payloads(
+    raw: object,
+    *,
+    field: str,
+    default_capsule_id: str | None = None,
+    require_receipts: bool = False,
+) -> list[dict[str, object]]:
     if raw is None:
         return []
     if not isinstance(raw, list):
@@ -5091,22 +5252,72 @@ def _normalize_claim_payloads(raw: object, *, field: str) -> list[dict[str, obje
         claim_id = str(raw_claim.get("id") or "").strip()
         if not claim_id:
             claim_id = f"cl-{_short_hash(f'{field}:{index}', 10)}"
-        capsule_id = _required_str(raw_claim.get("capsule_id"), f"{field}[{index}].capsule_id")
+        raw_capsule_id = raw_claim.get("capsule_id")
+        if raw_capsule_id is None and default_capsule_id is not None:
+            capsule_id = default_capsule_id
+        else:
+            capsule_id = _required_str(raw_capsule_id, f"{field}[{index}].capsule_id")
         claim_receipts = _normalize_receipt_pointers(
             raw_claim.get("receipt_pointers"),
             field=f"{field}[{index}].receipt_pointers",
-            required=True,
+            required=require_receipts,
         )
-        claims.append(
+        normalized_claim = {
+            "id": claim_id,
+            "capsule_id": capsule_id,
+            "category": str(raw_claim.get("category") or "behavior").strip() or "behavior",
+            "text": str(raw_claim.get("text") or "Claim derived from distill adapter output.").strip(),
+            "receipt_pointers": claim_receipts,
+        }
+        source_paths = _safe_string_list(raw_claim.get("source_paths"))
+        if source_paths:
+            normalized_claim["source_paths"] = source_paths
+        claims.append(normalized_claim)
+    return claims
+
+
+def _normalize_distill_oracles(raw: object, *, field: str) -> list[dict[str, object]]:
+    if not isinstance(raw, list) or not raw:
+        raise WorkerAdapterError(f"{field} must include at least one oracle")
+    normalized: list[dict[str, object]] = []
+    for index, raw_oracle in enumerate(raw):
+        if not isinstance(raw_oracle, dict):
+            raise WorkerAdapterError(f"{field}[{index}] must be an object")
+        name = _required_str(raw_oracle.get("name"), f"{field}[{index}].name")
+        raw_command = raw_oracle.get("command")
+        if raw_command is None:
+            command_value = None
+        else:
+            command_value = _required_str(raw_command, f"{field}[{index}].command")
+        normalized.append(
             {
-                "id": claim_id,
-                "capsule_id": capsule_id,
-                "category": str(raw_claim.get("category") or "behavior").strip() or "behavior",
-                "text": str(raw_claim.get("text") or "Synthetic claim from codex adapter output.").strip(),
-                "receipt_pointers": claim_receipts,
+                "name": name,
+                "command": command_value,
+                "scope": _safe_string_list(raw_oracle.get("scope")),
             }
         )
-    return claims
+    return normalized
+
+
+def _normalize_distill_decision(raw: object, *, field: str) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object")
+    return {
+        "statement": _required_str(raw.get("statement"), f"{field}.statement"),
+        "rationale": _required_str(raw.get("rationale"), f"{field}.rationale"),
+        "status": _required_str(raw.get("status"), f"{field}.status"),
+    }
+
+
+def _normalize_distill_lineage(raw: object, *, field: str) -> dict[str, object]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object")
+    parent_capsule_ids = _safe_string_list(raw.get("parent_capsule_ids"))
+    if not parent_capsule_ids:
+        return {}
+    return {"parent_capsule_ids": parent_capsule_ids}
 
 
 def _normalize_distill_delta(raw: object) -> dict[str, object]:
@@ -5131,13 +5342,29 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
             {
                 "id": _required_str(raw_id, f"capsule_updates[{index}].id"),
                 "status": str(raw_update.get("status") or "success"),
+                "goal": _required_str(raw_update.get("goal"), f"capsule_updates[{index}].goal"),
+                "scope": _string_list(
+                    raw_update.get("scope"),
+                    f"capsule_updates[{index}].scope",
+                ),
+                "constraints": _safe_string_list(raw_update.get("constraints")),
+                "oracles": _normalize_distill_oracles(
+                    raw_update.get("oracles"),
+                    field=f"capsule_updates[{index}].oracles",
+                ),
                 "claims": _normalize_claim_payloads(
                     raw_update.get("claims"),
                     field=f"capsule_updates[{index}].claims",
+                    default_capsule_id=_required_str(raw_id, f"capsule_updates[{index}].id"),
+                    require_receipts=False,
                 ),
-                "decision_refs": _string_list(
-                    raw_update.get("decision_refs"),
-                    f"capsule_updates[{index}].decision_refs",
+                "decision": _normalize_distill_decision(
+                    raw_update.get("decision"),
+                    field=f"capsule_updates[{index}].decision",
+                ),
+                "lineage": _normalize_distill_lineage(
+                    raw_update.get("lineage"),
+                    field=f"capsule_updates[{index}].lineage",
                 ),
                 "errors": _string_list(
                     raw_update.get("errors"),
@@ -5232,18 +5459,20 @@ def _build_distill_input(
     run_id: str,
     profile: str,
     mode: str,
-    target_capsules: list[str],
+    target_capsules: list[dict[str, object]],
     changed_paths: list[str],
     policy_ref: str = ".outcomegraph/policy.yaml",
+    materials_lock_ref: str = ".outcomegraph/materials.lock",
 ) -> dict[str, object]:
     return {
         "interface_version": WORKER_INTERFACE_VERSION,
         "schema_version": WORKER_SCHEMA_VERSION,
         "adapter_profile": profile,
         "mode": mode,
-        "target_capsules": [{"id": capsule} for capsule in target_capsules],
+        "target_capsules": target_capsules,
         "changed_paths": changed_paths,
         "policy_ref": policy_ref,
+        "materials_lock_ref": materials_lock_ref,
         "run_id": run_id,
     }
 
@@ -5256,6 +5485,9 @@ def _build_replay_input(
     changed_materials: list[dict[str, object]],
     source_ref: str = "HEAD",
     materials_lock_ref: str = ".outcomegraph/materials.lock",
+    capsule_payload: dict[str, object] | None = None,
+    scope_materials: list[dict[str, object]] | None = None,
+    baseline_equivalence: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "interface_version": WORKER_INTERFACE_VERSION,
@@ -5267,6 +5499,9 @@ def _build_replay_input(
         "source_ref": source_ref,
         "materials_lock_ref": materials_lock_ref,
         "changed_materials": changed_materials,
+        "scope_materials": scope_materials or changed_materials,
+        "capsule": capsule_payload or {},
+        "baseline_equivalence": baseline_equivalence or {},
     }
 
 
@@ -5308,7 +5543,7 @@ def _build_claim_payload(
     category: str = "behavior",
 ) -> dict[str, object]:
     now = _utc_timestamp()
-    claim_text = text or f"Synthetic claim for {capsule_id} from codex worker stage."
+    claim_text = text or f"Claim for {capsule_id} captured during {profile} stage."
     return {
         "schema_version": 2,
         "artifact_type": "claim",
@@ -8163,8 +8398,14 @@ def _collect_all_non_runtime_files(repo_root: str) -> list[str]:
         candidate = _normalize_repo_relative_path(path)
         if any(candidate.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
             continue
+        if _is_sync_managed_generated_path(candidate):
+            continue
         normalized.append(candidate)
     return normalized
+
+
+def _requires_bootstrap_full_snapshot(repo_root: str) -> bool:
+    return not _list_known_capsules(repo_root)
 
 
 def _collect_changed_paths(repo_root: str, baseline_ref: str) -> list[str]:
@@ -8176,6 +8417,8 @@ def _collect_changed_paths(repo_root: str, baseline_ref: str) -> list[str]:
     for path in raw:
         candidate = _normalize_repo_relative_path(path)
         if any(candidate.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
+            continue
+        if _is_sync_managed_generated_path(candidate):
             continue
         normalized.append(candidate)
     return normalized
@@ -8217,12 +8460,10 @@ def _collect_sync_snapshot(repo_root: str, profile: str, mode: str, *, force_ful
     branch_result = _run_git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"])
     baseline = _resolve_sync_baseline(repo_root)
     baseline_ref = str(baseline.get("resolved") or "")
-    if baseline.get("strategy") == "empty_tree":
+    if baseline.get("strategy") == "empty_tree" or force_full_sync or _requires_bootstrap_full_snapshot(repo_root):
         changed_files = _collect_all_non_runtime_files(repo_root)
     else:
         changed_files = _collect_changed_paths(repo_root, baseline_ref)
-    if not changed_files and force_full_sync and baseline.get("strategy") != "empty_tree":
-        changed_files = _collect_all_non_runtime_files(repo_root)
     changed_files = sorted(set(changed_files))
     head = head_result.stdout.strip() if head_result.returncode == 0 else "HEAD_NOT_AVAILABLE"
     branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "detached"
@@ -8318,6 +8559,42 @@ def _load_capsule_oracles(repo_root: str, capsule_id: str) -> list[dict[str, obj
     ]
 
 
+def _load_capsule_payload(repo_root: str, capsule_id: str) -> dict[str, object]:
+    json_path = os.path.join(repo_root, OG_ROOT, "capsules", f"{_safe_slug(capsule_id)}.json")
+    yaml_path = os.path.join(repo_root, OG_ROOT, "capsules", f"{_safe_slug(capsule_id)}.yaml")
+    for candidate in (json_path, yaml_path):
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            payload = _read_structured_mapping_file(candidate)
+        except ValueError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
+def _path_matches_capsule_scope(path: str, scope: list[str]) -> bool:
+    normalized_path = _normalize_repo_relative_path(path).replace("\\", "/")
+    if not normalized_path:
+        return False
+    if not scope:
+        return True
+    for raw_pattern in scope:
+        pattern = _normalize_repo_relative_path(str(raw_pattern)).replace("\\", "/")
+        if not pattern:
+            continue
+        if any(char in pattern for char in "*?[]"):
+            if fnmatch.fnmatch(normalized_path, pattern):
+                return True
+            continue
+        if normalized_path == pattern:
+            return True
+        if normalized_path.startswith(f"{pattern}/"):
+            return True
+    return False
+
+
 def _oracle_scopes_match(oracle: dict[str, object], changed_paths: list[str]) -> bool:
     scope_raw = oracle.get("scope")
     if not isinstance(scope_raw, list):
@@ -8342,12 +8619,14 @@ def _run_oracle_check(
     run_id: str,
     mode: str,
     policy: dict[str, object] | None = None,
+    exec_root: str | None = None,
+    trace_label: str = "verify",
 ) -> dict[str, object]:
     oracle_name = str(oracle.get("name", "unknown-oracle"))
     command = oracle.get("command")
     command_text = command.strip() if isinstance(command, str) else None
     resolved_policy = policy or _default_policy()
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-verify.json"
+    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-{_safe_slug(trace_label)}.json"
     trace_write_check = _evaluate_policy_writes(
         resolved_policy,
         command="verify",
@@ -8369,28 +8648,6 @@ def _run_oracle_check(
             "message": trace_write_check.get("message"),
             "trace": trace_path,
         }
-    if command_text:
-        denied = _ensure_policy_action_allowed(
-            resolved_policy,
-            command="verify",
-            category="verify_commands",
-            target=command_text,
-            mode=mode,
-        )
-        if denied is not None:
-            return {
-                **denied,
-                "schema_version": 2,
-                "oracle_name": oracle_name,
-                "capsule_id": capsule_id,
-                "run_id": run_id,
-                "mode": mode,
-                "status": "error",
-                "checked_at": _utc_timestamp(),
-                "changed_paths": changed_paths,
-                "command": command_text,
-                "message": denied.get("message"),
-            }
 
     start = time.perf_counter()
     result_payload: dict[str, object] = {
@@ -8404,6 +8661,33 @@ def _run_oracle_check(
         "changed_paths": changed_paths,
         "command": command_text or "",
     }
+    if command_text:
+        denied = _ensure_policy_action_allowed(
+            resolved_policy,
+            command="verify",
+            category="verify_commands",
+            target=command_text,
+            mode=mode,
+        )
+        if denied is not None:
+            result_payload["status"] = "skipped"
+            result_payload["code"] = denied.get("error_code") or denied.get("code") or POLICY_DENIED_CODE
+            result_payload["message"] = str(denied.get("message") or "oracle command skipped by policy")
+            result_payload["remediation"] = denied.get("remediation", [])
+            payload_bytes = (
+                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+            ).encode("utf-8")
+            result_payload["duration_ms"] = int((time.perf_counter() - start) * 1000)
+            trace_full_path = os.path.join(repo_root, trace_path)
+            os.makedirs(os.path.dirname(trace_full_path), exist_ok=True)
+            _write_text_payload(trace_full_path, payload_bytes.decode("utf-8"))
+            receipts = [
+                _build_file_pointer(trace_path, payload_bytes, "application/json"),
+                _store_put(repo_root, payload_bytes.decode("utf-8"), "application/json"),
+            ]
+            result_payload["receipt_pointers"] = receipts
+            result_payload["trace"] = trace_path
+            return result_payload
 
     if not command_text:
         result_payload["status"] = "pass"
@@ -8417,7 +8701,7 @@ def _run_oracle_check(
             executed = subprocess.run(
                 command_text,
                 shell=True,
-                cwd=repo_root,
+                cwd=exec_root or repo_root,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -8462,15 +8746,14 @@ def _run_oracle_check(
     return result_payload
 
 
-def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str | None:
+def _collect_replay_equivalence_baseline_payload(repo_root: str, capsule_id: str) -> dict[str, object]:
     certificates = _collect_certificate_records(repo_root)
     if not certificates:
-        return None
+        return {}
 
     normalized_target = _safe_slug(capsule_id)
     latest_updated_at: datetime.datetime | None = None
-    baseline_hash: str | None = None
-
+    baseline_payload: dict[str, object] = {}
     for certificate in certificates:
         if _safe_slug(str(certificate.get("capsule_id") or "default")) != normalized_target:
             continue
@@ -8485,7 +8768,7 @@ def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str
         equivalence = replay_context.get("equivalence")
         if not isinstance(equivalence, dict):
             continue
-        candidate_hash = equivalence.get("observed_hash")
+        candidate_hash = equivalence.get("oracle_digest") or equivalence.get("observed_hash")
         if not isinstance(candidate_hash, str) or not candidate_hash:
             continue
 
@@ -8498,18 +8781,50 @@ def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str
         if latest_updated_at is not None and candidate_updated_at is not None and candidate_updated_at <= latest_updated_at:
             continue
         latest_updated_at = candidate_updated_at or latest_updated_at
-        baseline_hash = candidate_hash
+        baseline_payload = dict(equivalence)
+    return baseline_payload
 
-    return baseline_hash
+
+def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str | None:
+    equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule_id)
+    candidate_hash = equivalence.get("oracle_digest") or equivalence.get("observed_hash")
+    return candidate_hash if isinstance(candidate_hash, str) and candidate_hash else None
 
 
-def _collect_replay_sandbox_paths(repo_root: str, changed_materials: list[dict[str, object]]) -> list[str]:
+def _collect_capsule_scope_materials(
+    repo_root: str,
+    capsule_id: str,
+    changed_materials: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    capsule_payload = _load_capsule_payload(repo_root, capsule_id)
+    scope = _safe_string_list(capsule_payload.get("scope"))
     material_records, _ = _read_material_lock_records(repo_root)
+    selected: dict[str, dict[str, object]] = {}
+    for path, record in material_records.items():
+        if _path_matches_capsule_scope(path, scope):
+            selected[path] = dict(record)
+    for raw_material in changed_materials:
+        if not isinstance(raw_material, dict):
+            continue
+        path = str(raw_material.get("path") or "").strip()
+        digest = str(raw_material.get("digest") or "").strip()
+        if not path or not digest:
+            continue
+        if _path_matches_capsule_scope(path, scope):
+            selected[path] = {"path": path, "digest": digest}
+    return [selected[path] for path in sorted(selected)]
+
+
+def _collect_replay_sandbox_paths(
+    repo_root: str,
+    capsule_id: str,
+    changed_materials: list[dict[str, object]],
+) -> list[str]:
     paths: set[str] = set()
+    scope_materials = _collect_capsule_scope_materials(repo_root, capsule_id, changed_materials)
+    selected_changed_paths = [str(item.get("path") or "") for item in scope_materials if isinstance(item, dict)]
 
-    selected_changed_paths = [str(item.get("path") or "") for item in changed_materials if isinstance(item, dict)]
-
-    for raw_path in list(material_records.keys()) + selected_changed_paths:
+    for raw_path in selected_changed_paths:
         normalized = _normalize_repo_relative_path(str(raw_path)).replace("\\", "/")
         normalized = os.path.normpath(normalized)
         if not normalized or normalized == ".":
@@ -8537,9 +8852,14 @@ def _collect_replay_sandbox_paths(repo_root: str, changed_materials: list[dict[s
     return sorted(paths)
 
 
-def _materialize_replay_sandbox(repo_root: str, sandbox_root: str, changed_materials: list[dict[str, object]]) -> list[str]:
+def _materialize_replay_sandbox(
+    repo_root: str,
+    sandbox_root: str,
+    capsule_id: str,
+    changed_materials: list[dict[str, object]],
+) -> list[str]:
     os.makedirs(os.path.join(repo_root, sandbox_root), exist_ok=True)
-    selected_paths = _collect_replay_sandbox_paths(repo_root, changed_materials)
+    selected_paths = _collect_replay_sandbox_paths(repo_root, capsule_id, changed_materials)
     sandbox_root_abs = os.path.join(repo_root, sandbox_root)
     missing_paths: list[str] = []
 
@@ -8572,6 +8892,23 @@ def _compute_replay_observed_hash(step_results: list[dict[str, object]]) -> str:
                 "observed_exit_code": raw_result.get("observed_exit_code"),
                 "stdout": _safe_string_list(raw_result.get("stdout")),
                 "stderr": _safe_string_list(raw_result.get("stderr")),
+            }
+        )
+    rendered = json.dumps(observed, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return _content_sha256(rendered.encode("utf-8"))
+
+
+def _compute_oracle_observed_hash(checks: list[dict[str, object]]) -> str:
+    observed: list[dict[str, object]] = []
+    for check in checks:
+        observed.append(
+            {
+                "oracle_name": str(check.get("oracle_name") or ""),
+                "status": str(check.get("status") or ""),
+                "observed_code": check.get("observed_code"),
+                "stdout": _safe_string_list(check.get("stdout")),
+                "stderr": _safe_string_list(check.get("stderr")),
+                "message": str(check.get("message") or ""),
             }
         )
     rendered = json.dumps(observed, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -8678,28 +9015,102 @@ def _run_replay_step(
 
 
 def _collect_affected_capsules(changed_files: list[str]) -> list[str]:
-    if not changed_files:
-        return []
-    capsules = set()
-    for path in changed_files:
-        normalized = _normalize_repo_relative_path(path)
-        if normalized.startswith(f"{OG_ROOT}/"):
-            normalized = normalized[len(OG_ROOT) + 1 :]
-        if normalized.startswith("capsules/"):
-            capsules.add(normalized.split("/", 1)[1].split(".")[0])
-        elif normalized.startswith("decisions/"):
-            capsules.add(normalized.split("/", 1)[1].split(".")[0])
-        elif normalized.startswith("claims/"):
-            capsules.add("default")
-        elif normalized.startswith("certificates/"):
-            capsules.add("default")
-        elif normalized.startswith("refs/"):
-            capsules.add(normalized.split("/", 1)[1].split(".")[0])
-        elif normalized == "materials.lock":
-            capsules.add("materials")
-        else:
-            capsules.add("default")
-    return sorted(capsules)
+    return sorted(_group_changed_files_by_capsule(changed_files))
+
+
+def _artifact_filename_capsule_id(relative_path: str, prefix: str | None = None) -> str | None:
+    filename = os.path.basename(relative_path)
+    stem = os.path.splitext(filename)[0]
+    if prefix is not None:
+        if not stem.startswith(prefix):
+            return None
+        remainder = stem[len(prefix) :]
+        if not remainder:
+            return None
+        capsule_part, separator, _ = remainder.rpartition("-")
+        stem = capsule_part if separator else remainder
+    else:
+        stem = stem.lstrip(".")
+    normalized = _safe_slug(stem)
+    return normalized or None
+
+
+def _capsule_id_for_canonical_internal_path(relative_path: str) -> str | None:
+    internal = _normalize_repo_relative_path(relative_path)
+    if not internal:
+        return None
+    if internal.startswith("capsules/"):
+        return _artifact_filename_capsule_id(internal) or "default"
+    if internal.startswith("decisions/"):
+        return _artifact_filename_capsule_id(internal) or "default"
+    if internal.startswith("refs/"):
+        return _artifact_filename_capsule_id(internal) or "default"
+    if internal.startswith("claims/"):
+        return _artifact_filename_capsule_id(internal, "cl-") or "default"
+    if internal.startswith("certificates/"):
+        return _artifact_filename_capsule_id(internal, "cert-") or "default"
+    if internal == "materials.lock":
+        return "materials"
+    if internal == "policy.yaml":
+        return "policy"
+    if internal == "config.yaml":
+        return "config"
+    if internal == ".gitignore":
+        return "runtime"
+    if internal.startswith("constitution/"):
+        return "constitution"
+    if internal.startswith("export/"):
+        return "export"
+    return None
+
+
+def _capsule_id_for_repo_path(relative_path: str) -> str:
+    normalized = _normalize_repo_relative_path(relative_path)
+    if normalized.startswith(f"{OG_ROOT}/"):
+        internal = normalized[len(OG_ROOT) + 1 :]
+        canonical_capsule = _capsule_id_for_canonical_internal_path(internal)
+        if canonical_capsule is not None:
+            return canonical_capsule
+        internal_top = internal.split("/", 1)[0]
+        return _safe_slug(internal_top) or "default"
+
+    canonical_capsule = _capsule_id_for_canonical_internal_path(normalized)
+    if canonical_capsule is not None:
+        return canonical_capsule
+
+    parts = normalized.split("/")
+    top = parts[0]
+    if len(parts) > 1:
+        if top == "skills" and len(parts) > 2:
+            skill_name = _safe_slug(parts[1])
+            if skill_name:
+                return f"skill-{skill_name}"
+        if top.startswith("."):
+            hidden = _safe_slug(top.lstrip("."))
+            if hidden:
+                return hidden
+        return _safe_slug(top) or "default"
+
+    if top.startswith("."):
+        hidden_name = os.path.splitext(top.lstrip("."))[0]
+        return _safe_slug(hidden_name) or "repo-config"
+    return _artifact_filename_capsule_id(top) or "default"
+
+
+def _group_changed_files_by_capsule(changed_files: list[str]) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for raw_path in changed_files:
+        if not isinstance(raw_path, str):
+            continue
+        normalized = _normalize_repo_relative_path(raw_path)
+        if not normalized:
+            continue
+        capsule_id = _capsule_id_for_repo_path(normalized)
+        grouped.setdefault(capsule_id, []).append(normalized)
+    return {
+        capsule_id: sorted(set(paths))
+        for capsule_id, paths in grouped.items()
+    }
 
 
 def _safe_string_list(raw: object) -> list[str]:
@@ -8943,6 +9354,96 @@ def _list_known_capsules(repo_root: str) -> list[str]:
     return sorted(capsules)
 
 
+def _build_distill_target_capsules(
+    repo_root: str,
+    changed_capsules: list[str],
+    changed_files_by_capsule: dict[str, list[str]],
+) -> list[dict[str, object]]:
+    targets: list[dict[str, object]] = []
+    for capsule_id in changed_capsules:
+        normalized_capsule_id = _safe_slug(capsule_id) or "default"
+        existing_capsule = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{normalized_capsule_id}.json"))
+        changed_files = changed_files_by_capsule.get(normalized_capsule_id, [])
+        targets.append(
+            {
+                "id": normalized_capsule_id,
+                "changed_files": changed_files,
+                "changed_file_snapshots": [snapshot for snapshot in (_read_repo_file_snapshot(repo_root, path) for path in changed_files) if snapshot],
+                "existing_capsule": (
+                    {
+                        "id": str(existing_capsule.get("id") or normalized_capsule_id),
+                        "goal": str(existing_capsule.get("goal") or ""),
+                        "scope": _safe_string_list(existing_capsule.get("scope")),
+                        "constraints": _safe_string_list(existing_capsule.get("constraints")),
+                        "oracles": _safe_object_list(existing_capsule.get("oracles")),
+                        "lineage": existing_capsule.get("lineage") if isinstance(existing_capsule.get("lineage"), dict) else {},
+                    }
+                    if existing_capsule
+                    else None
+                ),
+            }
+        )
+    return targets
+
+
+def _snapshot_char_limit(relative_path: str) -> int:
+    normalized_path = _normalize_repo_relative_path(relative_path)
+    _, extension = os.path.splitext(normalized_path.lower())
+    if extension in {".md", ".txt", ".rst"}:
+        return 8000
+    if extension in {".json", ".yaml", ".yml", ".toml", ".lock"}:
+        return 6000
+    if extension in {".py", ".sh"}:
+        return 4000
+    return 3000
+
+
+def _read_repo_file_snapshot(repo_root: str, relative_path: str, max_chars: int | None = None) -> dict[str, object] | None:
+    normalized_path = _normalize_repo_relative_path(relative_path)
+    if not normalized_path:
+        return None
+    if max_chars is None:
+        max_chars = _snapshot_char_limit(normalized_path)
+    full_path = os.path.join(repo_root, normalized_path)
+    if os.path.isdir(full_path):
+        try:
+            entries = sorted(os.listdir(full_path))
+        except OSError:
+            return None
+        truncated = len(entries) > 20
+        return {
+            "path": normalized_path,
+            "digest": None,
+            "kind": "symlink_directory" if os.path.islink(full_path) else "directory",
+            "entries": entries[:20],
+            "truncated": truncated,
+            **({"symlink_target": os.readlink(full_path)} if os.path.islink(full_path) else {}),
+        }
+    if not os.path.isfile(full_path):
+        return None
+    try:
+        with open(full_path, "r", encoding="utf-8") as handle:
+            content = handle.read(max_chars + 1)
+    except (OSError, UnicodeDecodeError):
+        return None
+    truncated = len(content) > max_chars
+    if truncated:
+        content = content[:max_chars]
+    snapshot = {
+        "path": normalized_path,
+        "digest": _file_sha256(normalized_path, repo_root),
+        "kind": "symlink_file" if os.path.islink(full_path) else "file",
+        "content": content,
+        "truncated": truncated,
+    }
+    if os.path.islink(full_path):
+        try:
+            snapshot["symlink_target"] = os.readlink(full_path)
+        except OSError:
+            pass
+    return snapshot
+
+
 def _file_sha256(relative_path: str, repo_root: str) -> str | None:
     candidate = os.path.join(repo_root, relative_path)
     try:
@@ -9127,13 +9628,20 @@ def _build_capsule_payload(
     decision_refs: list[str],
     existing_payload: dict[str, object] | None,
     created_at_default: str,
+    goal: str | None = None,
+    scope: list[str] | None = None,
+    constraints: list[str] | None = None,
+    oracles: list[dict[str, object]] | None = None,
+    lineage: dict[str, object] | None = None,
     status: str = "active",
 ) -> dict[str, object]:
     now = _utc_timestamp()
     existing = existing_payload or {}
     existing_scope = _safe_string_list(existing.get("scope")) if isinstance(existing, dict) else []
-    scope = existing_scope if existing_scope else []
-    if not scope:
+    resolved_scope = [str(item) for item in scope or [] if str(item).strip()]
+    if not resolved_scope:
+        resolved_scope = existing_scope if existing_scope else []
+    if not resolved_scope:
         for item in _safe_string_list(changed_files):
             normalized = _normalize_repo_relative_path(item)
             if normalized.startswith(f"{OG_ROOT}/"):
@@ -9141,30 +9649,36 @@ def _build_capsule_payload(
             if not normalized:
                 continue
             top = normalized.split("/", 1)[0]
-            if top and top not in scope:
-                scope.append(top)
-    if not scope:
-        scope = ["."]
+            if top and top not in resolved_scope:
+                resolved_scope.append(top)
+    if not resolved_scope:
+        resolved_scope = ["."]
 
     existing_oracles = _safe_object_list(existing.get("oracles"))
-    oracles = existing_oracles if existing_oracles else [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
-    if not isinstance(existing_oracles, list) or not existing_oracles:
-        oracles = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+    resolved_oracles = [oracle for oracle in (oracles or []) if isinstance(oracle, dict)]
+    if not resolved_oracles:
+        resolved_oracles = existing_oracles if existing_oracles else [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+    if not isinstance(existing_oracles, list) or (not existing_oracles and not resolved_oracles):
+        resolved_oracles = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
 
     merged_decision_refs = _normalize_artifact_path_refs(existing.get("decision_refs"), "decisions") if isinstance(existing, dict) else []
     merged_decision_refs.extend(_safe_string_list(decision_refs))
     merged_decision_refs = sorted({item for item in merged_decision_refs if isinstance(item, str)})
     created_at = str(existing.get("created_at") or created_at_default)
+    resolved_constraints = [item for item in _safe_string_list(constraints) if item]
+    if not resolved_constraints:
+        resolved_constraints = _safe_string_list(existing.get("constraints"))
     return {
         "schema_version": 2,
         "artifact_type": "capsule",
         "id": _safe_slug(capsule_id),
-        "goal": str(existing.get("goal") or f"OutcomeGraph capsule for {capsule_id}"),
-        "scope": scope,
-        "oracles": oracles,
+        "goal": str(goal or existing.get("goal") or f"OutcomeGraph capsule for {capsule_id}"),
+        "scope": resolved_scope,
+        "constraints": resolved_constraints,
+        "oracles": resolved_oracles,
         "materials_lock_ref": f"{OG_ROOT}/materials.lock",
         "decision_refs": merged_decision_refs,
-        "lineage": existing.get("lineage") or {},
+        "lineage": lineage if isinstance(lineage, dict) and lineage else existing.get("lineage") or {},
         "status": str(existing.get("status") or status),
         "created_at": created_at,
         "updated_at": now,
@@ -9206,6 +9720,9 @@ def _build_decision_payload(
     claim_refs: list[str],
     evidence_refs: list[str],
     existing_payload: dict[str, object] | None,
+    statement: str | None = None,
+    rationale: str | None = None,
+    status: str | None = None,
 ) -> dict[str, object]:
     now = _utc_timestamp()
     existing = existing_payload or {}
@@ -9217,10 +9734,10 @@ def _build_decision_payload(
         "artifact_type": "decision",
         "id": _safe_slug(decision_id),
         "capsule_id": _safe_slug(capsule_id),
-        "statement": str(existing.get("statement") or f"Decision for {capsule_id} derived from sync outcome."),
-        "rationale": str(existing.get("rationale") or "Computed from distill/apply stage evidence."),
+        "statement": str(statement or existing.get("statement") or f"Decision for {capsule_id} derived from sync outcome."),
+        "rationale": str(rationale or existing.get("rationale") or "Computed from distill/apply stage evidence."),
         "claim_refs": merged_claim_refs,
-        "status": str(existing.get("status") or "accepted"),
+        "status": str(status or existing.get("status") or "accepted"),
         "evidence_refs": merged_evidence_refs,
         "created_at": created_at,
         "updated_at": now,
@@ -9292,6 +9809,7 @@ def _run_distill_stage(
     if not isinstance(changed, list):
         changed = []
     changed_files = [str(entry) for entry in changed]
+    changed_files_by_capsule = _group_changed_files_by_capsule(changed_files)
     try:
         worker_adapter = adapter_get("worker")
     except AdapterRegistryError as exc:
@@ -9306,39 +9824,79 @@ def _run_distill_stage(
             "generated_deltas": [],
             "errors": [str(exc)],
         }
-    distill_input = _build_distill_input(
-        run_id=run_id,
-        profile=profile,
-        mode=mode,
-        target_capsules=changed_capsules,
-        changed_paths=changed_files,
-        policy_ref=f"{OG_ROOT}/policy.yaml",
-    )
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-distill.json"
+    distill_timeout_seconds = _select_distill_worker_timeout(repo_root, snapshot)
+    target_capsules = _build_distill_target_capsules(repo_root, changed_capsules, changed_files_by_capsule)
     try:
-        output, receipts = _run_codex_worker(
-            "distill",
-            distill_input,
-            repo_root,
-            trace_path,
-            adapter=worker_adapter,
-        )
-        delta_payload = _normalize_distill_delta(output)
         deltas = []
-        for update in delta_payload["capsule_updates"]:
-            raw_delta = update if isinstance(update, dict) else {}
-            deltas.append(
-                {
-                    "capsule_id": str(raw_delta.get("id")),
-                    "status": str(raw_delta.get("status") or "success"),
-                    "claims": raw_delta.get("claims"),
-                    "decision_refs": raw_delta.get("decision_refs"),
-                    "errors": raw_delta.get("errors"),
-                    "receipts": raw_delta.get("receipts") if isinstance(raw_delta.get("receipts"), list) else [],
-                    "changed_files": raw_delta.get("changed_files", changed_files),
-                    "adapter_receipts": receipts,
-                }
-            )
+        batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
+        for batch_index in range(0, len(target_capsules), WORKER_ADAPTER_DISTILL_BATCH_SIZE):
+            batch_capsules = target_capsules[batch_index : batch_index + WORKER_ADAPTER_DISTILL_BATCH_SIZE]
+            batch_changed_files: list[str] = []
+            for capsule_descriptor in batch_capsules:
+                if not isinstance(capsule_descriptor, dict):
+                    continue
+                batch_changed_files.extend(_safe_string_list(capsule_descriptor.get("changed_files")))
+            if not batch_changed_files:
+                batch_changed_files = changed_files
+            trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-distill-batch-{batch_index // WORKER_ADAPTER_DISTILL_BATCH_SIZE}.json"
+            batch_specs.append((batch_index, batch_capsules, sorted(set(batch_changed_files)), trace_path))
+
+        completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]]]] = {}
+        max_workers = min(WORKER_ADAPTER_DISTILL_MAX_WORKERS, max(len(batch_specs), 1))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {}
+            for batch_index, batch_capsules, batch_changed_files, trace_path in batch_specs:
+                distill_input = _build_distill_input(
+                    run_id=run_id,
+                    profile=profile,
+                    mode=mode,
+                    target_capsules=batch_capsules,
+                    changed_paths=batch_changed_files,
+                    policy_ref=f"{OG_ROOT}/policy.yaml",
+                    materials_lock_ref=f"{OG_ROOT}/materials.lock",
+                )
+                future = executor.submit(
+                    _run_codex_worker,
+                    "distill",
+                    distill_input,
+                    repo_root,
+                    trace_path,
+                    worker_adapter,
+                    distill_timeout_seconds,
+                )
+                future_map[future] = batch_index
+            for future in as_completed(future_map):
+                batch_index = future_map[future]
+                completed_batches[batch_index] = future.result()
+
+        for batch_index, batch_capsules, _, _ in batch_specs:
+            output, receipts = completed_batches[batch_index]
+            delta_payload = _normalize_distill_delta(output)
+            for update in delta_payload["capsule_updates"]:
+                raw_delta = update if isinstance(update, dict) else {}
+                capsule_id = _safe_slug(str(raw_delta.get("id") or "")) or "default"
+                raw_changed_files = raw_delta.get("changed_files")
+                if isinstance(raw_changed_files, list) and raw_changed_files:
+                    delta_changed_files = [str(item) for item in raw_changed_files if str(item)]
+                else:
+                    delta_changed_files = changed_files_by_capsule.get(capsule_id, changed_files)
+                deltas.append(
+                    {
+                        "capsule_id": capsule_id,
+                        "status": str(raw_delta.get("status") or "success"),
+                        "goal": raw_delta.get("goal"),
+                        "scope": raw_delta.get("scope"),
+                        "constraints": raw_delta.get("constraints"),
+                        "oracles": raw_delta.get("oracles"),
+                        "claims": raw_delta.get("claims"),
+                        "decision": raw_delta.get("decision"),
+                        "lineage": raw_delta.get("lineage"),
+                        "errors": raw_delta.get("errors"),
+                        "receipts": raw_delta.get("receipts") if isinstance(raw_delta.get("receipts"), list) else [],
+                        "changed_files": delta_changed_files,
+                        "adapter_receipts": receipts,
+                    }
+                )
         adapter_name = str(worker_adapter.get("name", WORKER_ADAPTER_NAME))
         for delta in deltas:
             delta["adapter_name"] = adapter_name
@@ -9373,6 +9931,41 @@ def _run_distill_stage(
         "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         "generated_deltas": deltas,
     }
+
+
+def _select_distill_worker_timeout(repo_root: str, snapshot: dict[str, object]) -> int:
+    if _requires_bootstrap_full_snapshot(repo_root):
+        return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+
+    if bool(snapshot.get("force_full_sync", False)):
+        return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+
+    diff_baseline = snapshot.get("diff_baseline")
+    if isinstance(diff_baseline, dict) and str(diff_baseline.get("strategy") or "") == "empty_tree":
+        return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+
+    changed_files = snapshot.get("changed_files")
+    if isinstance(changed_files, list):
+        normalized = [_normalize_repo_relative_path(str(item)) for item in changed_files if str(item).strip()]
+        if len(normalized) >= WORKER_ADAPTER_COMPLEX_TIMEOUT_FILE_COUNT:
+            return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+
+        observed_bytes = 0
+        for relative_path in normalized:
+            if relative_path.startswith("tests/"):
+                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+            if os.path.splitext(relative_path)[1].lower() in WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS:
+                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+            full_path = os.path.join(repo_root, relative_path)
+            try:
+                if os.path.isfile(full_path):
+                    observed_bytes += os.path.getsize(full_path)
+            except OSError:
+                continue
+            if observed_bytes >= WORKER_ADAPTER_COMPLEX_TIMEOUT_BYTES:
+                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+
+    return WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS
 
 
 def _run_apply_stage(
@@ -9499,6 +10092,7 @@ def _run_apply_stage(
     applied_decisions: list[str] = []
     processed_capsules: set[str] = set()
     errors: list[str] = []
+    warnings: list[str] = []
 
     def _normalize_capsule_id(raw: object, fallback: str = "default") -> str:
         if not isinstance(raw, str):
@@ -9537,12 +10131,18 @@ def _run_apply_stage(
             errors.append("Invalid delta entry")
             continue
         capsule_id = _normalize_capsule_id(delta.get("capsule_id"), "default")
-        if str(delta.get("status") or "success") != "success":
+        delta_status = str(delta.get("status") or "success").strip().lower()
+        if delta_status in {"error", "failed", "fail"}:
             delta_errors = delta.get("errors")
             if isinstance(delta_errors, list):
-                errors.extend([str(item) for item in delta_errors if str(item)])
-            errors.append(f"distill reported non-success for capsule {capsule_id}")
+                warnings.extend([str(item) for item in delta_errors if str(item)])
+            warnings.append(f"distill reported non-success for capsule {capsule_id}")
             continue
+        if delta_status in {"pending", "warn", "warning"}:
+            delta_errors = delta.get("errors")
+            if isinstance(delta_errors, list):
+                warnings.extend([str(item) for item in delta_errors if str(item)])
+            warnings.append(f"distill recorded {delta_status} status for capsule {capsule_id}")
         receipt_pointers = delta.get("receipt_pointers")
         if not isinstance(receipt_pointers, list):
             receipt_pointers = []
@@ -9567,43 +10167,56 @@ def _run_apply_stage(
         else:
             raw_claims = []
 
-        decision_ref_candidates = _normalize_artifact_path_refs(delta.get("decision_refs"), "decisions")
+        delta_goal = str(delta.get("goal") or "").strip()
+        delta_scope = _safe_string_list(delta.get("scope"))
+        delta_constraints = _safe_string_list(delta.get("constraints"))
+        delta_oracles = _safe_object_list(delta.get("oracles"))
+        delta_decision = delta.get("decision") if isinstance(delta.get("decision"), dict) else {}
+        delta_lineage = delta.get("lineage") if isinstance(delta.get("lineage"), dict) else {}
+
+        if not raw_claims:
+            warnings.append(f"distill produced no evidence-backed claims for capsule {capsule_id}")
+            continue
+        if not delta_goal:
+            warnings.append(f"distill produced no goal for capsule {capsule_id}")
+            continue
+        if not delta_scope:
+            warnings.append(f"distill produced no scope for capsule {capsule_id}")
+            continue
+        if not delta_oracles:
+            warnings.append(f"distill produced no oracles for capsule {capsule_id}")
+            continue
+        if not delta_decision:
+            warnings.append(f"distill produced no decision payload for capsule {capsule_id}")
+            continue
 
         try:
             claim_refs = []
-            if not raw_claims:
-                claim_id = f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:fallback')}"
-                generated_claims = [
+            generated_claims = []
+            for claim in raw_claims:
+                if not isinstance(claim, dict):
+                    continue
+                claim_capsule = _safe_slug(str(claim.get("capsule_id") or capsule_id))
+                if claim.get("capsule_id") and claim_capsule != capsule_id:
+                    continue
+                claim_receipts = claim.get("receipt_pointers") if isinstance(claim.get("receipt_pointers"), list) else []
+                if not claim_receipts:
+                    claim_receipts = receipt_paths
+                generated_claims.append(
                     {
-                        "id": claim_id,
-                        "capsule_id": capsule_id,
-                        "category": "behavior",
-                        "text": f"Synthetic claim for {capsule_id} from distill stage.",
-                        "receipt_pointers": receipt_paths,
+                        "id": str(
+                            claim.get("id")
+                            or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"
+                        ),
+                        "capsule_id": claim_capsule,
+                        "category": str(claim.get("category") or "behavior"),
+                        "text": str(claim.get("text") or f"Distill claim for {capsule_id}."),
+                        "receipt_pointers": claim_receipts,
                     }
-                ]
-            else:
-                generated_claims = []
-                for claim in raw_claims:
-                    if not isinstance(claim, dict):
-                        continue
-                    claim_capsule = _safe_slug(str(claim.get("capsule_id") or capsule_id))
-                    if claim.get("capsule_id") and claim_capsule != capsule_id:
-                        continue
-                    generated_claims.append(
-                        {
-                            "id": str(
-                                claim.get("id")
-                                or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"
-                            ),
-                            "capsule_id": claim_capsule,
-                            "category": str(claim.get("category") or "behavior"),
-                            "text": str(claim.get("text") or f"Synthetic claim for {capsule_id} from distill stage."),
-                            "receipt_pointers": claim.get("receipt_pointers")
-                            if isinstance(claim.get("receipt_pointers"), list)
-                            else [],
-                        }
-                    )
+                )
+            if not generated_claims:
+                errors.append(f"distill claims for capsule {capsule_id} could not be normalized")
+                continue
             for generated_claim in generated_claims:
                 claim_payload = _build_claim_payload(
                     str(generated_claim["id"]),
@@ -9641,6 +10254,9 @@ def _run_apply_stage(
                 claim_refs,
                 list(_safe_evidence_refs(receipt_paths)),
                 _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "decisions", f"{decision_id}.json")),
+                statement=str(delta_decision.get("statement") or ""),
+                rationale=str(delta_decision.get("rationale") or ""),
+                status=str(delta_decision.get("status") or ""),
             )
             os.makedirs(os.path.dirname(os.path.join(repo_root, OG_ROOT, "decisions", f"{decision_id}.json")), exist_ok=True)
             _write_canonical_artifact(
@@ -9656,7 +10272,7 @@ def _run_apply_stage(
 
         try:
             capsule_path = f"{OG_ROOT}/capsules/{capsule_id}.json"
-            decision_refs = list(dict.fromkeys([*decision_ref_candidates, decision_ref]))
+            decision_refs = [decision_ref]
             existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
             capsule_payload = _build_capsule_payload(
                 capsule_id,
@@ -9664,6 +10280,12 @@ def _run_apply_stage(
                 decision_refs,
                 existing_payload,
                 _utc_timestamp(),
+                goal=delta_goal,
+                scope=delta_scope,
+                constraints=delta_constraints,
+                oracles=delta_oracles,
+                lineage=delta_lineage,
+                status=delta_status,
             )
             _write_canonical_artifact(
                 repo_root,
@@ -9715,14 +10337,14 @@ def _run_apply_stage(
         except Exception as exc:
             errors.append(f"Failed to write certificate for {capsule_id}: {exc}")
 
-    baseline_capsules = normalized_discovered_capsules or ["default"]
-    if "default" not in baseline_capsules:
-        baseline_capsules.append("default")
+    baseline_capsules = normalized_discovered_capsules
     for capsule_id in sorted(set(baseline_capsules)):
         if capsule_id in processed_capsules:
             continue
         try:
             existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
+            if not existing_payload:
+                continue
             capsule_payload = _build_capsule_payload(
                 capsule_id,
                 [],
@@ -9766,12 +10388,30 @@ def _run_apply_stage(
             "applied_refs": applied_refs,
             "applied_decisions": applied_decisions,
             "errors": errors,
+            "warnings": warnings,
+        }
+
+    if warnings:
+        return {
+            "name": "apply",
+            "status": "warn",
+            "message": "Applied usable distill deltas with warnings.",
+            "mode": mode,
+            "applied_changes": len(applied_claims),
+            "applied_claims": applied_claims,
+            "applied_certificates": applied_certs,
+            "applied_capsules": applied_capsules,
+            "applied_refs": applied_refs,
+            "applied_decisions": applied_decisions,
+            "applied_deltas": deltas,
+            "errors": [],
+            "warnings": warnings,
         }
 
     return {
         "name": "apply",
         "status": "ok",
-        "message": "Applied synthetic deltas to canonical artifacts.",
+        "message": "Applied distill deltas to canonical artifacts.",
         "mode": mode,
         "applied_changes": len(applied_claims),
         "applied_claims": applied_claims,
@@ -9780,6 +10420,7 @@ def _run_apply_stage(
         "applied_refs": applied_refs,
         "applied_decisions": applied_decisions,
         "applied_deltas": deltas,
+        "warnings": [],
     }
 
 
@@ -9990,13 +10631,19 @@ def _run_replay_stage(
 
     for capsule in targets:
         trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-replay.json"
+        capsule_payload = _load_capsule_payload(repo_root, capsule)
+        scope_materials = _collect_capsule_scope_materials(repo_root, capsule, changed_materials)
+        baseline_equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule)
         try:
             input_payload = _build_replay_input(
                 run_id=run_id,
                 profile=profile,
                 mode=mode,
                 capsule_id=capsule,
-                changed_materials=changed_materials,
+                changed_materials=scope_materials,
+                capsule_payload=capsule_payload,
+                scope_materials=scope_materials,
+                baseline_equivalence=baseline_equivalence,
             )
             output, receipts = _run_codex_worker(
                 "replay",
@@ -10039,7 +10686,7 @@ def _run_replay_stage(
         replay_failures = _safe_string_list(plan.get("failures"))
         replay_steps: list[dict[str, object]] = []
         replay_receipts: list[dict[str, object]] = _safe_object_list(plan.get("adapter_receipts"))
-        materialized_paths = _collect_replay_sandbox_paths(repo_root, changed_materials)
+        materialized_paths = _collect_replay_sandbox_paths(repo_root, capsule, scope_materials)
         sandbox_root = f"{OG_ROOT}/work/replay/{_safe_slug(run_id)}/{_safe_slug(capsule)}"
         replay_result: dict[str, object] = {
             "capsule_id": capsule,
@@ -10052,6 +10699,7 @@ def _run_replay_stage(
             "replay_steps": replay_steps,
             "equivalence": None,
             "materialized_paths": materialized_paths,
+            "oracle_results": [],
         }
 
         if lower_status in {"error", "failed", "fail", "warn"}:
@@ -10063,7 +10711,7 @@ def _run_replay_stage(
         claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
 
         if replay_status == "success":
-            missing_paths = _materialize_replay_sandbox(repo_root, sandbox_root, changed_materials)
+            missing_paths = _materialize_replay_sandbox(repo_root, sandbox_root, capsule, scope_materials)
             if missing_paths:
                 replay_status = "failed"
                 overall_failed = True
@@ -10072,6 +10720,10 @@ def _run_replay_stage(
                 )
             else:
                 sandbox_steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+                if not sandbox_steps:
+                    replay_status = "failed"
+                    overall_failed = True
+                    replay_failures.append("Replay plan omitted executable steps.")
                 for step_index, raw_step in enumerate(sandbox_steps):
                     if not isinstance(raw_step, dict):
                         replay_status = "failed"
@@ -10095,15 +10747,42 @@ def _run_replay_stage(
                         replay_failures.extend(_safe_string_list(step_result.get("failures")))
                         break
 
+                oracle_checks: list[dict[str, object]] = []
+                sandbox_exec_root = os.path.join(repo_root, sandbox_root)
+                for oracle in _load_capsule_oracles(repo_root, capsule):
+                    check = _run_oracle_check(
+                        repo_root,
+                        capsule,
+                        oracle,
+                        materialized_paths,
+                        run_id,
+                        mode,
+                        policy=policy_payload,
+                        exec_root=sandbox_exec_root,
+                        trace_label="replay",
+                    )
+                    oracle_checks.append(check)
+                    replay_receipts.extend(_safe_object_list(check.get("receipt_pointers")))
+                    if str(check.get("status") or "") not in {"pass", "skipped"}:
+                        replay_status = "failed"
+                        overall_failed = True
+                        replay_failures.append(
+                            f"Replay oracle {check.get('oracle_name', 'unknown-oracle')} finished with status {check.get('status', 'unknown')}."
+                        )
+                replay_result["oracle_results"] = oracle_checks
+
                 baseline_hash = _collect_replay_equivalence_baseline(repo_root, capsule)
-                observed_hash = _compute_replay_observed_hash(replay_steps)
+                observed_hash = _compute_oracle_observed_hash(oracle_checks)
+                plan_hash = _compute_replay_observed_hash(replay_steps)
                 equivalence = {
                     "baseline_hash": baseline_hash,
                     "observed_hash": observed_hash,
                     "oracle_digest": observed_hash,
+                    "plan_digest": plan_hash,
                     "match": baseline_hash is None or baseline_hash == observed_hash,
                     "materialized_path_count": len(materialized_paths),
                     "trace_count": len(replay_steps),
+                    "oracle_count": len(oracle_checks),
                 }
                 replay_result["equivalence"] = equivalence
                 if baseline_hash is not None and not equivalence["match"]:
@@ -10121,7 +10800,7 @@ def _run_replay_stage(
                 run_id,
                 "replay",
                 mode,
-                changed_files if changed_only else [],
+                materialized_paths,
                 _normalize_receipt_pointers(replay_receipts, field=f"replay_plans[{len(replay_results)}].receipts"),
                 text=f"Replay stage for {capsule} completed with plan status '{step_status}'.",
             )
@@ -10164,8 +10843,9 @@ def _run_replay_stage(
                 "adapter_profile": profile,
                 "source_ref": "HEAD",
                 "sandbox_root": sandbox_root,
-                "changed_materials": changed_materials,
+                "changed_materials": scope_materials,
                 "materialized_paths": materialized_paths,
+                "oracle_results": replay_result.get("oracle_results"),
                 "equivalence": replay_result.get("equivalence"),
             }
             certificate_path = os.path.join(repo_root, OG_ROOT, "certificates", f"{certificate_id}.json")
@@ -10276,8 +10956,14 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
                 failed_capsules.append(capsule)
                 break
 
+    payload_status = "error"
+    if verify_status in {"ok", "skipped"}:
+        payload_status = "ok"
+    elif verify_status == "warn":
+        payload_status = "warn"
+
     payload = {
-        "status": "ok" if verify_status in {"ok", "skipped"} else "error",
+        "status": payload_status,
         "command": "verify",
         "options": options,
         "run_id": run_id,
@@ -10293,6 +10979,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "oracle_results": verify.get("oracle_results", {}),
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": verify.get("errors", []),
+        "warnings": verify.get("warnings", []),
     }
 
     if policy_error is None and verify_status == "ok":
@@ -11154,17 +11841,21 @@ def _run_verify_stage(
         if policy_denied:
             break
 
-    status = "warn" if overall_failed else "ok"
-    if policy_denied or configuration_failed:
+    status = "ok"
+    warnings: list[str] = []
+    if overall_failed or configuration_failed:
         status = "error"
-    if policy_denied and not errors and policy_denied_messages:
-        errors.extend(policy_denied_messages)
+    elif policy_denied:
+        status = "warn"
+        warnings.extend(policy_denied_messages)
 
     return {
         "name": "verify",
         "status": status,
         "message": (
-            "Oracle-driven verify loop blocked by policy."
+            "Oracle-driven verify loop completed with policy-skipped oracles."
+            if policy_denied and not (overall_failed or configuration_failed)
+            else "Oracle-driven verify loop blocked by policy."
             if policy_denied
             else "Oracle-driven verify loop failed due to invalid oracle configuration."
             if configuration_failed
@@ -11180,6 +11871,7 @@ def _run_verify_stage(
         "receipt_pointers": receipts,
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": errors,
+        "warnings": warnings,
     }
 
 
@@ -11600,7 +12292,7 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     summary_path = _record_sync_summary_event(repo_root, payload, duration_ms)
     _build_work_payload(
         repo_root,
-        status="idle" if run_status == "ok" else "degraded",
+        status="idle" if run_status in {"ok", "warn"} else "degraded",
         last_sync_id=run_id,
         last_idempotency_key=idempotency_key,
         last_message=f"sync finished ({run_status})",
