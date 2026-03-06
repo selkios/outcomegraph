@@ -474,6 +474,20 @@ class TestDaemonLifecycle(_RepoTestCase):
         self.assertIn('exec "$PYTHON_BIN" -m og daemon run "$@"', script)
         self.assertNotIn("uvx --from", script)
 
+    def test_daemon_run_sync_uses_current_python_module(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=[sys.executable, "-m", "og", "sync", "--json"],
+            returncode=0,
+            stdout=json.dumps({"status": "ok", "command": "sync"}),
+            stderr="",
+        )
+        with patch.object(og.subprocess, "run", return_value=completed) as run:
+            payload = og._daemon_run_sync(str(self.repo))
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(run.call_args.args[0], [sys.executable, "-m", "og", "sync", "--json"])
+        self.assertEqual(run.call_args.kwargs["env"]["OG_AUTOPILOT"], "1")
+
     def test_daemon_start_stop_round_trip(self) -> None:
         with self.git_root_patch(), patch.object(
             og,
@@ -506,16 +520,12 @@ class TestDaemonLifecycle(_RepoTestCase):
 
     def test_daemon_run_sync_rejects_invalid_status_payload(self) -> None:
         completed = subprocess.CompletedProcess(
-            args=["og", "sync", "--json"],
+            args=[sys.executable, "-m", "og", "sync", "--json"],
             returncode=0,
             stdout=json.dumps({"status": "invalid-state", "command": "sync"}),
             stderr="",
         )
-        with patch.object(og.shutil, "which", return_value="/usr/bin/og"), patch.object(
-            og.subprocess,
-            "run",
-            return_value=completed,
-        ):
+        with patch.object(og.subprocess, "run", return_value=completed):
             payload = og._daemon_run_sync(str(self.repo))
 
         self.assertEqual(payload["status"], "error")
@@ -1492,6 +1502,32 @@ class TestVerifyWorkflows(_RepoTestCase):
         self.assertEqual(payload["steps"][-1]["status"], "ok")
         self.assertIsNone(drift)
 
+    def test_run_verify_job_skips_export_refresh_after_verify_failure(self) -> None:
+        snapshot = {
+            "changed_files": ["capsules/default.yaml"],
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_count": 1,
+            "has_changes": True,
+            "captured_at": "2026-03-05T00:00:00Z",
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot):
+            (self.repo / ".outcomegraph" / "capsules").mkdir(parents=True)
+            (self.repo / ".outcomegraph" / "capsules" / "default.yaml").write_text(
+                "schema_version: 2\nid: default\n",
+                encoding="utf-8",
+            )
+            payload = og._run_verify_job(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual([step["name"] for step in payload["steps"]], ["verify"])
+        self.assertFalse((self.repo / ".outcomegraph" / "export" / "AGENTS.md").exists())
+        self.assertFalse((self.repo / "skills" / "outcome-steward" / "SKILL.md").exists())
+
 
 class TestReplayWorkflows(_RepoTestCase):
     def test_run_replay_step_rejects_prefix_based_cwd_escape(self) -> None:
@@ -1598,6 +1634,32 @@ class TestReplayWorkflows(_RepoTestCase):
         self.assertEqual(payload["steps"][-1]["name"], "export")
         self.assertEqual(payload["steps"][-1]["status"], "ok")
         self.assertIsNone(drift)
+
+    def test_run_replay_job_skips_export_refresh_after_replay_failure(self) -> None:
+        snapshot = {
+            "changed_files": ["capsules/default.yaml"],
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_count": 1,
+            "has_changes": True,
+            "captured_at": "2026-03-05T00:00:00Z",
+        }
+
+        with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot):
+            (self.repo / ".outcomegraph" / "capsules").mkdir(parents=True)
+            (self.repo / ".outcomegraph" / "capsules" / "default.yaml").write_text(
+                "schema_version: 2\nid: default\n",
+                encoding="utf-8",
+            )
+            payload = og._run_replay_job(
+                str(self.repo),
+                {"changed": True, "profile": "analyze", "mode": "observe"},
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual([step["name"] for step in payload["steps"]], ["replay"])
+        self.assertFalse((self.repo / ".outcomegraph" / "export" / "AGENTS.md").exists())
+        self.assertFalse((self.repo / "skills" / "outcome-steward" / "SKILL.md").exists())
 
     def test_run_replay_stage_errors_on_adapter_interface_mismatch(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
@@ -1753,6 +1815,37 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
                 og._run_codex_worker("distill", {"run_id": "run-1"}, str(self.repo), "trace.json")
 
         self.assertEqual(str(context.exception), "worker manifest schema mismatch")
+
+    def test_policy_yaml_preserves_colon_containing_verify_commands(self) -> None:
+        (self.repo / ".outcomegraph").mkdir()
+        (self.repo / ".outcomegraph" / "policy.yaml").write_text(
+            (
+                "schema_version: 2\n"
+                "mode: observe\n"
+                "allow:\n"
+                "  verify_commands:\n"
+                "    - npm run lint:ci\n"
+                "    - python -m pkg.module:main\n"
+                "  sandbox_operations:\n"
+                "    - read_artifacts\n"
+            ),
+            encoding="utf-8",
+        )
+
+        policy, error = og._resolve_policy_for_repo(str(self.repo))
+
+        self.assertIsNone(error)
+        self.assertIn("npm run lint:ci", policy["allow"]["verify_commands"])
+        self.assertIn("python -m pkg.module:main", policy["allow"]["verify_commands"])
+        self.assertIsNone(
+            og._ensure_policy_action_allowed(
+                policy,
+                command="verify",
+                category="verify_commands",
+                target="npm run lint:ci",
+                mode="observe",
+            )
+        )
 
     def test_parse_worker_output_extracts_contract_from_event_stream(self) -> None:
         payload = {

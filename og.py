@@ -333,7 +333,6 @@ DAEMON_SERVICE_DIR = f"{OG_ROOT}/work/daemon"
 DAEMON_SERVICE_SCRIPT = f"{DAEMON_SERVICE_DIR}/run-ogd.sh"
 DAEMON_SERVICE_STATE = f"{DAEMON_SERVICE_DIR}/state.json"
 DAEMON_SERVICE_LOG = f"{DAEMON_SERVICE_DIR}/daemon.log"
-DAEMON_UVX_SOURCE = "git+https://github.com/selkios/outcomegraph"
 DAEMON_SYNC_TIMEOUT_SECONDS = 300
 DAEMON_WATCH_INTERVAL_SECONDS = 2
 DAEMON_WATCH_IGNORE_PREFIXES = (
@@ -2546,14 +2545,27 @@ def _yaml_tokens(raw: str) -> list[_YamlToken]:
     return tokens
 
 
+def _yaml_mapping_separator_index(content: str) -> int | None:
+    for index, char in enumerate(content):
+        if char != ":":
+            continue
+        next_char = content[index + 1 : index + 2]
+        if next_char and not next_char.isspace():
+            continue
+        if content[:index].strip():
+            return index
+    return None
+
+
 def _yaml_key_value(content: str, line_number: int) -> tuple[str, str]:
-    if ":" not in content:
+    separator_index = _yaml_mapping_separator_index(content)
+    if separator_index is None:
         raise ValueError(f"invalid YAML mapping entry on line {line_number}: {content!r}")
-    key, _, value = content.partition(":")
-    key = key.strip()
+    key = content[:separator_index].strip()
+    value = content[separator_index + 1 :].strip()
     if not key:
         raise ValueError(f"invalid YAML key on line {line_number}")
-    return key, value.strip()
+    return key, value
 
 
 def _parse_yaml_tokens(tokens: list[_YamlToken], index: int, indent: int) -> tuple[object, int]:
@@ -2581,7 +2593,7 @@ def _parse_yaml_tokens(tokens: list[_YamlToken], index: int, indent: int) -> tup
                 items.append(_yaml_scalar(remainder))
                 continue
 
-            if ":" not in remainder:
+            if _yaml_mapping_separator_index(remainder) is None:
                 items.append(_yaml_scalar(remainder))
                 continue
 
@@ -6611,9 +6623,14 @@ def _daemon_running(pid: object) -> bool:
         return False
 
 
+def _current_python_bin() -> str:
+    executable = str(sys.executable or "").strip()
+    return executable or "python3"
+
+
 def _daemon_build_script(repo_root: str) -> str:
     quoted_repo_root = shlex.quote(repo_root)
-    python_bin = shlex.quote(sys.executable or "python3")
+    python_bin = shlex.quote(_current_python_bin())
     return (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
@@ -6802,10 +6819,7 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
     started = time.perf_counter()
     env = os.environ.copy()
     env["OG_AUTOPILOT"] = "1"
-    if shutil.which("og"):
-        cmd = ["og", "sync", "--json"]
-    else:
-        cmd = ["uvx", "--from", DAEMON_UVX_SOURCE, "og", "sync", "--json"]
+    cmd = [_current_python_bin(), "-m", "og", "sync", "--json"]
     try:
         process = subprocess.run(
             cmd,
@@ -10281,7 +10295,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "errors": verify.get("errors", []),
     }
 
-    if policy_error is None:
+    if policy_error is None and verify_status == "ok":
         _append_export_refresh_step(payload, repo_root, mode, policy_payload)
     payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
     payload["summary_event"] = _record_verify_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
@@ -10341,7 +10355,7 @@ def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "certificate_refs": replay.get("certificate_refs", []),
         "errors": replay.get("errors", []),
     }
-    if policy_error is None:
+    if policy_error is None and str(replay.get("status") or "").lower() == "ok":
         _append_export_refresh_step(payload, repo_root, mode, policy_payload)
     payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
     payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
