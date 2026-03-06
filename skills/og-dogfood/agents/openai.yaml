@@ -1,0 +1,4 @@
+interface:
+  display_name: "OG Dogfood"
+  short_description: "Run OutcomeGraph live dogfood validation."
+  default_prompt: "Use $og-dogfood to run the live OutcomeGraph dogfood flow in this repo and summarize the evidence."
