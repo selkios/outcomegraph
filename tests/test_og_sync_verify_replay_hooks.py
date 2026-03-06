@@ -53,6 +53,7 @@ class _RepoTestCase(TestCase):
 def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = "success") -> dict[str, object]:
     return {
         "id": capsule_id,
+        "capsule_id": capsule_id,
         "status": status,
         "goal": f"Preserve and replay the {capsule_id} capability.",
         "scope": changed_files or [capsule_id],
@@ -2434,6 +2435,100 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(capsule_payload["status"], "pending")
         self.assertTrue(payload["applied_capsules"])
         self.assertIn("snapshot was partial but still useful", payload["warnings"])
+
+    def test_run_apply_stage_upgrades_existing_capsule_status(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            existing_payload = og._build_capsule_payload(
+                "default",
+                ["README.md"],
+                [],
+                None,
+                og._utc_timestamp(),
+                goal="Existing default capsule",
+                scope=["README.md"],
+                constraints=["existing constraint"],
+                oracles=[{"name": "default-verify", "command": None, "scope": ["README.md"]}],
+                status="warn",
+            )
+            (self.repo / ".outcomegraph" / "capsules" / "default.json").write_text(
+                json.dumps(existing_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [
+                        _distill_update("default", ["README.md"], status="success"),
+                    ],
+                    "affected_capsules": ["default"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "default.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["status"], "success")
+
+    def test_run_apply_stage_infers_pytest_oracle_for_python_capsule(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [
+                        _distill_update("tests", ["tests/test_example.py"], status="warn"),
+                    ],
+                    "affected_capsules": ["tests"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
+        oracle_commands = [oracle.get("command") for oracle in capsule_payload["oracles"]]
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["status"], "success")
+        self.assertIn("pytest -q", oracle_commands)
+
+    def test_run_apply_stage_downgrades_policy_blocked_oracle_to_advisory_only(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("skill-og-dogfood", ["skills/og-dogfood/SKILL.md"], status="success")
+            delta["oracles"] = [
+                {
+                    "name": "sync stage",
+                    "command": "uv run og sync --json",
+                    "scope": ["skills/og-dogfood/SKILL.md"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["skill-og-dogfood"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads(
+            (self.repo / ".outcomegraph" / "capsules" / "skill-og-dogfood.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(payload["status"], "ok")
+        self.assertIsNone(capsule_payload["oracles"][0]["command"])
+        self.assertIn("advisory only in observe mode", capsule_payload["oracles"][0]["name"])
 
     def test_run_verify_stage_skips_oracle_command_when_not_allowed(self) -> None:
         (self.repo / ".outcomegraph").mkdir()

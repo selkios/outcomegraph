@@ -9668,6 +9668,7 @@ def _build_capsule_payload(
     resolved_constraints = [item for item in _safe_string_list(constraints) if item]
     if not resolved_constraints:
         resolved_constraints = _safe_string_list(existing.get("constraints"))
+    resolved_status = str(status).strip() if str(status).strip() else str(existing.get("status") or "active")
     return {
         "schema_version": 2,
         "artifact_type": "capsule",
@@ -9679,10 +9680,79 @@ def _build_capsule_payload(
         "materials_lock_ref": f"{OG_ROOT}/materials.lock",
         "decision_refs": merged_decision_refs,
         "lineage": lineage if isinstance(lineage, dict) and lineage else existing.get("lineage") or {},
-        "status": str(existing.get("status") or status),
+        "status": resolved_status,
         "created_at": created_at,
         "updated_at": now,
     }
+
+
+def _policy_allows_verify_command(policy: dict[str, object], mode: str, command: str) -> bool:
+    normalized_command = command.strip()
+    if not normalized_command:
+        return False
+    denied = _ensure_policy_action_allowed(
+        policy,
+        command="verify",
+        category="verify_commands",
+        target=normalized_command,
+        mode=mode,
+    )
+    return denied is None
+
+
+def _normalize_capsule_oracles_for_apply(
+    capsule_id: str,
+    oracles: list[dict[str, object]],
+    changed_files: list[str],
+    scope: list[str],
+    status: str,
+    policy: dict[str, object],
+    mode: str,
+) -> tuple[list[dict[str, object]], str]:
+    normalized: list[dict[str, object]] = []
+    executable_commands: set[str] = set()
+    oracle_scope = sorted(
+        {
+            _normalize_repo_relative_path(str(item))
+            for item in [*changed_files, *scope]
+            if _normalize_repo_relative_path(str(item))
+        }
+    )
+
+    for raw_oracle in oracles:
+        normalized_oracle = _normalize_oracle_entry(raw_oracle)
+        if normalized_oracle is None:
+            continue
+        command_value = str(normalized_oracle.get("command") or "").strip()
+        if command_value and not _policy_allows_verify_command(policy, mode, command_value):
+            normalized_oracle["command"] = None
+            normalized_oracle["name"] = f"{normalized_oracle['name']} (advisory only in {mode} mode)"
+        command_after = str(normalized_oracle.get("command") or "").strip()
+        if command_after:
+            executable_commands.add(command_after)
+        normalized.append(normalized_oracle)
+
+    python_or_test_scope = any(
+        path == "og.py"
+        or path.startswith("tests/")
+        or os.path.splitext(path)[1].lower() == ".py"
+        for path in oracle_scope
+    )
+    if python_or_test_scope and "pytest -q" not in executable_commands and _policy_allows_verify_command(policy, mode, "pytest -q"):
+        normalized.append(
+            {
+                "name": "pytest regression suite",
+                "command": "pytest -q",
+                "scope": oracle_scope or ["og.py", "tests/**"],
+            }
+        )
+        executable_commands.add("pytest -q")
+        if status in {"warn", "warning", "pending"}:
+            status = "success"
+
+    if not normalized:
+        normalized = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": oracle_scope}]
+    return normalized, status
 
 
 def _normalize_artifact_path_refs(raw_refs: object, scope: str) -> list[str]:
@@ -10138,11 +10208,6 @@ def _run_apply_stage(
                 warnings.extend([str(item) for item in delta_errors if str(item)])
             warnings.append(f"distill reported non-success for capsule {capsule_id}")
             continue
-        if delta_status in {"pending", "warn", "warning"}:
-            delta_errors = delta.get("errors")
-            if isinstance(delta_errors, list):
-                warnings.extend([str(item) for item in delta_errors if str(item)])
-            warnings.append(f"distill recorded {delta_status} status for capsule {capsule_id}")
         receipt_pointers = delta.get("receipt_pointers")
         if not isinstance(receipt_pointers, list):
             receipt_pointers = []
@@ -10173,6 +10238,20 @@ def _run_apply_stage(
         delta_oracles = _safe_object_list(delta.get("oracles"))
         delta_decision = delta.get("decision") if isinstance(delta.get("decision"), dict) else {}
         delta_lineage = delta.get("lineage") if isinstance(delta.get("lineage"), dict) else {}
+        delta_oracles, delta_status = _normalize_capsule_oracles_for_apply(
+            capsule_id,
+            delta_oracles,
+            normalized_changed_files,
+            delta_scope,
+            delta_status,
+            policy_payload,
+            mode,
+        )
+        if delta_status in {"pending", "warn", "warning"}:
+            delta_errors = delta.get("errors")
+            if isinstance(delta_errors, list):
+                warnings.extend([str(item) for item in delta_errors if str(item)])
+            warnings.append(f"distill recorded {delta_status} status for capsule {capsule_id}")
 
         if not raw_claims:
             warnings.append(f"distill produced no evidence-backed claims for capsule {capsule_id}")
