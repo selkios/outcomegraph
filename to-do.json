@@ -9,7 +9,8 @@
     "ARCHITECTURE.md",
     "QUICKSTART.md",
     "README.md",
-    "SPEC-v2.md"
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md"
   ],
   "tasks": [
     {
@@ -1374,15 +1375,22 @@
         "OG-AGENT-003"
       ],
       "files": [
-        "og.py",
+        "/home/agent/outcomegraph/AGENT_FIRST_CLI_REVIEW.md",
+        "/home/agent/outcomegraph/README.md",
+        "/home/agent/outcomegraph/RUNBOOKS.md",
+        "/home/agent/outcomegraph/SPEC-v2.md",
+        "/home/agent/outcomegraph/og.py",
+        "/home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py",
+        "/home/agent/outcomegraph/to-do.json",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
-        "AGENT_FIRST_CLI_REVIEW.md",
+        "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T08:52:31Z"
+      "updated_at": "2026-03-07T08:54:51Z"
     },
     {
       "id": "OG-AGENT-010",
@@ -1702,6 +1710,337 @@
       ],
       "created_at": "2026-03-05T21:40:15Z",
       "updated_at": "2026-03-05T21:59:35Z"
+    },
+    {
+      "id": "OG-PLAN-001",
+      "title": "Capture the worker and capsule refactor plan in a repo-owned Markdown document",
+      "priority": 1,
+      "status": "done",
+      "details": "Created `WORKER_CAPSULE_REFACTOR_PLAN.md` as the controlling document for the Codex worker, capsule-quality, replay, and dogfood refactor. All tasks in this workstream must reference that plan directly.",
+      "steps": [
+        "Write a detailed plan document in `WORKER_CAPSULE_REFACTOR_PLAN.md` describing findings, target design, phased workstreams, acceptance criteria, and recommended sequencing",
+        "Add the plan document to `to-do.json` source files so backlog work treats it as ground truth",
+        "Create follow-on implementation tasks that explicitly reference `WORKER_CAPSULE_REFACTOR_PLAN.md` in their details and file lists"
+      ],
+      "tags": [
+        "planning",
+        "codex",
+        "capsules",
+        "prompts"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "to-do.json"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-PROMPT-001",
+      "title": "Externalize Codex worker prompts into repo-managed prompt assets",
+      "priority": 1,
+      "status": "todo",
+      "details": "Phase 1 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: move distill and replay worker prompts out of `og.py` into a human-readable prompt asset directory with manifest-driven loading and validation.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 1 and create a top-level prompt asset directory with repo-owned worker prompt files and a manifest",
+        "Replace inline prompt bodies in `og.py` with a prompt loader/renderer that validates prompt ids, versions, roles, and required variables",
+        "Add regression tests proving missing or malformed prompt assets fail fast and that worker execution still renders deterministic prompt text"
+      ],
+      "tags": [
+        "prompts",
+        "codex",
+        "refactor",
+        "worker"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-WORKER-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-PROMPT-002",
+      "title": "Record worker prompt provenance in traces and generated artifacts",
+      "priority": 1,
+      "status": "todo",
+      "details": "Phase 1 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: once prompt assets are externalized, persist prompt id, version, and source path in worker traces and any downstream artifact metadata that depends on worker output.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 1 and extend worker trace input/output records to carry prompt provenance metadata",
+        "Plumb prompt provenance into certificates, summary events, or other relevant receipts so generated artifacts can be tied back to the exact prompt revision",
+        "Add tests proving prompt provenance is emitted and stable across repeated runs with unchanged prompt assets"
+      ],
+      "tags": [
+        "prompts",
+        "provenance",
+        "traces",
+        "worker"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-PROMPT-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-CAPSULE-001",
+      "title": "Introduce capsule kinds and kind-specific success policy",
+      "priority": 1,
+      "status": "done",
+      "details": "Phase 2 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: classify capsules as `code`, `test`, `doc`, `config`, or `runtime` so success rules match the kind of artifact being distilled.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 2 and add explicit internal capsule-kind classification based on scope, source files, and artifact role",
+        "Define kind-specific success criteria so `code` and `test` capsules require stronger executable evidence than `doc` or `config` capsules",
+        "Add tests proving thin snapshot-only code capsules cannot silently qualify as strong `success` records"
+      ],
+      "tags": [
+        "capsules",
+        "quality",
+        "classification",
+        "policy"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-WORKER-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "SPEC-v2.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T09:07:36Z"
+    },
+    {
+      "id": "OG-DISTILL-001",
+      "title": "Enrich distill payloads with code-aware feature context",
+      "priority": 1,
+      "status": "todo",
+      "details": "Phase 3 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: improve distill inputs so Codex sees feature-relevant context instead of mainly file snapshots and path lists.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 3 and extend the distill payload with changed-region context, stronger supporting scope inputs, existing capsule summaries, and related test/oracle hints",
+        "Keep the payload bounded and deterministic so distill remains reproducible without exposing the full repo or full transcripts",
+        "Add tests that large-file edits produce useful changed-region payloads and that feature-related supporting files are surfaced when needed"
+      ],
+      "tags": [
+        "distill",
+        "payload",
+        "capsules",
+        "worker"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-CAPSULE-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-DISTILL-002",
+      "title": "Rewrite the distill contract around recreation briefs instead of summaries",
+      "priority": 1,
+      "status": "todo",
+      "details": "Phase 4 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: change the distill prompt and output expectations so capsules describe recreatable behavior, invariants, dependencies, acceptance oracles, and explicit unknowns.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 4 and rewrite the distill worker prompt to request compact feature recreation briefs rather than broad summaries",
+        "Update any related output schema, normalizers, and tests so strong capsule outputs must include behavior claims, invariants, dependencies, and an acceptance oracle or explicit reason one is absent",
+        "Add regression fixtures showing the new contract produces materially better `og` and `tests` capsules for this repo"
+      ],
+      "tags": [
+        "distill",
+        "prompts",
+        "capsules",
+        "recreation"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-PROMPT-001",
+        "OG-CAPSULE-001",
+        "OG-DISTILL-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-APPLY-001",
+      "title": "Reduce apply-stage heuristics and preserve evidence gaps honestly",
+      "priority": 2,
+      "status": "todo",
+      "details": "Phase 5 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: keep policy-safe normalization but stop apply from turning weak distill outputs into misleadingly strong capsules.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 5 and audit every apply-stage heuristic that upgrades status, synthesizes claims, or strengthens oracle posture",
+        "Retain helpful normalization such as policy-based command downgrades, but preserve unknowns and evidence gaps in the canonical artifacts",
+        "Add tests proving thin code capsules remain transparently weak until distill or replay produces stronger evidence"
+      ],
+      "tags": [
+        "apply",
+        "capsules",
+        "quality",
+        "truthfulness"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-CAPSULE-001",
+        "OG-DISTILL-002"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-REPLAY-003",
+      "title": "Tighten replay as a real regeneration proof path",
+      "priority": 2,
+      "status": "todo",
+      "details": "Phase 6 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: externalize the replay prompt and strengthen replay plans so they prove capsule regeneration and equivalence more directly.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 6 and move the replay prompt into the shared prompt asset system with the same provenance rules as distill",
+        "Require replay plans to be capsule-scoped, materially executable in isolated environments, and explicit about acceptance checks and equivalence inputs",
+        "Add tests showing replay plans fail clearly when a capsule lacks enough regeneration information instead of fabricating shallow success"
+      ],
+      "tags": [
+        "replay",
+        "prompts",
+        "verification",
+        "regeneration"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-PROMPT-001",
+        "OG-CAPSULE-001",
+        "OG-REPLAY-002"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "RUNBOOKS.md",
+        "SPEC-v2.md"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-EVAL-001",
+      "title": "Add an artifact-quality evaluation harness for capsule usefulness",
+      "priority": 2,
+      "status": "todo",
+      "details": "Phase 7 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: measure graph quality directly so prompt and payload changes are judged by capsule usefulness rather than only by structural success.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 7 and define measurable acceptance metrics for executable oracles, invariant coverage, stale-doc contradictions, and code-capsule evidence quality",
+        "Implement tests or evaluation helpers that fail when those metrics regress on this repo",
+        "Wire the harness into the local quality pass or a focused repo-quality workflow so prompt changes are continuously evaluated"
+      ],
+      "tags": [
+        "evaluation",
+        "quality",
+        "capsules",
+        "dogfood"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-DISTILL-002",
+        "OG-APPLY-001",
+        "OG-REPLAY-003"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "skills/og-quality-pass/SKILL.md"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-DOGFOOD-001",
+      "title": "Dogfood the refactor with a clean full-repo rebuild and capsule review",
+      "priority": 2,
+      "status": "todo",
+      "details": "Phase 8 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: validate the new prompt system and capsule-quality rules with `og clean`, `og init`, and a full live sync on this repository.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 8 and run a clean bootstrap plus full sync/review loop against this repo after the refactor lands",
+        "Review target capsules called out in the plan (`og`, `tests`, `runbooks`, `spec-v2`, and `uv`) for recreation quality, executable oracle coverage, and stale-doc contradictions",
+        "Capture the dogfood evidence and summarize remaining gaps before any release or broader rollout"
+      ],
+      "tags": [
+        "dogfood",
+        "validation",
+        "capsules",
+        "codex"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-EVAL-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        ".outcomegraph",
+        "skills/outcome-steward/SKILL.md",
+        "README.md",
+        "RUNBOOKS.md"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
+    },
+    {
+      "id": "OG-DOC-003",
+      "title": "Document the new prompt asset system and capsule quality contract",
+      "priority": 3,
+      "status": "todo",
+      "details": "Phase 8 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: update public docs so the new prompt asset location, provenance rules, and capsule-quality expectations are part of the maintained contract.",
+      "steps": [
+        "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 8 and document where worker prompt assets live and how they are versioned in the main codebase",
+        "Explain the difference between prompt assets as implementation inputs and `.outcomegraph` as canonical replayable truth",
+        "Update docs and runbooks to describe kind-specific capsule quality rules, stronger recreation briefs, and the expected dogfood review process"
+      ],
+      "tags": [
+        "docs",
+        "prompts",
+        "capsules",
+        "contract"
+      ],
+      "depends_on": [
+        "OG-PLAN-001",
+        "OG-DOGFOOD-001"
+      ],
+      "files": [
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "README.md",
+        "RUNBOOKS.md",
+        "SPEC-v2.md",
+        "ARCHITECTURE.md",
+        "to-do.json"
+      ],
+      "created_at": "2026-03-07T05:47:03Z",
+      "updated_at": "2026-03-07T05:47:03Z"
     }
   ]
 }

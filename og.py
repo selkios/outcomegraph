@@ -234,6 +234,62 @@ CLEAN_ALL_TARGETS = (
     ".agents/skills/og",
     ".claude/skills/og",
 )
+CAPSULE_KIND_CODE = "code"
+CAPSULE_KIND_TEST = "test"
+CAPSULE_KIND_DOC = "doc"
+CAPSULE_KIND_CONFIG = "config"
+CAPSULE_KIND_RUNTIME = "runtime"
+CAPSULE_KIND_VALUES = frozenset(
+    {
+        CAPSULE_KIND_CODE,
+        CAPSULE_KIND_TEST,
+        CAPSULE_KIND_DOC,
+        CAPSULE_KIND_CONFIG,
+        CAPSULE_KIND_RUNTIME,
+    }
+)
+CAPSULE_KIND_DOC_EXTENSIONS = frozenset({".adoc", ".md", ".rst", ".txt"})
+CAPSULE_KIND_CONFIG_EXTENSIONS = frozenset({".cfg", ".conf", ".env", ".ini", ".json", ".lock", ".toml", ".yaml", ".yml"})
+CAPSULE_KIND_CODE_EXTENSIONS = frozenset(
+    {
+        ".bash",
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cs",
+        ".go",
+        ".h",
+        ".hpp",
+        ".java",
+        ".js",
+        ".jsx",
+        ".kt",
+        ".mjs",
+        ".py",
+        ".rb",
+        ".rs",
+        ".sh",
+        ".ts",
+        ".tsx",
+        ".zsh",
+    }
+)
+CAPSULE_KIND_TEST_PATH_PREFIXES = ("__tests__/", "test/", "tests/")
+CAPSULE_KIND_DOC_PATH_PREFIXES = ("doc/", "docs/")
+CAPSULE_KIND_CONFIG_PATH_PREFIXES = (".github/", ".idea/", ".vscode/")
+CAPSULE_KIND_CONFIG_FILENAMES = frozenset({"dockerfile", "pyproject.toml", "to-do.json", "to-do.schema.json", "uv.lock"})
+CAPSULE_KIND_CODE_FILENAMES = frozenset({"og", "ogd"})
+CAPSULE_KIND_TEST_FILENAME_SUFFIXES = (
+    ".spec.js",
+    ".spec.py",
+    ".spec.ts",
+    ".spec.tsx",
+    ".test.js",
+    ".test.py",
+    ".test.ts",
+    ".test.tsx",
+    "_test.py",
+)
 SYNC_GENERATED_IGNORE_PREFIXES = (
     f"{OG_ROOT}/capsules/",
     f"{OG_ROOT}/refs/",
@@ -5766,6 +5822,7 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- Use repo-relative paths only\n"
             "- Use input.target_capsules[].changed_file_snapshots as the primary source of file context\n"
             "- When input.target_capsules[].supporting_file_snapshots is present, use it to retain unchanged scope context that still matters for the capsule\n"
+            "- input.target_capsules[].kind tells you whether the capsule is code, test, doc, config, or runtime; use it when choosing oracle strength and status\n"
             "- A snapshot with selection='diff_hunks' is an intentional changed-region view, not a simple file-prefix truncation\n"
             "- Use only the input payload below\n"
             "- Fill goal, scope, constraints, oracles, claims, decision, receipts, and changed_files from actual repository evidence\n"
@@ -5776,7 +5833,8 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- Prefer concrete validation commands already used in this repository when they fit the capsule, including repo-native wrappers such as `uv run ...` when the repository uses them\n"
             "- Do not turn documentation examples, allowlists, or generic command catalogs into live oracle commands unless repository evidence shows they are the capsule's actual verification contract\n"
             "- When a command is only mentioned as an example or policy allowance, emit command=null and explain the gap instead of inventing an executable oracle\n"
-            "- Prefer status='success' when you can capture the current observable capsule state with concrete claims, even if broader context is incomplete\n"
+            "- For code or test capsules, use status='success' only when repository evidence supports at least one executable oracle command for the capsule; snapshot-only or doc-like evidence should stay at warn\n"
+            "- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable when they are the strongest honest evidence\n"
             "- Use status='warn' when the capsule is materially useful but still missing important supporting context\n"
             "- Use status='pending' only when repository evidence is too thin to produce a reusable capsule record\n"
             "\n"
@@ -6725,6 +6783,10 @@ def _validate_canonical_artifact_records(repo_root: str) -> None:
         if artifact_type.strip() != expected_type:
             raise ValueError(
                 f"{relative_path}: artifact_type '{artifact_type.strip()}' does not match expected '{expected_type}' for this path"
+            )
+        if expected_type == "capsule" and record.get("kind") is not None and _normalize_capsule_kind(record.get("kind")) is None:
+            raise ValueError(
+                f"{relative_path}: capsule kind must be one of {sorted(CAPSULE_KIND_VALUES)}, detected {record.get('kind')!r}"
             )
 
 
@@ -10242,6 +10304,134 @@ def _group_changed_files_by_capsule(changed_files: list[str]) -> dict[str, list[
     }
 
 
+def _normalize_capsule_kind(raw: object) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower()
+    return value if value in CAPSULE_KIND_VALUES else None
+
+
+def _classify_path_capsule_kind(relative_path: str) -> str | None:
+    normalized = _normalize_repo_relative_path(relative_path)
+    if not normalized:
+        return None
+
+    lower = normalized.lower()
+    basename = os.path.basename(lower)
+    stem, extension = os.path.splitext(basename)
+    if normalized in {".gitignore", OUTCOME_GITIGNORE} or normalized.startswith(RUNTIME_IGNORE_PREFIXES):
+        return CAPSULE_KIND_RUNTIME
+    if normalized.startswith(f"{OG_ROOT}/"):
+        internal = normalized[len(OG_ROOT) + 1 :]
+        if internal in {"config.yaml", "materials.lock", "policy.yaml"}:
+            return CAPSULE_KIND_CONFIG
+        if internal.startswith(("cache/", "events/", "objects/", "traces/", "work/")):
+            return CAPSULE_KIND_RUNTIME
+    if normalized.startswith(CAPSULE_KIND_TEST_PATH_PREFIXES):
+        return CAPSULE_KIND_TEST
+    if basename.startswith("test_") or any(basename.endswith(suffix) for suffix in CAPSULE_KIND_TEST_FILENAME_SUFFIXES):
+        return CAPSULE_KIND_TEST
+    if normalized.startswith(CAPSULE_KIND_DOC_PATH_PREFIXES) or extension in CAPSULE_KIND_DOC_EXTENSIONS:
+        return CAPSULE_KIND_DOC
+    if normalized.startswith(CAPSULE_KIND_CONFIG_PATH_PREFIXES):
+        return CAPSULE_KIND_CONFIG
+    if basename in CAPSULE_KIND_CONFIG_FILENAMES or extension in CAPSULE_KIND_CONFIG_EXTENSIONS:
+        return CAPSULE_KIND_CONFIG
+    if basename in CAPSULE_KIND_CODE_FILENAMES or extension in CAPSULE_KIND_CODE_EXTENSIONS:
+        return CAPSULE_KIND_CODE
+    if stem in {"readme", "changelog", "license"}:
+        return CAPSULE_KIND_DOC
+    return None
+
+
+def _classify_capsule_kind(
+    capsule_id: str,
+    changed_files: list[str],
+    scope: list[str],
+    existing_payload: dict[str, object] | None = None,
+) -> str:
+    existing_kind = _normalize_capsule_kind(existing_payload.get("kind")) if isinstance(existing_payload, dict) else None
+    if existing_kind is not None:
+        return existing_kind
+
+    normalized_capsule_id = _safe_slug(capsule_id) or "default"
+    if normalized_capsule_id == "runtime":
+        return CAPSULE_KIND_RUNTIME
+    if normalized_capsule_id in {"test", "tests"}:
+        return CAPSULE_KIND_TEST
+
+    observed_paths: list[str] = []
+    for raw_path in [*changed_files, *scope]:
+        normalized = _normalize_repo_relative_path(str(raw_path))
+        if normalized and normalized not in observed_paths:
+            observed_paths.append(normalized)
+
+    observed_kinds = {
+        kind
+        for kind in (_classify_path_capsule_kind(path) for path in observed_paths)
+        if kind is not None
+    }
+    if not observed_kinds:
+        if normalized_capsule_id in {"config", "materials", "policy"}:
+            return CAPSULE_KIND_CONFIG
+        return CAPSULE_KIND_CODE
+    if CAPSULE_KIND_CODE in observed_kinds:
+        return CAPSULE_KIND_CODE
+    if observed_kinds <= {CAPSULE_KIND_TEST, CAPSULE_KIND_DOC} and CAPSULE_KIND_TEST in observed_kinds:
+        return CAPSULE_KIND_TEST
+    if observed_kinds == {CAPSULE_KIND_RUNTIME}:
+        return CAPSULE_KIND_RUNTIME
+    if observed_kinds <= {CAPSULE_KIND_CONFIG, CAPSULE_KIND_RUNTIME}:
+        return CAPSULE_KIND_CONFIG if CAPSULE_KIND_CONFIG in observed_kinds else CAPSULE_KIND_RUNTIME
+    if observed_kinds <= {CAPSULE_KIND_DOC, CAPSULE_KIND_CONFIG}:
+        return CAPSULE_KIND_DOC if CAPSULE_KIND_DOC in observed_kinds else CAPSULE_KIND_CONFIG
+    if CAPSULE_KIND_TEST in observed_kinds:
+        return CAPSULE_KIND_TEST
+    if CAPSULE_KIND_DOC in observed_kinds:
+        return CAPSULE_KIND_DOC
+    if CAPSULE_KIND_CONFIG in observed_kinds:
+        return CAPSULE_KIND_CONFIG
+    return CAPSULE_KIND_CODE
+
+
+def _normalize_distill_status(status: object) -> str:
+    value = str(status or "success").strip().lower()
+    if value == "ok":
+        return "success"
+    if value == "warning":
+        return "warn"
+    return value or "success"
+
+
+def _apply_kind_specific_success_policy(
+    capsule_id: str,
+    capsule_kind: str,
+    status: str,
+    oracle_summary: dict[str, object],
+) -> tuple[str, list[str]]:
+    normalized_status = _normalize_distill_status(status)
+    if capsule_kind not in {CAPSULE_KIND_CODE, CAPSULE_KIND_TEST}:
+        return normalized_status, []
+
+    explicit_commands = _safe_string_list(oracle_summary.get("explicit_executable_commands"))
+    inferred_commands = _safe_string_list(oracle_summary.get("inferred_executable_commands"))
+    blocked_commands = _safe_string_list(oracle_summary.get("policy_blocked_commands"))
+
+    if normalized_status == "warn" and explicit_commands:
+        return "success", []
+    if normalized_status != "success":
+        return normalized_status, []
+    if explicit_commands:
+        return normalized_status, []
+
+    warning = f"{capsule_kind} capsule {capsule_id} requires explicit executable oracle evidence for success"
+    if blocked_commands:
+        warning = f"{warning}; policy blocked {', '.join(blocked_commands)}"
+    elif inferred_commands:
+        warning = f"{warning}; inferred commands remain advisory ({', '.join(inferred_commands)})"
+    return "warn", [warning]
+
+
 def _safe_string_list(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -10496,14 +10686,22 @@ def _build_distill_target_capsules(
         normalized_capsule_id = _safe_slug(capsule_id) or "default"
         existing_capsule = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{normalized_capsule_id}.json"))
         changed_files = changed_files_by_capsule.get(normalized_capsule_id, [])
+        existing_scope = _safe_string_list(existing_capsule.get("scope")) if existing_capsule else []
+        capsule_kind = _classify_capsule_kind(
+            normalized_capsule_id,
+            changed_files,
+            existing_scope,
+            existing_capsule,
+        )
         supporting_scope_paths = _collect_supporting_scope_paths(
             repo_root,
-            _safe_string_list(existing_capsule.get("scope")) if existing_capsule else [],
+            existing_scope,
             changed_files,
         )
         targets.append(
             {
                 "id": normalized_capsule_id,
+                "kind": capsule_kind,
                 "changed_files": changed_files,
                 "changed_file_snapshots": [
                     snapshot
@@ -10526,8 +10724,9 @@ def _build_distill_target_capsules(
                 "existing_capsule": (
                     {
                         "id": str(existing_capsule.get("id") or normalized_capsule_id),
+                        "kind": capsule_kind,
                         "goal": str(existing_capsule.get("goal") or ""),
-                        "scope": _safe_string_list(existing_capsule.get("scope")),
+                        "scope": existing_scope,
                         "constraints": _safe_string_list(existing_capsule.get("constraints")),
                         "oracles": _safe_object_list(existing_capsule.get("oracles")),
                         "lineage": existing_capsule.get("lineage") if isinstance(existing_capsule.get("lineage"), dict) else {},
@@ -10960,6 +11159,7 @@ def _build_capsule_payload(
     created_at_default: str,
     goal: str | None = None,
     scope: list[str] | None = None,
+    kind: str | None = None,
     constraints: list[str] | None = None,
     oracles: list[dict[str, object]] | None = None,
     lineage: dict[str, object] | None = None,
@@ -10983,6 +11183,11 @@ def _build_capsule_payload(
                 resolved_scope.append(top)
     if not resolved_scope:
         resolved_scope = ["."]
+    resolved_kind = (
+        _normalize_capsule_kind(kind)
+        or _normalize_capsule_kind(existing.get("kind"))
+        or _classify_capsule_kind(capsule_id, changed_files, resolved_scope, existing if isinstance(existing, dict) else None)
+    )
 
     existing_oracles = _safe_object_list(existing.get("oracles"))
     resolved_oracles = [oracle for oracle in (oracles or []) if isinstance(oracle, dict)]
@@ -11003,6 +11208,7 @@ def _build_capsule_payload(
         "schema_version": 2,
         "artifact_type": "capsule",
         "id": _safe_slug(capsule_id),
+        "kind": resolved_kind,
         "goal": str(goal or existing.get("goal") or f"OutcomeGraph capsule for {capsule_id}"),
         "scope": resolved_scope,
         "constraints": resolved_constraints,
@@ -11038,9 +11244,12 @@ def _normalize_capsule_oracles_for_apply(
     status: str,
     policy: dict[str, object],
     mode: str,
-) -> tuple[list[dict[str, object]], str]:
+) -> tuple[list[dict[str, object]], str, dict[str, object]]:
     normalized: list[dict[str, object]] = []
     executable_commands: set[str] = set()
+    explicit_executable_commands: set[str] = set()
+    inferred_executable_commands: set[str] = set()
+    policy_blocked_commands: set[str] = set()
     oracle_scope = sorted(
         {
             _normalize_repo_relative_path(str(item))
@@ -11057,9 +11266,12 @@ def _normalize_capsule_oracles_for_apply(
         if command_value and not _policy_allows_verify_command(policy, mode, command_value):
             normalized_oracle["command"] = None
             normalized_oracle["name"] = f"{normalized_oracle['name']} (advisory only in {mode} mode)"
+            policy_blocked_commands.add(command_value)
         command_after = str(normalized_oracle.get("command") or "").strip()
         if command_after:
             executable_commands.add(command_after)
+            if command_value:
+                explicit_executable_commands.add(command_after)
         normalized.append(normalized_oracle)
 
     python_or_test_scope = any(
@@ -11077,12 +11289,19 @@ def _normalize_capsule_oracles_for_apply(
             }
         )
         executable_commands.add("pytest -q")
-    if python_or_test_scope and executable_commands and status in {"warn", "warning", "pending"}:
-        status = "success"
+        inferred_executable_commands.add("pytest -q")
 
     if not normalized:
         normalized = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": oracle_scope}]
-    return normalized, status
+    return (
+        normalized,
+        _normalize_distill_status(status),
+        {
+            "explicit_executable_commands": sorted(explicit_executable_commands),
+            "inferred_executable_commands": sorted(inferred_executable_commands),
+            "policy_blocked_commands": sorted(policy_blocked_commands),
+        },
+    )
 
 
 def _normalize_artifact_path_refs(raw_refs: object, scope: str) -> list[str]:
@@ -11562,7 +11781,7 @@ def _run_apply_stage(
             errors.append("Invalid delta entry")
             continue
         capsule_id = _normalize_capsule_id(delta.get("capsule_id"), "default")
-        delta_status = str(delta.get("status") or "success").strip().lower()
+        delta_status = _normalize_distill_status(delta.get("status"))
         if delta_status in {"error", "failed", "fail"}:
             delta_errors = delta.get("errors")
             if isinstance(delta_errors, list):
@@ -11599,7 +11818,14 @@ def _run_apply_stage(
         delta_oracles = _safe_object_list(delta.get("oracles"))
         delta_decision = delta.get("decision") if isinstance(delta.get("decision"), dict) else {}
         delta_lineage = delta.get("lineage") if isinstance(delta.get("lineage"), dict) else {}
-        delta_oracles, delta_status = _normalize_capsule_oracles_for_apply(
+        existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
+        capsule_kind = _classify_capsule_kind(
+            capsule_id,
+            normalized_changed_files,
+            delta_scope,
+            existing_payload,
+        )
+        delta_oracles, delta_status, oracle_summary = _normalize_capsule_oracles_for_apply(
             capsule_id,
             delta_oracles,
             normalized_changed_files,
@@ -11608,6 +11834,13 @@ def _run_apply_stage(
             policy_payload,
             mode,
         )
+        delta_status, kind_warnings = _apply_kind_specific_success_policy(
+            capsule_id,
+            capsule_kind,
+            delta_status,
+            oracle_summary,
+        )
+        warnings.extend(kind_warnings)
         if delta_status in {"pending", "warn", "warning"}:
             delta_errors = delta.get("errors")
             if isinstance(delta_errors, list):
@@ -11713,7 +11946,6 @@ def _run_apply_stage(
         try:
             capsule_path = f"{OG_ROOT}/capsules/{capsule_id}.json"
             decision_refs = [decision_ref]
-            existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
             capsule_payload = _build_capsule_payload(
                 capsule_id,
                 normalized_changed_files,
@@ -11722,6 +11954,7 @@ def _run_apply_stage(
                 _utc_timestamp(),
                 goal=delta_goal,
                 scope=delta_scope,
+                kind=capsule_kind,
                 constraints=delta_constraints,
                 oracles=delta_oracles,
                 lineage=delta_lineage,

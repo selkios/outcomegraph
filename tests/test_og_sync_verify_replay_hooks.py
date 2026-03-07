@@ -141,6 +141,8 @@ class TestDistillSnapshotSelection(_RepoTestCase):
 
         supporting = targets[0]["supporting_file_snapshots"]
         self.assertEqual(targets[0]["changed_files"], [".gitignore"])
+        self.assertEqual(targets[0]["kind"], "runtime")
+        self.assertEqual(targets[0]["existing_capsule"]["kind"], "runtime")
         self.assertTrue(any(snapshot["path"] == ".outcomegraph/.gitignore" for snapshot in supporting))
 
     def test_read_repo_file_snapshot_keeps_moderate_docs_and_lockfiles_complete(self) -> None:
@@ -2676,6 +2678,7 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
 
         capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "default.json").read_text(encoding="utf-8"))
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["kind"], "doc")
         self.assertEqual(capsule_payload["status"], "success")
 
     def test_run_apply_stage_infers_pytest_oracle_for_python_capsule(self) -> None:
@@ -2698,9 +2701,36 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
 
         capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
         oracle_commands = [oracle.get("command") for oracle in capsule_payload["oracles"]]
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(capsule_payload["status"], "success")
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(capsule_payload["kind"], "test")
+        self.assertEqual(capsule_payload["status"], "warn")
         self.assertIn("pytest -q", oracle_commands)
+
+    def test_run_apply_stage_does_not_mark_code_capsule_success_with_inferred_pytest_only(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [
+                        _distill_update("og", ["og.py"], status="success"),
+                    ],
+                    "affected_capsules": ["og"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "og.json").read_text(encoding="utf-8"))
+        oracle_commands = [oracle.get("command") for oracle in capsule_payload["oracles"]]
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(capsule_payload["kind"], "code")
+        self.assertEqual(capsule_payload["status"], "warn")
+        self.assertIn("pytest -q", oracle_commands)
+        self.assertTrue(any("explicit executable oracle evidence" in warning for warning in payload["warnings"]))
 
     def test_run_apply_stage_promotes_warn_python_capsule_with_executable_oracle(self) -> None:
         with self.git_root_patch():
@@ -2728,6 +2758,7 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
 
         capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["kind"], "test")
         self.assertEqual(capsule_payload["status"], "success")
 
     def test_run_apply_stage_downgrades_policy_blocked_oracle_to_advisory_only(self) -> None:

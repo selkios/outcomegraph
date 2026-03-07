@@ -352,6 +352,7 @@ Suggested schema:
 schema_version: 2
 artifact_type: capsule
 id: cap-frontend
+kind: code
 goal: "Reduce startup latency on cold boot."
 scope:
   - "src/**/*.ts"
@@ -370,6 +371,13 @@ status: active
 created_at: "2026-03-04T10:00:00Z"
 updated_at: "2026-03-04T10:00:00Z"
 ```
+
+Kind policy:
+
+- Capsules written by current distill/apply flows persist a `kind` field.
+- `kind` is one of `code`, `test`, `doc`, `config`, or `runtime`.
+- `code` and `test` capsules require at least one executable oracle command before `status: success` is considered strong enough to persist.
+- `doc`, `config`, and `runtime` capsules may remain `success` with advisory or `command: null` oracles when that is the strongest honest evidence.
 
 ### 7.2 `refs/<name>.yaml`
 
@@ -729,6 +737,7 @@ adapter_profile: analyze|propose|apply
 mode: observe|autonomous
 target_capsules:
   - id: cap-frontend
+    kind: code
 changed_paths:
   - "src/main.ts"
 policy_ref: ".outcomegraph/policy.yaml"
