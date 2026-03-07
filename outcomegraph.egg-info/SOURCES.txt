@@ -1,0 +1,12 @@
+README.md
+og.py
+pyproject.toml
+outcomegraph.egg-info/PKG-INFO
+outcomegraph.egg-info/SOURCES.txt
+outcomegraph.egg-info/dependency_links.txt
+outcomegraph.egg-info/entry_points.txt
+outcomegraph.egg-info/requires.txt
+outcomegraph.egg-info/top_level.txt
+tests/test_capsule_quality_eval.py
+tests/test_cli_mcp_contracts.py
+tests/test_og_sync_verify_replay_hooks.py

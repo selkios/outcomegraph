@@ -1,6 +1,6 @@
 {
   "artifact_type": "materials_lock",
-  "captured_at": "2026-03-06T22:21:21Z",
+  "captured_at": "2026-03-07T21:32:13Z",
   "created_at": "2026-03-06T19:58:02Z",
   "entries": [
     {
@@ -1444,10 +1444,10 @@
       "size": 6007
     },
     {
-      "digest": "sha256:ae244a50a771cbd7ffef1e32aba80637f36d07042baef027a599b3f76f06c7bc",
+      "digest": "sha256:8814f8ce000c4e1edb799dcd7468c4a94a5b8bc2b4d0ec51e90c28a647b4aff9",
       "kind": "file",
       "path": "ARCHITECTURE.md",
-      "size": 11040
+      "size": 12501
     },
     {
       "digest": "sha256:7ad4a3e5db2a92b915ed6f5482954007a37f5a020656f466143a9612f2f86c24",
@@ -1468,34 +1468,40 @@
       "size": 3374
     },
     {
-      "digest": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "digest": "sha256:07e33a3aaa2708a4e744f739e5616273dca258e83ea632c64bccf06585166bc7",
       "kind": "file",
       "path": "README.md",
-      "size": 12651
+      "size": 20896
     },
     {
-      "digest": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "digest": "sha256:097ca88de78120e44f2bde0da636fa1a504ee9a8cee0f59d05d408d553ffc597",
       "kind": "file",
       "path": "RUNBOOKS.md",
-      "size": 6606
+      "size": 12192
     },
     {
-      "digest": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "digest": "sha256:9399b998aaa6efebb34650ac6158ff3c1117ff104b0da35d058ed3a34e1ab9ed",
       "kind": "file",
       "path": "SECURITY_POLICY.md",
-      "size": 3050
+      "size": 3292
     },
     {
-      "digest": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "digest": "sha256:b874924b6f2a02b6e4b3db21d97543b3dcf41445028d440efefcf725cac4cd0a",
       "kind": "file",
       "path": "SPEC-v2.md",
-      "size": 31371
+      "size": 40823
     },
     {
-      "digest": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "digest": "sha256:04545424d0db46489fc7b8a8d1569e2c5d94f5fa2582ef01df1f8d132702413e",
       "kind": "file",
       "path": "SPEC_IMPLEMENTATION_MATRIX.md",
-      "size": 6613
+      "size": 6554
+    },
+    {
+      "digest": "sha256:f8f62499ecb2a3b74e7470fce93ea0d6363fc3acabfe654019a30eb960f2093c",
+      "kind": "file",
+      "path": "WORKER_CAPSULE_REFACTOR_PLAN.md",
+      "size": 9486
     },
     {
       "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
@@ -1504,16 +1510,58 @@
       "size": 225
     },
     {
-      "digest": "sha256:16a6dbed1c3010db4597231c90f291fc2f4c788634576d2de7d81faecc7227cb",
+      "digest": "sha256:1f6c7fa46f75e534d59d7a473fcd2c98b7867cea5c881b49e14e6dcd330612df",
       "kind": "file",
       "path": "og.py",
-      "size": 521783
+      "size": 750682
     },
     {
       "digest": "sha256:5bfd50e1b1428f5d295ae6f4bc049c8c18bab863a962fd87e387c34d9d44b0ea",
       "kind": "file",
       "path": "ogd",
       "size": 145
+    },
+    {
+      "digest": "sha256:73bd22df6dee7d20b2c5a928aa13df26fd3547640940d168533719c71734f6f4",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/PKG-INFO",
+      "size": 21140
+    },
+    {
+      "digest": "sha256:44e1721c4543e86651d89c0fff131c1039fe94c0721356062c7eca2552a02212",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/SOURCES.txt",
+      "size": 357
+    },
+    {
+      "digest": "sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/dependency_links.txt",
+      "size": 1
+    },
+    {
+      "digest": "sha256:163be6ea35724e504389876490338e064620fe67d384d679df4d2431cacdf7e1",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/entry_points.txt",
+      "size": 50
+    },
+    {
+      "digest": "sha256:806706bc16da804481f5daf0177349dfca395db663ce15d223d141370d4b361c",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/requires.txt",
+      "size": 30
+    },
+    {
+      "digest": "sha256:f4e7e93c5250ba951138f232fc40cf5b90a4fac589bf1634be9fd6f3c280dc00",
+      "kind": "file",
+      "path": "outcomegraph.egg-info/top_level.txt",
+      "size": 3
+    },
+    {
+      "digest": "sha256:8f1ef4d24dbd04dc635e583c00173d5ccdfef24c8f49c9efd0e2a7e619a006d4",
+      "kind": "file",
+      "path": "prompts/workers/distill-v1.txt",
+      "size": 5232
     },
     {
       "digest": "sha256:2e9e83e77841e467e14538fab30ca43364074bf7b4d3e075a488fda256ab293b",
@@ -1534,10 +1582,10 @@
       "size": 224
     },
     {
-      "digest": "sha256:7a7e93d304de47cd1188f118a9760995bff78a16377878fbe0e8c44bc05cd53e",
+      "digest": "sha256:6c91810e055ede8cbe1a88dd7ae5b9588a6cc47042d9d708d906d60dd992b1d6",
       "kind": "file",
       "path": "skills/og-dogfood/scripts/run_dogfood.sh",
-      "size": 4105
+      "size": 4435
     },
     {
       "digest": "sha256:00dbd85efd765c00a45a6da4896180890158cf60d345c6a2acf42fe51225d5fc",
@@ -1570,22 +1618,172 @@
       "size": 1315
     },
     {
+      "digest": "sha256:2b1caaaed5465a4bf18e43523e55f01f1150f02dda2fd0ae6ba9eac708886752",
+      "kind": "file",
+      "path": "tasks/og-doc-003/TASK.md",
+      "size": 2623
+    },
+    {
+      "digest": "sha256:568b5de7d42c8355ad0963039b2af0fed37502520647f1c54996ecb720e220c4",
+      "kind": "file",
+      "path": "tasks/og-doc-003/task-plan.json",
+      "size": 1782
+    },
+    {
+      "digest": "sha256:a3f8c18749d97eec2cb82572bc35e2154569c9330a8b386bb3c935c72983afea",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/TASK.md",
+      "size": 4867
+    },
+    {
+      "digest": "sha256:f50877fb51859a89ea270d00652bc7132c2c733f23d1e74a47db63fdfc4b3e50",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-distill-batch-9-input.json",
+      "size": 260915
+    },
+    {
+      "digest": "sha256:b273eea50bcecbc377da40d753d00f23113ae9dbdf89e77f23fb0bba4ce6a27f",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-distill-batch-9-result.json",
+      "size": 25098
+    },
+    {
+      "digest": "sha256:73ddf709de8a81039e086bb938c342b844c98d352df773d46987c800cd1c2deb",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-dogfood-status-pre-sync.json",
+      "size": 14566
+    },
+    {
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-dogfood-sync.json",
+      "size": 0
+    },
+    {
+      "digest": "sha256:03d90e7113838c58e4370a23aab63b7eb5c3f97e1b3f85ef73c7bbbd62219a82",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-review.md",
+      "size": 2046
+    },
+    {
+      "digest": "sha256:bf63177c5028ffa3fd56786faca6ae9672ca8b509b0820d985b707dfbcae161b",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-work-lock.json",
+      "size": 515
+    },
+    {
+      "digest": "sha256:d96dcb63c51002def1e25ff5238dd54ac351ae00a1e01dda146874541732adb0",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-1800-work-state.json",
+      "size": 286
+    },
+    {
+      "digest": "sha256:10a2a4d549ac77c823e448c8bc66165645b1a59d9a05e7dbbd5433f31cc698eb",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-dogfood-status-pre-sync.json",
+      "size": 14566
+    },
+    {
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-dogfood-sync.json",
+      "size": 0
+    },
+    {
+      "digest": "sha256:d429aaaeb58fc7b782c50b4caf1f7f73311a051b38180d2db2c6d7e4bac836bb",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-review.md",
+      "size": 2396
+    },
+    {
+      "digest": "sha256:a8951c149b30824ecab13582c400ee1690b3cf3632b6f8ce41ea9046fdaba8d3",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-trace-summary.json",
+      "size": 613
+    },
+    {
+      "digest": "sha256:09d287a4dca989bd85ce073643d63d52f2addcf104ef3af4d1161d6105d4c4f8",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-work-lock.json",
+      "size": 515
+    },
+    {
+      "digest": "sha256:de8f167aec04527997a059db14270a35687174c8480eef52dbff3f5f8db51d8d",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-3600-work-state.json",
+      "size": 286
+    },
+    {
+      "digest": "sha256:7621978df6dd1276f667e79b6391aaea12b860aedc344c628daf2746797e873c",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-corrected-review.md",
+      "size": 2418
+    },
+    {
+      "digest": "sha256:5c2e02c831b4e60d5279abd140ce9c6b8c48430e05738e7c418a52e255d5f554",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-corrected-trace-summary.json",
+      "size": 1235
+    },
+    {
+      "digest": "sha256:7f47ae3c7e8d695ea2c6af8d3594d729867b289547ef8318db17ec8ceb074352",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-distill-batch-9-input.json",
+      "size": 237200
+    },
+    {
+      "digest": "sha256:3161d9880b432c1e90a9f0e770a070b716077fbe05668d32d0325677b6a8eea5",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-distill-batch-9-result.json",
+      "size": 19507
+    },
+    {
+      "digest": "sha256:3013fde457703400addb444853f3f9355ec6ecb73ea5dfa0da81df7369a7912a",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-dogfood-status-pre-sync.json",
+      "size": 13361
+    },
+    {
+      "digest": "sha256:b1b949a0f7015f7c2011f38659c1ac072f744a8b095771c7fa36bf145ffbea60",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-dogfood-sync.json",
+      "size": 13078
+    },
+    {
+      "digest": "sha256:db8ac19d0478317e258bd5b16ba71c7ea6f79af724310cbeef725a5d54599cc1",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-review.md",
+      "size": 1581
+    },
+    {
+      "digest": "sha256:2bdb315903dd89d5df6ca70386f40cc02ff303236bc5b308524cbdb209516645",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/evidence/clean-clone-sync-summary.json",
+      "size": 9185
+    },
+    {
+      "digest": "sha256:c80a999796ffb83e0a3c73229d018f9fed456b2bc4dcf27ceed5121eae2de365",
+      "kind": "file",
+      "path": "tasks/og-dogfood-001/task-plan.json",
+      "size": 3369
+    },
+    {
       "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
       "kind": "file",
       "path": "tests/conftest.py",
       "size": 240
     },
     {
-      "digest": "sha256:c5f1b8556a38cca5f4cab782fa5f975f0e2fef2ddadd773453470a6a2020de13",
+      "digest": "sha256:689b71eb81954b5793f1198c829300b64f18673583c76b85fa9ad0560fa7a66d",
       "kind": "file",
       "path": "tests/test_og_sync_verify_replay_hooks.py",
-      "size": 133683
+      "size": 248718
     },
     {
-      "digest": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "digest": "sha256:65d8b5111af66ab39d3de70391e76cbd4ff1b33bdbf61303a90d46fdf6c005b4",
       "kind": "file",
       "path": "to-do.json",
-      "size": 62588
+      "size": 80220
     },
     {
       "digest": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
@@ -1602,5 +1800,5 @@
   ],
   "id": "materials-lock",
   "schema_version": 2,
-  "updated_at": "2026-03-06T22:21:21Z"
+  "updated_at": "2026-03-07T21:32:13Z"
 }

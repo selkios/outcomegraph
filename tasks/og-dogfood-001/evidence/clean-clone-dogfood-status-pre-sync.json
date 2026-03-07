@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "command": "status",
+  "status": "warn",
+  "run_id": null,
+  "session_id": null,
+  "data": {
+    "status_schema_version": 1,
+    "status": "warn",
+    "command": "status",
+    "options": {
+      "changed": false,
+      "profile": null,
+      "mode": null,
+      "force_hooks_path": false,
+      "force_full_sync": false,
+      "output_mode": "json",
+      "output_json": true,
+      "strict": false,
+      "non_interactive": false,
+      "validate": false,
+      "dry_run": false,
+      "max_retries": 0,
+      "timeout": null,
+      "configuration": {
+        "config_file": ".outcomegraph/config.yaml",
+        "config_source": "built-in",
+        "policy_file": ".outcomegraph/policy.yaml",
+        "policy_source": "built-in",
+        "codex_home": null,
+        "resolved_from": {
+          "output_mode": "flag:--json"
+        }
+      }
+    },
+    "generated_at": "2026-03-07T14:41:38Z",
+    "message": "status dashboard indicates warnings",
+    "issues": [
+      {
+        "type": "unknown_verification",
+        "message": "no sync or replay summary available"
+      },
+      {
+        "type": "unknown_certificates",
+        "message": "no certificates directory exists"
+      },
+      {
+        "type": "drift_error",
+        "message": "policy/certificate drift checks failed"
+      }
+    ],
+    "freshness": {
+      "sync": {
+        "state": "unknown",
+        "status": "unknown",
+        "run_id": null,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "message": "no sync summary available",
+        "threshold_seconds": 3600
+      },
+      "certificates": {
+        "state": "unknown",
+        "count": 0,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "newest": null,
+        "oldest": null,
+        "message": "no certificates directory exists",
+        "paths": [],
+        "stale_threshold_seconds": 86400
+      },
+      "message": "sync=unknown, certificates=unknown"
+    },
+    "drift": {
+      "status_schema_version": 1,
+      "state": "error",
+      "status": "error",
+      "checks": [
+        {
+          "type": "stale_certificates",
+          "status": "error",
+          "message": "no certificates directory exists",
+          "remediation": [
+            "Run `og sync` to regenerate current certificates.",
+            "Check `.outcomegraph/events` for prior sync summary failures."
+          ],
+          "details": {
+            "state": "unknown",
+            "count": 0,
+            "age_seconds": null
+          },
+          "errors": [
+            {
+              "error_class": "runtime",
+              "error_code": "RUNTIME_ERROR",
+              "message": "no certificates directory exists",
+              "retryable": false,
+              "hint": "Retry only after correcting the underlying runtime issue."
+            }
+          ]
+        },
+        {
+          "type": "export_control_surface",
+          "status": "warn",
+          "message": "Exported control surfaces are out of sync with canonical artifacts.",
+          "remediation": [
+            "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+            "Re-run `og sync` after fixing canonical artifact path/type or payload errors."
+          ],
+          "details": {
+            "total_artifacts": 0,
+            "issues": [
+              {
+                "path": ".outcomegraph/export/AGENTS.md",
+                "type": "missing",
+                "generated_hash": "sha256:87ff35013c6bc83545cb1a8ca3731a4cdeb74f7133e0498a48bb6c9c5a7c97e1"
+              },
+              {
+                "path": ".outcomegraph/export/README_OUTCOMES.md",
+                "type": "missing",
+                "generated_hash": "sha256:b36168b8b73b4ddb02d3b5de8d63207cc4f819739f20597664e43477f1912cca"
+              },
+              {
+                "path": ".outcomegraph/export/mcp-resources.json",
+                "type": "missing",
+                "generated_hash": "sha256:c753e8614be707189dd7b2c09cebc1c54bf0e53371ef5dede83f8d6504a01be2"
+              },
+              {
+                "path": "skills/outcome-steward/SKILL.md",
+                "type": "missing",
+                "generated_hash": "sha256:532a6b022d15a84eef4b9eab181618fc95efbd2486c3268843b21cc8daeaec63"
+              }
+            ]
+          }
+        }
+      ],
+      "remediation": [
+        "Check `.outcomegraph/events` for prior sync summary failures.",
+        "Re-run `og sync` after fixing canonical artifact path/type or payload errors.",
+        "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+        "Run `og sync` to regenerate current certificates."
+      ],
+      "certificates": {
+        "state": "unknown",
+        "count": 0,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "newest": null,
+        "oldest": null,
+        "message": "no certificates directory exists",
+        "paths": [],
+        "stale_threshold_seconds": 86400
+      },
+      "policy": {
+        "path": ".outcomegraph/policy.yaml",
+        "present": false,
+        "status": "ok",
+        "message": "policy file is not explicit; built-in defaults apply",
+        "checks": [],
+        "policy": {
+          "schema_version": 2,
+          "mode": "observe",
+          "policy_id": "observe-default-v1",
+          "allow": {
+            "file_writes": [
+              ".outcomegraph/**",
+              "export/**",
+              "skills/outcome-steward/**"
+            ],
+            "verify_commands": [
+              "npm test --listTests",
+              "npm test",
+              "go test ./...",
+              "pytest -q"
+            ],
+            "sandbox_operations": [
+              "create_isolated_worktree",
+              "read_repo_state",
+              "read_artifacts"
+            ]
+          },
+          "deny": {
+            "file_writes": [
+              "src/**",
+              "lib/**",
+              "app/**",
+              "packages/**"
+            ],
+            "network": [
+              "unrestricted"
+            ],
+            "dependencies": [
+              "npm install",
+              "pip install",
+              "cargo add",
+              "go mod tidy"
+            ],
+            "deployment": [
+              "push",
+              "git commit --amend",
+              "github pr create",
+              "gha workflow_dispatch"
+            ]
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "warn": 0
+        },
+        "parsed": {}
+      },
+      "latest_event": null,
+      "errors": [
+        {
+          "error_class": "runtime",
+          "error_code": "RUNTIME_ERROR",
+          "message": "status dashboard indicates warnings",
+          "retryable": false,
+          "hint": "Retry only after correcting the underlying runtime issue."
+        }
+      ]
+    },
+    "integrity": {
+      "state": "ok",
+      "status": "ok",
+      "message": "integrity ledger has no events yet",
+      "valid": true,
+      "event_count": 0,
+      "event_sequence": 0,
+      "event_hash": null,
+      "checkpoint": null
+    },
+    "verification": {
+      "state": "unknown",
+      "status": "unknown",
+      "run_id": null,
+      "age_seconds": null,
+      "age_human": "unknown",
+      "message": "no sync or replay summary available",
+      "steps": [],
+      "threshold_seconds": 86400
+    },
+    "remediation": [
+      "Check `.outcomegraph/events` for prior sync summary failures.",
+      "Re-run `og sync` after fixing canonical artifact path/type or payload errors.",
+      "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+      "Run `og sync` to regenerate current certificates."
+    ],
+    "runtime": {
+      "status": "initialized",
+      "pending": false,
+      "pending_source": null,
+      "pending_file": {
+        "present": false,
+        "source": null
+      },
+      "last_message": null,
+      "lock": {
+        "status": "unlocked",
+        "age_human": "unknown",
+        "holder": null,
+        "session": null
+      },
+      "message": "runtime is idle"
+    },
+    "agent_reliability": {
+      "schema_version": 1,
+      "tracked_at": "2026-03-07T14:41:38Z",
+      "status": "warn",
+      "message": "agent reliability metrics need attention: commands_per_successful_task",
+      "warn_metrics": [
+        "commands_per_successful_task"
+      ],
+      "unknown_metrics": [
+        "retry_auto_recovery_rate",
+        "session_churn"
+      ],
+      "totals": {
+        "commands": 3,
+        "successful_tasks": 1,
+        "schema_valid_outputs": 3,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "resumable_session_starts": 0,
+        "resumable_session_reuses": 0,
+        "resumable_session_rotations": 0
+      },
+      "current": {
+        "commands_since_successful_task": 2
+      },
+      "latest_command": {
+        "command": "status",
+        "subcommand": null,
+        "status": "warn",
+        "observed_at": "2026-03-07T14:41:38Z",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_transition": "none",
+        "commands_since_successful_task": 2
+      },
+      "commands_per_successful_task": {
+        "value": 3.0,
+        "units": "commands/task",
+        "direction": "lower_is_better",
+        "status": "warn",
+        "total_commands": 3,
+        "successful_tasks": 1
+      },
+      "schema_valid_output_rate": {
+        "value": 1.0,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "ok",
+        "valid_outputs": 3,
+        "total_outputs": 3
+      },
+      "retry_auto_recovery_rate": {
+        "value": null,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "unknown",
+        "retryable_operations": 0,
+        "recovered_operations": 0
+      },
+      "session_churn": {
+        "value": null,
+        "units": "ratio",
+        "direction": "lower_is_better",
+        "status": "unknown",
+        "tracked_session_kinds": [
+          "autopilot",
+          "daemon"
+        ],
+        "session_starts": 0,
+        "reused_sessions": 0,
+        "rotated_sessions": 0,
+        "repeat_observations": 0
+      }
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "agent_reliability": {
+      "observation": {
+        "observed_at": "2026-03-07T14:41:38Z",
+        "command": "status",
+        "subcommand": null,
+        "status": "warn",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_tracked": false,
+        "session_transition": "none",
+        "commands_since_successful_task": 2
+      },
+      "snapshot": {
+        "schema_version": 1,
+        "tracked_at": "2026-03-07T14:41:38Z",
+        "status": "warn",
+        "message": "agent reliability metrics need attention: commands_per_successful_task",
+        "warn_metrics": [
+          "commands_per_successful_task"
+        ],
+        "unknown_metrics": [
+          "retry_auto_recovery_rate",
+          "session_churn"
+        ],
+        "totals": {
+          "commands": 3,
+          "successful_tasks": 1,
+          "schema_valid_outputs": 3,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "resumable_session_starts": 0,
+          "resumable_session_reuses": 0,
+          "resumable_session_rotations": 0
+        },
+        "current": {
+          "commands_since_successful_task": 2
+        },
+        "latest_command": {
+          "command": "status",
+          "subcommand": null,
+          "status": "warn",
+          "observed_at": "2026-03-07T14:41:38Z",
+          "successful_task": false,
+          "schema_valid_output": true,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "session_kind": null,
+          "session_id": null,
+          "session_transition": "none",
+          "commands_since_successful_task": 2
+        },
+        "commands_per_successful_task": {
+          "value": 3.0,
+          "units": "commands/task",
+          "direction": "lower_is_better",
+          "status": "warn",
+          "total_commands": 3,
+          "successful_tasks": 1
+        },
+        "schema_valid_output_rate": {
+          "value": 1.0,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "ok",
+          "valid_outputs": 3,
+          "total_outputs": 3
+        },
+        "retry_auto_recovery_rate": {
+          "value": null,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "unknown",
+          "retryable_operations": 0,
+          "recovered_operations": 0
+        },
+        "session_churn": {
+          "value": null,
+          "units": "ratio",
+          "direction": "lower_is_better",
+          "status": "unknown",
+          "tracked_session_kinds": [
+            "autopilot",
+            "daemon"
+          ],
+          "session_starts": 0,
+          "reused_sessions": 0,
+          "rotated_sessions": 0,
+          "repeat_observations": 0
+        }
+      }
+    }
+  }
+}

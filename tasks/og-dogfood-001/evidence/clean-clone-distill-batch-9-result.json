@@ -1,0 +1,449 @@
+{
+  "adapter": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "--json",
+    "--sandbox",
+    "read-only",
+    "--output-schema",
+    "/tmp/og-worker-5zsp0ix3/distill-schema.json",
+    "--output-last-message",
+    "/tmp/og-worker-5zsp0ix3/distill-last-message.json",
+    "-"
+  ],
+  "configuration": {
+    "codex_home": null,
+    "resolved_from": "unset"
+  },
+  "duration_ms": 841421,
+  "output": {
+    "capsule_updates": [
+      {
+        "behavior_claims": [
+          "Preserve the done OG-DOC-003 backlog entry that makes prompt-asset location, provenance rules, and capsule-quality expectations part of maintained docs.",
+          "Preserve dogfood blockers as explicit records tied to concrete .outcomegraph replay/status/sync evidence and doc-cleanup gaps.",
+          "Keep task metadata in the schema-governed todo envelope with dependencies, files, steps, tags, blockers, and timestamps."
+        ],
+        "changed_files": [
+          "to-do.json"
+        ],
+        "claims": [
+          {
+            "capsule_id": "to-do",
+            "category": "behavior",
+            "id": "to-do-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.json"
+            ],
+            "text": "The changed region records OG-DOC-003 as status done, scoped to Phase 8 of WORKER_CAPSULE_REFACTOR_PLAN.md, with steps to document prompt asset location/versioning, distinguish prompt assets from .outcomegraph canonical replayable truth, and describe kind-specific capsule quality and dogfood review expectations."
+          },
+          {
+            "capsule_id": "to-do",
+            "category": "behavior",
+            "id": "to-do-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.json"
+            ],
+            "text": "The adjacent dogfood task keeps blocker state explicit: replay remains error because traces report 'set: Illegal option -o pipefail' and './og: not found'; status/drift remain warn; sync remains warn because reviewed capsules still lack executable oracle commands."
+          },
+          {
+            "capsule_id": "to-do",
+            "category": "contract",
+            "id": "to-do-contract-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.json",
+              "to-do.schema.json"
+            ],
+            "text": "The backlog file is governed by to-do.schema.json: root schema_version is fixed at 1, tasks require id/title/priority/status, priority is bounded 1..5, status is limited to todo|doing|blocked|done, and extra root/task properties are disallowed."
+          }
+        ],
+        "constraints": [
+          "Keep to-do.json compatible with to-do.schema.json, including root schema_version = 1.",
+          "Only schema-listed task fields are allowed; priority must remain 1..5 and status must remain one of todo, doing, blocked, or done."
+        ],
+        "decision": {
+          "rationale": "The payload provides a diff-hunk for the changed backlog slice plus the governing schema, which is enough to recreate the tracked documentation-contract and dogfood-blocker behavior, but not the full surrounding task ledger.",
+          "statement": "Recreate the changed task-ledger slice and its schema linkage without inventing unseen backlog context.",
+          "status": "accepted_with_gaps"
+        },
+        "dependencies": [
+          "to-do.schema.json",
+          "WORKER_CAPSULE_REFACTOR_PLAN.md",
+          "README.md",
+          "RUNBOOKS.md",
+          "QUICKSTART.md",
+          "SPEC-v2.md",
+          "ARCHITECTURE.md",
+          "tasks/og-doc-003/TASK.md",
+          "tasks/og-doc-003/task-plan.json",
+          "tasks/og-dogfood-001/TASK.md",
+          "tasks/og-dogfood-001/task-plan.json",
+          ".outcomegraph/events/dogfood-replay.json",
+          ".outcomegraph/events/dogfood-status.json",
+          ".outcomegraph/events/dogfood-sync.json",
+          ".outcomegraph/events/dogfood-drift.txt"
+        ],
+        "errors": [],
+        "goal": "Maintain a schema-governed task ledger that records the completed OG-DOC-003 documentation-contract work and the current dogfood blocker state that still prevents a clean replay/sync review.",
+        "id": "to-do",
+        "invariants": [
+          "The documentation-contract work remains represented as a done task record, not informal prose.",
+          "OG-DOC-003 stays linked to its implementation plan and doc targets through explicit depends_on and files metadata.",
+          "Dogfood blockers remain explicit until the cited replay/status/sync evidence changes."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "todo-schema-and-slice-review",
+            "reason": "No repo-native validator, CLI contract, or test target for to-do.json is supplied. Accept recreation by matching the schema-v1 todo shape and preserving the OG-DOC-003 plus dogfood-blocker records present in the changed region.",
+            "scope": [
+              "to-do.json",
+              "to-do.schema.json"
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+            "media_type": "application/json",
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+            "media_type": "application/json",
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.schema.json",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "to-do.json"
+        ],
+        "status": "warn",
+        "unknowns": [
+          "The payload shows only a diff-hunk view of to-do.json, so task ordering and surrounding records outside lines 2036-2107 are unknown.",
+          "It is unclear whether OG-DOC-003 was newly added or edited in place.",
+          "The duplicated blocker wording in the dogfood task may be intentional or an artifact of the changed region; the payload does not justify deduplication."
+        ]
+      },
+      {
+        "behavior_claims": [
+          "Require a closed root object with schema_version, source_files, and tasks.",
+          "Require each task to include id, title, priority, and status with bounded values.",
+          "Allow only the documented optional metadata fields for project and task records."
+        ],
+        "changed_files": [
+          "to-do.schema.json"
+        ],
+        "claims": [
+          {
+            "capsule_id": "to-do-schema",
+            "category": "behavior",
+            "id": "to-do-schema-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json"
+            ],
+            "text": "The schema is a draft 2020-12 JSON Schema titled 'Codex RALF Todo' that requires schema_version, source_files, and tasks at the root and sets additionalProperties to false for the root object."
+          },
+          {
+            "capsule_id": "to-do-schema",
+            "category": "behavior",
+            "id": "to-do-schema-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json"
+            ],
+            "text": "Each task object is closed-world and must include id, title, priority, and status; title has minLength 1, priority is 1..5, and status is one of todo, doing, blocked, or done."
+          },
+          {
+            "capsule_id": "to-do-schema",
+            "category": "evidence",
+            "id": "to-do-schema-evidence-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+                "media_type": "application/json",
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json",
+              "to-do.json"
+            ],
+            "text": "The supporting to-do.json snapshot uses schema_version 1 and stores project, source_files, and tasks with optional details/steps/blockers/tags/files/depends_on/timestamps, matching the schema's intended consumer shape."
+          }
+        ],
+        "constraints": [
+          "Keep the schema root closed with additionalProperties = false and schema_version const 1.",
+          "Keep task validation strict: required id/title/priority/status, title minLength 1, priority 1..5, and status limited to todo|doing|blocked|done."
+        ],
+        "decision": {
+          "rationale": "The full schema text is present and a consumer example is provided, so the contract is reproducible even though no executable validator is named.",
+          "statement": "Recreate this capsule as the exact validation contract for the repository todo ledger.",
+          "status": "accepted"
+        },
+        "dependencies": [
+          "to-do.json"
+        ],
+        "errors": [],
+        "goal": "Define the strict JSON contract for the repository todo ledger so task records have a predictable, closed-world shape.",
+        "id": "to-do-schema",
+        "invariants": [
+          "The schema remains a JSON Schema draft 2020-12 document titled Codex RALF Todo.",
+          "Both the root object and each task object remain closed-world via additionalProperties = false.",
+          "Timestamp fields, when present, remain date-time formatted strings."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "schema-contract-review",
+            "reason": "The payload includes the schema and a sample consumer file but no repository-native validation command or test. Accept recreation by matching the schema text and its closed-world constraints exactly.",
+            "scope": [
+              "to-do.schema.json",
+              "to-do.json"
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+            "media_type": "application/json",
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.schema.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+            "media_type": "application/json",
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.json",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "to-do.schema.json"
+        ],
+        "status": "success",
+        "unknowns": [
+          "The payload does not include a prior version of to-do.schema.json, so the exact semantic change from the previous revision is unknown.",
+          "No schema-validation command, CI rule, or test file is named for this contract.",
+          "The supporting to-do.json snapshot is truncated, so it does not prove real-world use of every optional field."
+        ]
+      },
+      {
+        "behavior_claims": [
+          "Pin the editable outcomegraph package for Python 3.11+ with pydantic and typer as runtime dependencies.",
+          "Resolve concrete direct and transitive package versions instead of leaving dependency selection implicit.",
+          "Preserve artifact URLs and hashes so installs can be reproduced from the lockfile alone."
+        ],
+        "changed_files": [
+          "uv.lock"
+        ],
+        "claims": [
+          {
+            "capsule_id": "uv",
+            "category": "behavior",
+            "id": "uv-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": "text/plain",
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "uv.lock declares version = 1, revision = 3, requires-python >=3.11, and an editable outcomegraph 0.1.0 package sourced from . with requires-dist entries pydantic >=2,<3 and typer >=0.24,<1."
+          },
+          {
+            "capsule_id": "uv",
+            "category": "behavior",
+            "id": "uv-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": "text/plain",
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "The resolved graph includes concrete versions for direct and transitive packages such as pydantic 2.12.5, pydantic-core 2.41.5, typer 0.24.1, click 8.3.1, rich 14.3.3, annotated-doc 0.0.4, shellingham 1.5.4, typing-extensions 4.15.0, and typing-inspection 0.4.2."
+          },
+          {
+            "capsule_id": "uv",
+            "category": "evidence",
+            "id": "uv-evidence-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": "text/plain",
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "Package entries carry sdist and wheel URLs, hashes, sizes, and upload times, showing that the lockfile is intended to pin downloadable artifacts rather than only package names."
+          }
+        ],
+        "constraints": [
+          "Keep uv.lock at version = 1, revision = 3, and requires-python = '>=3.11'.",
+          "Keep the local outcomegraph package editable from . with pydantic >=2,<3 and typer >=0.24,<1 in package metadata."
+        ],
+        "decision": {
+          "rationale": "The full lockfile is present, including the local editable package entry and all resolved artifacts, so the dependency pinning contract is reproducible even without a runnable lock-validation command.",
+          "statement": "Recreate this capsule as the exact locked dependency graph for the local outcomegraph package.",
+          "status": "accepted"
+        },
+        "dependencies": [
+          ".",
+          "uv.lock"
+        ],
+        "errors": [],
+        "goal": "Pin the Python dependency graph for the local outcomegraph package under Python 3.11+ with reproducible artifact metadata.",
+        "id": "uv",
+        "invariants": [
+          "The lock continues to anchor the local package as outcomegraph 0.1.0 from the repo root.",
+          "Resolved package entries continue to include dependency edges plus artifact hashes/URLs for reproducibility.",
+          "The runtime stack continues to center on pydantic and typer with their current transitive dependencies recorded in the lockfile."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "lockfile-review",
+            "reason": "The payload provides only uv.lock; it does not include pyproject metadata, a repository-native uv lock/sync command, or tests tied to this lockfile. Accept recreation by preserving the exact top-level constraints and resolved package/artifact set shown here.",
+            "scope": [
+              "uv.lock",
+              "."
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+            "media_type": "text/plain",
+            "schema_version": 2,
+            "size": null,
+            "target": "uv.lock",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "uv.lock"
+        ],
+        "status": "success",
+        "unknowns": [
+          "The payload does not include a prior uv.lock revision, so the exact package changes in this edit are unknown.",
+          "No pyproject.toml snapshot or repo-native uv command is supplied to prove how this lockfile is regenerated.",
+          "The lock lists many platform-specific wheels, but the intended deployment platforms are not stated."
+        ]
+      }
+    ],
+    "interface_version": 1,
+    "run_id": "sync-20260307T144144Z-99d37726c8",
+    "schema_version": 2
+  },
+  "prompt_provenance": {
+    "id": "worker-distill",
+    "source_path": "prompts/workers/distill-v1.txt",
+    "version": "1.0.1"
+  },
+  "role": "distill",
+  "schema_version": 2
+}

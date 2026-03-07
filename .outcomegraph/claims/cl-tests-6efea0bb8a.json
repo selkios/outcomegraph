@@ -1,0 +1,49 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "tests",
+  "category": "behavior",
+  "created_at": "2026-03-07T21:34:33Z",
+  "id": "cl-tests-6efea0bb8a",
+  "origin": {
+    "changed_files": [],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "verify-20260307T213332Z-6b48f02177"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:8bc74a2efcd81f3a4c18ef3bebc4722e3ec2c22b5dc91ae910c40777ffc7f677",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 744,
+      "target": ".outcomegraph/traces/tests-verify-20260307t213332z-6b48f02177-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:8bc74a2efcd81f3a4c18ef3bebc4722e3ec2c22b5dc91ae910c40777ffc7f677",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 744,
+      "target": "sha256:8bc74a2efcd81f3a4c18ef3bebc4722e3ec2c22b5dc91ae910c40777ffc7f677",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:bdd6664209dd92f911a85fa1f619ae894fd169eab01293eb71b4e25db6889ef4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 567,
+      "target": ".outcomegraph/traces/tests-verify-20260307t213332z-6b48f02177-visible-snapshot-contract--no-narrower-command-preserved-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:bdd6664209dd92f911a85fa1f619ae894fd169eab01293eb71b4e25db6889ef4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 567,
+      "target": "sha256:bdd6664209dd92f911a85fa1f619ae894fd169eab01293eb71b4e25db6889ef4",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for tests on 2 oracle checks."
+}

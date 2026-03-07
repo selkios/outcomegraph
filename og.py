@@ -64,6 +64,17 @@ def _load_runtime_version() -> str:
 
 VERSION = _load_runtime_version()
 TOP_LEVEL_AGENT_GUIDANCE_PATH = "CONTEXT.md"
+REPLAY_REFERENCE_DISCOVERY_PATHS = (
+    TOP_LEVEL_AGENT_GUIDANCE_PATH,
+    "pyproject.toml",
+    "README.md",
+    "RUNBOOKS.md",
+    "SPEC-v2.md",
+    "SECURITY_POLICY.md",
+    "to-do.json",
+    "to-do.schema.json",
+)
+REPLAY_REFERENCE_DISCOVERY_EXTENSIONS = frozenset({".md", ".py", ".sh", ".txt", ".toml", ".json", ".yaml", ".yml"})
 AGENT_GUIDANCE_CONTRACT_VERSION = 1
 CANONICAL_ARTIFACT_SCHEMA_VERSION = 2
 
@@ -433,7 +444,10 @@ WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS = frozenset(
     {".c", ".cc", ".cpp", ".cs", ".go", ".h", ".hpp", ".java", ".js", ".jsx", ".php", ".py", ".rb", ".rs", ".sh", ".ts", ".tsx"}
 )
 WORKER_ADAPTER_DISTILL_BATCH_SIZE = 1
+WORKER_ADAPTER_BOOTSTRAP_DISTILL_BATCH_SIZE = 3
+WORKER_ADAPTER_BOOTSTRAP_PROMPT_CHAR_BUDGET = 130_000
 WORKER_ADAPTER_DISTILL_MAX_WORKERS = 4
+WORKER_ADAPTER_BOOTSTRAP_MAX_WORKERS = 2
 WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "workers")
 WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
@@ -552,8 +566,16 @@ def _default_policy() -> dict[str, object]:
             "verify_commands": [
                 "npm test --listTests",
                 "npm test",
+                "npm test*",
                 "go test ./...",
+                "go test ./...*",
                 "pytest -q",
+                "pytest -q*",
+                "uv run --with pytest --no-project pytest -q*",
+                "uv run --with pytest pytest -q*",
+                "uv run pytest -q*",
+                "python -m unittest -q*",
+                "python3 -m unittest -q*",
             ],
             "sandbox_operations": [
                 "create_isolated_worktree",
@@ -7323,23 +7345,26 @@ def _run_codex_worker(
         command = command_variants[0]
         start = time.perf_counter()
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 command,
-                input=worker_prompt,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                capture_output=True,
                 cwd=repo_root,
-                timeout=timeout_seconds,
                 env=worker_env,
+                start_new_session=(os.name != "nt"),
             )
         except FileNotFoundError:
             raise WorkerAdapterError("codex executable was not found") from None
+
+        try:
+            output, error_output = proc.communicate(worker_prompt, timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
+            _terminate_subprocess_tree(proc)
             raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
 
         duration_ms = int((time.perf_counter() - start) * 1000)
-        output = proc.stdout or ""
-        error_output = proc.stderr or ""
         if proc.returncode != 0:
             worker_error = _extract_worker_exec_error(output, error_output)
             if worker_error:
@@ -7409,6 +7434,29 @@ def _run_codex_worker(
         _build_file_pointer(trace_result_path, result_bytes, "application/json"),
         _store_put(repo_root, result_bytes, "application/json"),
     ]
+
+
+def _terminate_subprocess_tree(proc: subprocess.Popen[str]) -> None:
+    try:
+        if os.name != "nt":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
+    except ProcessLookupError:
+        return
+    except OSError:
+        try:
+            proc.kill()
+        except OSError:
+            return
+
+    try:
+        proc.communicate(timeout=5)
+    except (subprocess.TimeoutExpired, ValueError, OSError):
+        try:
+            proc.kill()
+        except OSError:
+            return
 
 
 def _parse_worker_output(role: str, raw: str) -> dict[str, object]:
@@ -8346,9 +8394,28 @@ def _validate_canonical_artifact_records(repo_root: str) -> None:
             raise ValueError(
                 f"{relative_path}: artifact_type '{artifact_type.strip()}' does not match expected '{expected_type}' for this path"
             )
-        if expected_type == "capsule" and record.get("kind") is not None and _normalize_capsule_kind(record.get("kind")) is None:
+        if relative_path.endswith((".yaml", ".yml")):
+            continue
+        payload = _read_json_file(os.path.join(repo_root, relative_path))
+        if not isinstance(payload, dict):
+            raise ValueError(f"{relative_path}: canonical artifact must be a JSON object")
+        artifact_id = payload.get("id")
+        if not isinstance(artifact_id, str) or not artifact_id.strip():
+            raise ValueError(f"{relative_path}: missing id")
+        created_at = payload.get("created_at")
+        if not isinstance(created_at, str) or not created_at.strip():
+            raise ValueError(f"{relative_path}: missing created_at timestamp")
+        if expected_type != "claim":
+            updated_at = payload.get("updated_at")
+            if not isinstance(updated_at, str) or not updated_at.strip():
+                raise ValueError(f"{relative_path}: missing updated_at timestamp")
+        if expected_type == "claim":
+            receipt_pointers = payload.get("receipt_pointers")
+            if not isinstance(receipt_pointers, list) or not receipt_pointers:
+                raise ValueError(f"{relative_path}: claim must include at least one receipt_pointer")
+        if expected_type == "capsule" and payload.get("kind") is not None and _normalize_capsule_kind(payload.get("kind")) is None:
             raise ValueError(
-                f"{relative_path}: capsule kind must be one of {sorted(CAPSULE_KIND_VALUES)}, detected {record.get('kind')!r}"
+                f"{relative_path}: capsule kind must be one of {sorted(CAPSULE_KIND_VALUES)}, detected {payload.get('kind')!r}"
             )
 
 
@@ -8733,8 +8800,16 @@ allow:
   verify_commands:
     - "npm test --listTests"
     - "npm test"
+    - "npm test*"
     - "go test ./..."
+    - "go test ./...*"
     - "pytest -q"
+    - "pytest -q*"
+    - "uv run --with pytest --no-project pytest -q*"
+    - "uv run --with pytest pytest -q*"
+    - "uv run pytest -q*"
+    - "python -m unittest -q*"
+    - "python3 -m unittest -q*"
   sandbox_operations:
     - create_isolated_worktree
     - read_repo_state
@@ -11930,6 +12005,19 @@ def _collect_executable_oracle_map(oracles: list[dict[str, object]]) -> dict[str
     return executable
 
 
+def _capsule_is_advisory_for_replay(capsule_payload: dict[str, object]) -> bool:
+    capsule_kind = _normalize_capsule_kind(capsule_payload.get("kind"))
+    if capsule_kind in {CAPSULE_KIND_DOC, CAPSULE_KIND_CONFIG, CAPSULE_KIND_RUNTIME}:
+        return True
+
+    capsule_status = _normalize_distill_status(capsule_payload.get("status"))
+    return capsule_status in {"warn", "pending"}
+
+
+def _capsule_can_skip_replay_without_executable_oracles(capsule_payload: dict[str, object]) -> bool:
+    return _capsule_is_advisory_for_replay(capsule_payload)
+
+
 def _validate_replay_plan_contract(
     run_id: str,
     capsule_id: str,
@@ -12070,6 +12158,40 @@ def _validate_replay_plan_contract(
     return failures
 
 
+def _discover_replay_support_paths(repo_root: str, source_paths: list[str]) -> list[str]:
+    discovered: set[str] = set()
+    for raw_path in source_paths:
+        normalized_path = _normalize_repo_relative_path(raw_path)
+        if not normalized_path:
+            continue
+        _, extension = os.path.splitext(normalized_path.lower())
+        if extension not in REPLAY_REFERENCE_DISCOVERY_EXTENSIONS:
+            continue
+        absolute_path = os.path.join(repo_root, normalized_path)
+        if not os.path.isfile(absolute_path):
+            continue
+        remaining = {
+            candidate
+            for candidate in REPLAY_REFERENCE_DISCOVERY_PATHS
+            if candidate != normalized_path and os.path.isfile(os.path.join(repo_root, candidate))
+        }
+        if not remaining:
+            continue
+        try:
+            with open(absolute_path, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    for candidate in tuple(remaining):
+                        if candidate in line:
+                            discovered.add(candidate)
+                            remaining.remove(candidate)
+                    if not remaining:
+                        break
+        except (OSError, UnicodeDecodeError):
+            continue
+
+    return sorted(discovered)
+
+
 def _collect_replay_sandbox_paths(
     repo_root: str,
     capsule_id: str,
@@ -12103,6 +12225,15 @@ def _collect_replay_sandbox_paths(
         absolute = os.path.join(repo_root, metadata_path)
         if os.path.exists(absolute):
             paths.add(metadata_path)
+
+    for referenced_path in _discover_replay_support_paths(repo_root, selected_changed_paths):
+        if referenced_path.startswith(f"{OG_ROOT}/work") or referenced_path.startswith(f"{OG_ROOT}/events") or referenced_path.startswith(
+            f"{OG_ROOT}/traces"
+        ):
+            continue
+        if referenced_path.startswith(".git"):
+            continue
+        paths.add(referenced_path)
 
     return sorted(paths)
 
@@ -14307,6 +14438,22 @@ def _policy_allows_verify_command(policy: dict[str, object], mode: str, command:
     return denied is None
 
 
+def _canonicalize_verify_oracle_command(command: object) -> str | None:
+    command_value = str(command or "").strip()
+    if not command_value:
+        return None
+
+    for prefix in ("uv run pytest -q", "pytest -q"):
+        if command_value == prefix or command_value.startswith(f"{prefix} "):
+            suffix = command_value[len(prefix) :].strip()
+            rewritten = "uv run --with pytest --no-project pytest -q"
+            if suffix:
+                rewritten = f"{rewritten} {suffix}"
+            return rewritten
+
+    return command_value
+
+
 def _normalize_capsule_oracles_for_apply(
     capsule_id: str,
     oracles: list[dict[str, object]],
@@ -14331,7 +14478,9 @@ def _normalize_capsule_oracles_for_apply(
         normalized_oracle = _normalize_oracle_entry(raw_oracle)
         if normalized_oracle is None:
             continue
-        command_value = str(normalized_oracle.get("command") or "").strip()
+        command_value = _canonicalize_verify_oracle_command(normalized_oracle.get("command")) or ""
+        if command_value:
+            normalized_oracle["command"] = command_value
         if command_value and not _policy_allows_verify_command(policy, mode, command_value):
             normalized_oracle["command"] = None
             normalized_oracle["name"] = f"{normalized_oracle['name']} (advisory only in {mode} mode)"
@@ -14526,21 +14675,18 @@ def _run_distill_stage(
     try:
         deltas = []
         distill_prompt_provenance: dict[str, str] | None = None
-        batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
-        for batch_index in range(0, len(target_capsules), WORKER_ADAPTER_DISTILL_BATCH_SIZE):
-            batch_capsules = target_capsules[batch_index : batch_index + WORKER_ADAPTER_DISTILL_BATCH_SIZE]
-            batch_changed_files: list[str] = []
-            for capsule_descriptor in batch_capsules:
-                if not isinstance(capsule_descriptor, dict):
-                    continue
-                batch_changed_files.extend(_safe_string_list(capsule_descriptor.get("changed_files")))
-            if not batch_changed_files:
-                batch_changed_files = changed_files
-            trace_path = _build_trace_path(run_id, "distill-batch", batch_index // WORKER_ADAPTER_DISTILL_BATCH_SIZE)
-            batch_specs.append((batch_index, batch_capsules, sorted(set(batch_changed_files)), trace_path))
+        batch_specs = _build_distill_batch_specs(
+            repo_root,
+            snapshot,
+            run_id,
+            profile,
+            mode,
+            target_capsules,
+            changed_files,
+        )
 
         completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]], dict[str, object]]] = {}
-        max_workers = min(WORKER_ADAPTER_DISTILL_MAX_WORKERS, max(len(batch_specs), 1))
+        max_workers = _select_distill_max_workers(repo_root, snapshot, len(batch_specs))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {}
             for batch_index, batch_capsules, batch_changed_files, trace_path in batch_specs:
@@ -14656,28 +14802,152 @@ def _run_distill_stage(
 
 
 def _select_distill_worker_timeout(repo_root: str, snapshot: dict[str, object]) -> int:
-    if _requires_bootstrap_full_snapshot(repo_root):
+    if _is_distill_bootstrap_or_complex_snapshot(repo_root, snapshot):
         return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
 
+    return WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS
+
+
+def _select_distill_batch_size(
+    repo_root: str,
+    snapshot: dict[str, object],
+    target_capsules: list[dict[str, object]],
+) -> int:
+    if len(target_capsules) <= WORKER_ADAPTER_DISTILL_BATCH_SIZE:
+        return WORKER_ADAPTER_DISTILL_BATCH_SIZE
+
+    if _is_distill_bootstrap_or_complex_snapshot(repo_root, snapshot):
+        return min(WORKER_ADAPTER_BOOTSTRAP_DISTILL_BATCH_SIZE, len(target_capsules))
+
+    return WORKER_ADAPTER_DISTILL_BATCH_SIZE
+
+
+def _select_distill_prompt_char_budget(repo_root: str, snapshot: dict[str, object]) -> int | None:
+    if _is_distill_bootstrap_or_complex_snapshot(repo_root, snapshot):
+        return WORKER_ADAPTER_BOOTSTRAP_PROMPT_CHAR_BUDGET
+
+    return None
+
+
+def _select_distill_max_workers(
+    repo_root: str,
+    snapshot: dict[str, object],
+    batch_count: int,
+) -> int:
+    if batch_count <= 0:
+        return 1
+
+    if _is_distill_bootstrap_or_complex_snapshot(repo_root, snapshot):
+        return min(WORKER_ADAPTER_BOOTSTRAP_MAX_WORKERS, batch_count)
+
+    return min(WORKER_ADAPTER_DISTILL_MAX_WORKERS, batch_count)
+
+
+def _collect_distill_batch_changed_files(
+    batch_capsules: list[dict[str, object]],
+    fallback_changed_files: list[str],
+) -> list[str]:
+    batch_changed_files: list[str] = []
+    for capsule_descriptor in batch_capsules:
+        if not isinstance(capsule_descriptor, dict):
+            continue
+        batch_changed_files.extend(_safe_string_list(capsule_descriptor.get("changed_files")))
+    if not batch_changed_files:
+        batch_changed_files = fallback_changed_files
+    return sorted(set(batch_changed_files))
+
+
+def _estimate_distill_batch_prompt_chars(
+    run_id: str,
+    profile: str,
+    mode: str,
+    batch_capsules: list[dict[str, object]],
+    batch_changed_files: list[str],
+) -> int:
+    distill_input = _build_distill_input(
+        run_id=run_id,
+        profile=profile,
+        mode=mode,
+        target_capsules=batch_capsules,
+        changed_paths=batch_changed_files,
+        policy_ref=f"{OG_ROOT}/policy.yaml",
+        materials_lock_ref=f"{OG_ROOT}/materials.lock",
+    )
+    prompt, _ = _resolve_worker_prompt("distill", distill_input)
+    return len(prompt)
+
+
+def _build_distill_batch_specs(
+    repo_root: str,
+    snapshot: dict[str, object],
+    run_id: str,
+    profile: str,
+    mode: str,
+    target_capsules: list[dict[str, object]],
+    changed_files: list[str],
+) -> list[tuple[int, list[dict[str, object]], list[str], str]]:
+    distill_batch_size = _select_distill_batch_size(repo_root, snapshot, target_capsules)
+    prompt_char_budget = _select_distill_prompt_char_budget(repo_root, snapshot)
+    batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
+    current_batch: list[dict[str, object]] = []
+
+    def _append_batch(batch_capsules: list[dict[str, object]]) -> None:
+        if not batch_capsules:
+            return
+        batch_position = len(batch_specs)
+        batch_changed_files = _collect_distill_batch_changed_files(batch_capsules, changed_files)
+        trace_path = _build_trace_path(run_id, "distill-batch", batch_position)
+        batch_specs.append((batch_position, list(batch_capsules), batch_changed_files, trace_path))
+
+    for capsule_descriptor in target_capsules:
+        if not isinstance(capsule_descriptor, dict):
+            continue
+        candidate_batch = [*current_batch, capsule_descriptor]
+        if current_batch and len(candidate_batch) > distill_batch_size:
+            _append_batch(current_batch)
+            current_batch = [capsule_descriptor]
+            continue
+        if current_batch and prompt_char_budget is not None:
+            candidate_changed_files = _collect_distill_batch_changed_files(candidate_batch, changed_files)
+            candidate_prompt_chars = _estimate_distill_batch_prompt_chars(
+                run_id,
+                profile,
+                mode,
+                candidate_batch,
+                candidate_changed_files,
+            )
+            if candidate_prompt_chars > prompt_char_budget:
+                _append_batch(current_batch)
+                current_batch = [capsule_descriptor]
+                continue
+        current_batch = candidate_batch
+    _append_batch(current_batch)
+    return batch_specs
+
+
+def _is_distill_bootstrap_or_complex_snapshot(repo_root: str, snapshot: dict[str, object]) -> bool:
+    if _requires_bootstrap_full_snapshot(repo_root):
+        return True
+
     if bool(snapshot.get("force_full_sync", False)):
-        return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+        return True
 
     diff_baseline = snapshot.get("diff_baseline")
     if isinstance(diff_baseline, dict) and str(diff_baseline.get("strategy") or "") == "empty_tree":
-        return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+        return True
 
     changed_files = snapshot.get("changed_files")
     if isinstance(changed_files, list):
         normalized = [_normalize_repo_relative_path(str(item)) for item in changed_files if str(item).strip()]
         if len(normalized) >= WORKER_ADAPTER_COMPLEX_TIMEOUT_FILE_COUNT:
-            return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+            return True
 
         observed_bytes = 0
         for relative_path in normalized:
             if relative_path.startswith("tests/"):
-                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+                return True
             if os.path.splitext(relative_path)[1].lower() in WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS:
-                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+                return True
             full_path = os.path.join(repo_root, relative_path)
             try:
                 if os.path.isfile(full_path):
@@ -14685,9 +14955,9 @@ def _select_distill_worker_timeout(repo_root: str, snapshot: dict[str, object]) 
             except OSError:
                 continue
             if observed_bytes >= WORKER_ADAPTER_COMPLEX_TIMEOUT_BYTES:
-                return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
+                return True
 
-    return WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS
+    return False
 
 
 def _run_apply_stage(
@@ -15417,6 +15687,53 @@ def _run_replay_stage(
         scope_materials = _collect_capsule_scope_materials(repo_root, capsule, changed_materials)
         capsule_oracles = _load_capsule_oracles(repo_root, capsule)
         baseline_equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule)
+        executable_oracles = _collect_executable_oracle_map(capsule_oracles)
+        if not executable_oracles and _capsule_can_skip_replay_without_executable_oracles(capsule_payload):
+            material_paths = [
+                str(item.get("path") or "").strip()
+                for item in scope_materials
+                if isinstance(item, dict) and str(item.get("path") or "").strip()
+            ]
+            baseline_hash = (
+                baseline_equivalence.get("oracle_digest") or baseline_equivalence.get("observed_hash")
+                if isinstance(baseline_equivalence, dict)
+                else None
+            )
+            skip_reason = (
+                f"Replay skipped for {capsule} because the capsule is advisory-only without executable acceptance oracles."
+            )
+            replay_results.append(
+                {
+                    "capsule_id": capsule,
+                    "status": "skipped",
+                    "plan_status": "skipped",
+                    "certificate_id": None,
+                    "trace": None,
+                    "failures": [skip_reason],
+                    "capsule_scope": _safe_string_list(capsule_payload.get("scope")),
+                    "material_inputs": scope_materials,
+                    "acceptance_checks": [],
+                    "equivalence_inputs": {
+                        "baseline_hash": baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None,
+                        "oracle_names": [],
+                        "material_paths": material_paths,
+                        "notes": [skip_reason],
+                    },
+                    "parity_results": {
+                        "match": None,
+                        "details": skip_reason,
+                        "baseline_hash": baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None,
+                        "observed_hash": None,
+                        "oracle_digest": None,
+                        "trace_count": 0,
+                    },
+                    "replay_steps": [],
+                    "equivalence": None,
+                    "materialized_paths": material_paths,
+                    "oracle_results": [],
+                }
+            )
+            continue
         try:
             input_payload = _build_replay_input(
                 run_id=run_id,
@@ -15518,6 +15835,44 @@ def _run_replay_stage(
             "oracle_results": [],
             **({"prompt_provenance": plan_prompt_provenance} if plan_prompt_provenance is not None else {}),
         }
+
+        if _capsule_is_advisory_for_replay(capsule_payload) and (
+            lower_status in {"warn", "pending"} or plan_contract_failures
+        ):
+            skip_reason = f"Replay skipped for {capsule} because the capsule is advisory-only and replay inputs are not replay-complete."
+            equivalence_inputs = (
+                dict(replay_result["equivalence_inputs"])
+                if isinstance(replay_result.get("equivalence_inputs"), dict)
+                else {}
+            )
+            baseline_hash = equivalence_inputs.get("baseline_hash")
+            if not isinstance(baseline_hash, str) or not baseline_hash:
+                baseline_hash = (
+                    baseline_equivalence.get("oracle_digest") or baseline_equivalence.get("observed_hash")
+                    if isinstance(baseline_equivalence, dict)
+                    else None
+                )
+            notes = [skip_reason]
+            for note in _safe_string_list(equivalence_inputs.get("notes")):
+                if note not in notes:
+                    notes.append(note)
+            replay_result["status"] = "skipped"
+            replay_result["failures"] = [skip_reason, *replay_failures, *plan_contract_failures]
+            replay_result["equivalence_inputs"] = {
+                **equivalence_inputs,
+                "baseline_hash": baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None,
+                "notes": notes,
+            }
+            replay_result["parity_results"] = {
+                "match": None,
+                "details": skip_reason,
+                "baseline_hash": baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None,
+                "observed_hash": None,
+                "oracle_digest": None,
+                "trace_count": 0,
+            }
+            replay_results.append(replay_result)
+            continue
 
         if lower_status in {"error", "failed", "fail", "warn", "pending"}:
             replay_status = "failed"
@@ -15744,6 +16099,8 @@ def _run_replay_stage(
     if not errors and overall_failed:
         for replay_result in replay_results:
             if not isinstance(replay_result, dict):
+                continue
+            if str(replay_result.get("status") or "").lower() == "skipped":
                 continue
             failures = _safe_string_list(replay_result.get("failures"))
             if not failures:

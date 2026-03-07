@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "to-do-schema",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-to-do-schema-24d5d66315.json"
+  ],
+  "created_at": "2026-03-07T21:34:33Z",
+  "id": "cert-to-do-schema-24d5d66315",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:39f678c362a6b7d6897284b7efeb1c9319b5d7b0a37262db6c15a509f433665c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 634,
+      "target": ".outcomegraph/traces/to-do-schema-verify-20260307t213332z-6b48f02177-snapshot-evidence-only--no-repository-validator-command-is-pr-9db4affbc0-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:39f678c362a6b7d6897284b7efeb1c9319b5d7b0a37262db6c15a509f433665c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 634,
+      "target": "sha256:39f678c362a6b7d6897284b7efeb1c9319b5d7b0a37262db6c15a509f433665c",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260307T213332Z-6b48f02177",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260307T213332Z-6b48f02177",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-07T21:34:33Z"
+}

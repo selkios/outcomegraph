@@ -1,0 +1,315 @@
+{
+  "agent_reliability": {
+    "observation": {
+      "command": "sync",
+      "commands_since_successful_task": 3,
+      "observed_at": "2026-03-07T15:05:17Z",
+      "retry_auto_recoveries": 0,
+      "retryable_operations": 0,
+      "schema_valid_output": true,
+      "session_id": "sync-20260307t144144z-60aa2a611a",
+      "session_kind": "sync",
+      "session_tracked": false,
+      "session_transition": "ignored",
+      "status": "error",
+      "subcommand": null,
+      "successful_task": false
+    },
+    "snapshot": {
+      "commands_per_successful_task": {
+        "direction": "lower_is_better",
+        "status": "warn",
+        "successful_tasks": 1,
+        "total_commands": 4,
+        "units": "commands/task",
+        "value": 4.0
+      },
+      "current": {
+        "commands_since_successful_task": 3
+      },
+      "latest_command": {
+        "command": "sync",
+        "commands_since_successful_task": 3,
+        "observed_at": "2026-03-07T15:05:17Z",
+        "retry_auto_recoveries": 0,
+        "retryable_operations": 0,
+        "schema_valid_output": true,
+        "session_id": "sync-20260307t144144z-60aa2a611a",
+        "session_kind": "sync",
+        "session_transition": "ignored",
+        "status": "error",
+        "subcommand": null,
+        "successful_task": false
+      },
+      "message": "agent reliability metrics need attention: commands_per_successful_task",
+      "retry_auto_recovery_rate": {
+        "direction": "higher_is_better",
+        "recovered_operations": 0,
+        "retryable_operations": 0,
+        "status": "unknown",
+        "units": "ratio",
+        "value": null
+      },
+      "schema_valid_output_rate": {
+        "direction": "higher_is_better",
+        "status": "ok",
+        "total_outputs": 4,
+        "units": "ratio",
+        "valid_outputs": 4,
+        "value": 1.0
+      },
+      "schema_version": 1,
+      "session_churn": {
+        "direction": "lower_is_better",
+        "repeat_observations": 0,
+        "reused_sessions": 0,
+        "rotated_sessions": 0,
+        "session_starts": 0,
+        "status": "unknown",
+        "tracked_session_kinds": [
+          "autopilot",
+          "daemon"
+        ],
+        "units": "ratio",
+        "value": null
+      },
+      "status": "warn",
+      "totals": {
+        "commands": 4,
+        "resumable_session_reuses": 0,
+        "resumable_session_rotations": 0,
+        "resumable_session_starts": 0,
+        "retry_auto_recoveries": 0,
+        "retryable_operations": 0,
+        "schema_valid_outputs": 4,
+        "successful_tasks": 1
+      },
+      "tracked_at": "2026-03-07T15:05:17Z",
+      "unknown_metrics": [
+        "retry_auto_recovery_rate",
+        "session_churn"
+      ],
+      "warn_metrics": [
+        "commands_per_successful_task"
+      ]
+    }
+  },
+  "artifact_type": "sync_summary",
+  "command": "sync",
+  "created_at": "2026-03-07T15:05:17Z",
+  "duration_ms": 1412496,
+  "event_hash": "sha256:061dba3b5e8caa1b55bc86605cb082646541fd2761bb1285560045b87a457585",
+  "event_sequence": 1,
+  "id": "sync-20260307T144144Z-99d37726c8",
+  "idempotency_key": "99d37726c87c19993594218846aa9c4f2b1f297c501e68b39ad8f2d92127d398",
+  "previous_event_hash": null,
+  "recovery": {
+    "details": [
+      {
+        "attempts": 1,
+        "error_code": "TIMEOUT_EXPIRED",
+        "exhausted": false,
+        "max_retries": 0,
+        "message": "codex exec timed out after 900s (distill)",
+        "operation": "worker:distill",
+        "recovered": false,
+        "retries_used": 0,
+        "retryable": true,
+        "timed_out": false,
+        "timeout_seconds": 900
+      }
+    ],
+    "exhausted_operations": 0,
+    "operations": 1,
+    "recovered_operations": 0,
+    "retried_operations": 0,
+    "timeout_operations": 0,
+    "total_retries_used": 0
+  },
+  "schema_version": 2,
+  "session_id": "sync-20260307t144144z-60aa2a611a",
+  "snapshot": {
+    "branch": "main",
+    "captured_at": "2026-03-07T14:41:44Z",
+    "changed_count": 60,
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "CONTEXT.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "WORKER_CAPSULE_REFACTOR_PLAN.md",
+      "clean.json",
+      "init.json",
+      "og",
+      "og.py",
+      "ogd",
+      "prompts/workers/distill-v1.txt",
+      "prompts/workers/manifest.json",
+      "prompts/workers/replay-v1.txt",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tasks/og-agent-010/TASK.md",
+      "tasks/og-agent-010/task-plan.json",
+      "tasks/og-agent-012/TASK.md",
+      "tasks/og-agent-012/task-plan.json",
+      "tasks/og-agent-014/TASK.md",
+      "tasks/og-agent-014/task-plan.json",
+      "tasks/og-apply-001/TASK.md",
+      "tasks/og-apply-001/task-plan.json",
+      "tasks/og-distill-001/TASK.md",
+      "tasks/og-distill-001/task-plan.json",
+      "tasks/og-distill-002/TASK.md",
+      "tasks/og-distill-002/task-plan.json",
+      "tasks/og-doc-003/TASK.md",
+      "tasks/og-doc-003/task-plan.json",
+      "tasks/og-eval-001/TASK.md",
+      "tasks/og-eval-001/task-plan.json",
+      "tasks/og-prompt-002/TASK.md",
+      "tasks/og-prompt-002/task-plan.json",
+      "tasks/og-replay-003/TASK.md",
+      "tasks/og-replay-003/task-plan.json",
+      "tests/conftest.py",
+      "tests/test_capsule_quality_eval.py",
+      "tests/test_cli_mcp_contracts.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "diff_baseline": {
+      "details": "using previous commit parent",
+      "reference": "HEAD~1",
+      "resolved": "30800753ec6a244da04733126922ebcd95f79285",
+      "strategy": "head~1"
+    },
+    "force_full_sync": false,
+    "has_changes": true,
+    "materials_lock_ref": ".outcomegraph/materials.lock",
+    "mode": "observe",
+    "profile": "analyze",
+    "repository_head": "4c6b477ff6b72b49ed1bed5d6bff091d335f06bb"
+  },
+  "status": "error",
+  "steps": [
+    {
+      "adapter_name": "codex",
+      "affected_capsules": [
+        "agent_first_cli_review",
+        "agents",
+        "architecture",
+        "clean",
+        "config",
+        "constitution",
+        "context",
+        "init",
+        "migration_guide",
+        "og",
+        "ogd",
+        "plugin_api",
+        "policy",
+        "prompts",
+        "pyproject",
+        "quickstart",
+        "readme",
+        "runbooks",
+        "runtime",
+        "security_policy",
+        "skill-og",
+        "skill-og-dogfood",
+        "skill-og-quality-pass",
+        "spec-v2",
+        "spec_implementation_matrix",
+        "tasks",
+        "tests",
+        "to-do",
+        "to-do-schema",
+        "uv",
+        "worker_capsule_refactor_plan"
+      ],
+      "code": "WORKER_RUNTIME_UNAVAILABLE",
+      "duration_ms": 1412488,
+      "errors": [
+        {
+          "error_code": "WORKER_RUNTIME_UNAVAILABLE",
+          "message": "codex exec timed out after 900s (distill)"
+        }
+      ],
+      "generated_deltas": [],
+      "message": "codex exec timed out after 900s (distill)",
+      "mode": "observe",
+      "name": "distill",
+      "profile": "analyze",
+      "recovery": {
+        "attempts": 1,
+        "error_code": "TIMEOUT_EXPIRED",
+        "exhausted": false,
+        "max_retries": 0,
+        "message": "codex exec timed out after 900s (distill)",
+        "operation": "worker:distill",
+        "recovered": false,
+        "retries_used": 0,
+        "retryable": true,
+        "timed_out": false,
+        "timeout_seconds": 900
+      },
+      "status": "pending"
+    },
+    {
+      "applied_changes": 0,
+      "duration_ms": 2,
+      "message": "Distill was skipped; no structured deltas to apply.",
+      "mode": "observe",
+      "name": "apply",
+      "status": "skipped"
+    },
+    {
+      "certificate_refs": [],
+      "duration_ms": 0,
+      "message": "No affected capsules; verification deferred.",
+      "mode": "observe",
+      "name": "verify",
+      "oracle_results": {},
+      "receipt_pointers": {},
+      "status": "skipped",
+      "verified_capsules": []
+    },
+    {
+      "artifact_counts": {
+        "materials.lock": 1
+      },
+      "artifact_total": 1,
+      "duration_ms": 3,
+      "message": "Export refresh completed.",
+      "mode": "observe",
+      "name": "export",
+      "snapshot_generated_at": "2026-03-07T15:05:17Z",
+      "status": "ok",
+      "unchanged_exports": [],
+      "updated_exports": [
+        ".outcomegraph/export/AGENTS.md",
+        ".outcomegraph/export/README_OUTCOMES.md",
+        ".outcomegraph/export/mcp-resources.json",
+        "skills/outcome-steward/SKILL.md"
+      ]
+    }
+  ],
+  "subcommand": null
+}

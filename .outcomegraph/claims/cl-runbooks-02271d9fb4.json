@@ -1,0 +1,177 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "runbooks",
+  "category": "behavior",
+  "created_at": "2026-03-07T21:34:02Z",
+  "id": "cl-runbooks-02271d9fb4",
+  "origin": {
+    "changed_files": [],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "verify-20260307T213332Z-6b48f02177"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:019063323c83bbfd9c3baad7ec2ca6ebc47d9afe7d789db8a00b6315d60a7b34",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 558,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-release-verify-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:019063323c83bbfd9c3baad7ec2ca6ebc47d9afe7d789db8a00b6315d60a7b34",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 558,
+      "target": "sha256:019063323c83bbfd9c3baad7ec2ca6ebc47d9afe7d789db8a00b6315d60a7b34",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:24810d857de8fe5bbc354600449c8a76ff1cee4243156acab8cad17e24ac9214",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 564,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-dogfood-status-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:24810d857de8fe5bbc354600449c8a76ff1cee4243156acab8cad17e24ac9214",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 564,
+      "target": "sha256:24810d857de8fe5bbc354600449c8a76ff1cee4243156acab8cad17e24ac9214",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:32cc881dcffe2b46a8b65dc6328310caa8b93a8e5a3555e1b572caa22dcec7ae",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 554,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-release-sync-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:32cc881dcffe2b46a8b65dc6328310caa8b93a8e5a3555e1b572caa22dcec7ae",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 554,
+      "target": "sha256:32cc881dcffe2b46a8b65dc6328310caa8b93a8e5a3555e1b572caa22dcec7ae",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:334797d50b847e0bf8913f0b5716cd8b77d5b9be846aef3f6c3f3b9ed101e00a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 558,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-release-status-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:334797d50b847e0bf8913f0b5716cd8b77d5b9be846aef3f6c3f3b9ed101e00a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 558,
+      "target": "sha256:334797d50b847e0bf8913f0b5716cd8b77d5b9be846aef3f6c3f3b9ed101e00a",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:5907a2740747a02d26d16365b0683e1e2c8516f81b0290bca99c03e054eae2d9",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 572,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-targeted-verification-test--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:5907a2740747a02d26d16365b0683e1e2c8516f81b0290bca99c03e054eae2d9",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 572,
+      "target": "sha256:5907a2740747a02d26d16365b0683e1e2c8516f81b0290bca99c03e054eae2d9",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:605582f0a6affff0283e26251825a47ff6e6db1a2a0cf966fa912691dd238a65",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 747,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:605582f0a6affff0283e26251825a47ff6e6db1a2a0cf966fa912691dd238a65",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 747,
+      "target": "sha256:605582f0a6affff0283e26251825a47ff6e6db1a2a0cf966fa912691dd238a65",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:9aa4fdb6dd0707b93940ec8c1fdc074600c6975f0225ab0aad7d5c5a314610a6",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 582,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-implementation-matrix-gate-scan--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:9aa4fdb6dd0707b93940ec8c1fdc074600c6975f0225ab0aad7d5c5a314610a6",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 582,
+      "target": "sha256:9aa4fdb6dd0707b93940ec8c1fdc074600c6975f0225ab0aad7d5c5a314610a6",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b1b0ce0c54ecd2c8d5246604f84e9da143786ca8ffc81ec3c2be8b6bf0491eb1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 564,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-dogfood-verify-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b1b0ce0c54ecd2c8d5246604f84e9da143786ca8ffc81ec3c2be8b6bf0491eb1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 564,
+      "target": "sha256:b1b0ce0c54ecd2c8d5246604f84e9da143786ca8ffc81ec3c2be8b6bf0491eb1",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:bd4227a0a92a39f2ca019009ec1d85195edd264206398011cba9d6589135c1cf",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 560,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-dogfood-sync-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:bd4227a0a92a39f2ca019009ec1d85195edd264206398011cba9d6589135c1cf",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 560,
+      "target": "sha256:bd4227a0a92a39f2ca019009ec1d85195edd264206398011cba9d6589135c1cf",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:daa2793a3b9cfa5447254d05eabdd995665b95274a279ecd32ca872b1a7f8e8b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 562,
+      "target": ".outcomegraph/traces/runbooks-verify-20260307t213332z-6b48f02177-dogfood-drift-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:daa2793a3b9cfa5447254d05eabdd995665b95274a279ecd32ca872b1a7f8e8b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 562,
+      "target": "sha256:daa2793a3b9cfa5447254d05eabdd995665b95274a279ecd32ca872b1a7f8e8b",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for runbooks on 10 oracle checks."
+}

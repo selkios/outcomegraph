@@ -1,0 +1,49 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "spec-v2",
+  "category": "behavior",
+  "created_at": "2026-03-07T21:34:18Z",
+  "id": "cl-spec-v2-58dcd18184",
+  "origin": {
+    "changed_files": [],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "verify-20260307T213332Z-6b48f02177"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:8e62cc8e0e891e3b7512044f43692be06bde93cea9484053443d43ca0ad1d27a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 513,
+      "target": ".outcomegraph/traces/spec-v2-verify-20260307t213332z-6b48f02177-spec-v2-cli-contract-evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:8e62cc8e0e891e3b7512044f43692be06bde93cea9484053443d43ca0ad1d27a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 513,
+      "target": "sha256:8e62cc8e0e891e3b7512044f43692be06bde93cea9484053443d43ca0ad1d27a",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:ff7157756990c54797e6ebb8dd0649e15bf145654d4b004496a068e0f757eecb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 503,
+      "target": ".outcomegraph/traces/spec-v2-verify-20260307t213332z-6b48f02177-spec-v2-content-evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ff7157756990c54797e6ebb8dd0649e15bf145654d4b004496a068e0f757eecb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 503,
+      "target": "sha256:ff7157756990c54797e6ebb8dd0649e15bf145654d4b004496a068e0f757eecb",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for spec-v2 on 2 oracle checks."
+}

@@ -1,0 +1,2 @@
+pydantic<3,>=2
+typer<1,>=0.24

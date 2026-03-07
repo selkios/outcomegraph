@@ -54,11 +54,11 @@ OutcomeGraph canonical agent guidance contract.
 - og daemon install|start|stop|status
 
 - Canonical artifact directories tracked: ['capsules', 'certificates', 'claims', 'constitution', 'decisions', 'materials.lock', 'refs']
-- Total canonical artifacts: 760
+- Total canonical artifacts: 812
 
 - `capsules`: 26 item(s)
-- `certificates`: 170 item(s)
-- `claims`: 439 item(s)
+- `certificates`: 196 item(s)
+- `claims`: 465 item(s)
 - `constitution`: 1 item(s)
 - `decisions`: 97 item(s)
 - `materials.lock`: 1 item(s)

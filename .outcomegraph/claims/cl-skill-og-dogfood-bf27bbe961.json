@@ -1,0 +1,49 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "skill-og-dogfood",
+  "category": "behavior",
+  "created_at": "2026-03-07T21:34:18Z",
+  "id": "cl-skill-og-dogfood-bf27bbe961",
+  "origin": {
+    "changed_files": [],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "verify-20260307T213332Z-6b48f02177"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:53719447a1804cb3ee3415db05482bb496264c6360254ec530e6839944873b07",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 580,
+      "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260307t213332z-6b48f02177-repo-root-live-dogfood-run--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:53719447a1804cb3ee3415db05482bb496264c6360254ec530e6839944873b07",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 580,
+      "target": "sha256:53719447a1804cb3ee3415db05482bb496264c6360254ec530e6839944873b07",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:8b67c56ef2f9d76e0c70f6511129355ad904a8ad741f20d069fc271cf92db715",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 614,
+      "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260307t213332z-6b48f02177-explicit-checkout-argument-live-dogfood-run--advisory-only-in-71f56d5ce6-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:8b67c56ef2f9d76e0c70f6511129355ad904a8ad741f20d069fc271cf92db715",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 614,
+      "target": "sha256:8b67c56ef2f9d76e0c70f6511129355ad904a8ad741f20d069fc271cf92db715",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for skill-og-dogfood on 2 oracle checks."
+}

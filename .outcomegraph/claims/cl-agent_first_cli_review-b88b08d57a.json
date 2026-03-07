@@ -1,0 +1,69 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agent_first_cli_review",
+  "category": "behavior",
+  "created_at": "2026-03-07T21:35:43Z",
+  "id": "cl-agent_first_cli_review-b88b08d57a",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/materials.lock",
+      ".outcomegraph/policy.yaml"
+    ],
+    "mode": "observe",
+    "profile": "replay",
+    "run_id": "replay-20260307T213451Z-d7f0e8e6"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0356fe45073f42ae920503544cff601f0c7c46db7129a0e003643fee3444cede",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3074,
+      "target": ".outcomegraph/traces/agent_first_cli_review-replay-20260307t213451z-d7f0e8e6-replay-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0356fe45073f42ae920503544cff601f0c7c46db7129a0e003643fee3444cede",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3074,
+      "target": "sha256:0356fe45073f42ae920503544cff601f0c7c46db7129a0e003643fee3444cede",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:1f137c3b2c689da0e750b03e2947281aca3058c2e433084c55aaf789023be699",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2524,
+      "target": ".outcomegraph/traces/agent_first_cli_review-replay-20260307t213451z-d7f0e8e6-replay.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1f137c3b2c689da0e750b03e2947281aca3058c2e433084c55aaf789023be699",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2524,
+      "target": "sha256:1f137c3b2c689da0e750b03e2947281aca3058c2e433084c55aaf789023be699",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:79a379121fa45ddbcf0729734e883b3b60a15127e8df7fd96976481dcd844176",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 11330,
+      "target": ".outcomegraph/traces/agent_first_cli_review-replay-20260307t213451z-d7f0e8e6-replay-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:79a379121fa45ddbcf0729734e883b3b60a15127e8df7fd96976481dcd844176",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 11330,
+      "target": "sha256:79a379121fa45ddbcf0729734e883b3b60a15127e8df7fd96976481dcd844176",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Replay stage for agent_first_cli_review completed with plan status 'pending'."
+}

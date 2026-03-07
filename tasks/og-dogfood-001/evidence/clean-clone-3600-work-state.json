@@ -1,0 +1,10 @@
+{
+  "last_idempotency_key": "ef16c2ddd52b2332a108ed53aae3d6ef71fb9a1221131b4e02dab902149cb000",
+  "last_message": "starting distill",
+  "last_sync_id": null,
+  "mode": "observe",
+  "pending": false,
+  "schema_version": 2,
+  "status": "distill",
+  "updated_at": "2026-03-07T16:03:54Z"
+}

@@ -14,6 +14,9 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
+export OG_WORKER_MODEL="${OG_WORKER_MODEL:-gpt-5.4}"
+export OG_DOGFOOD_TIMEOUT_SECONDS="${OG_DOGFOOD_TIMEOUT_SECONDS:-900}"
+
 run_json() {
   local label="$1"
   local outfile="$2"
@@ -47,6 +50,8 @@ run_text() {
 }
 
 echo "Repo: $repo_root"
+echo "Worker model: $OG_WORKER_MODEL"
+echo "Timeout: ${OG_DOGFOOD_TIMEOUT_SECONDS}s"
 
 run_stdout "clean" uv run og clean --scope all --yes --json
 run_stdout "init" uv run og init --json
@@ -55,9 +60,9 @@ events_dir="$repo_root/.outcomegraph/events"
 mkdir -p "$events_dir"
 
 run_json "status (pre-sync)" "$events_dir/dogfood-status-pre-sync.json" uv run og status --json
-run_json "sync" "$events_dir/dogfood-sync.json" uv run og sync --json
-run_json "verify" "$events_dir/dogfood-verify.json" uv run og verify --changed --json
-run_json "replay" "$events_dir/dogfood-replay.json" uv run og replay --changed --json
+run_json "sync" "$events_dir/dogfood-sync.json" uv run og sync --json --timeout "$OG_DOGFOOD_TIMEOUT_SECONDS"
+run_json "verify" "$events_dir/dogfood-verify.json" uv run og verify --changed --json --timeout "$OG_DOGFOOD_TIMEOUT_SECONDS"
+run_json "replay" "$events_dir/dogfood-replay.json" uv run og replay --changed --json --timeout "$OG_DOGFOOD_TIMEOUT_SECONDS"
 run_text "drift" "$events_dir/dogfood-drift.txt" uv run og drift
 run_json "status (final)" "$events_dir/dogfood-status-final.json" uv run og status --json
 cp "$events_dir/dogfood-status-final.json" "$events_dir/dogfood-status.json"

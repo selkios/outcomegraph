@@ -1,0 +1,562 @@
+{
+  "adapter": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "--json",
+    "--sandbox",
+    "read-only",
+    "--model",
+    "gpt-5.4",
+    "--output-schema",
+    "/tmp/og-worker-e7i7zus0/distill-schema.json",
+    "--output-last-message",
+    "/tmp/og-worker-e7i7zus0/distill-last-message.json",
+    "-"
+  ],
+  "configuration": {
+    "codex_home": null,
+    "resolved_from": "unset"
+  },
+  "duration_ms": 619666,
+  "output": {
+    "capsule_updates": [
+      {
+        "behavior_claims": [
+          "Validate OutcomeGraph backlog files as one closed JSON object with required `schema_version`, `source_files`, and `tasks`, plus optional `project`.",
+          "Validate each task as a closed object with required identity/workflow fields and optional string-array metadata/timestamps.",
+          "Keep the schema aligned with the in-repo `to-do.json` backlog shape shown in the supporting snapshot."
+        ],
+        "changed_files": [
+          "to-do.schema.json"
+        ],
+        "claims": [
+          {
+            "capsule_id": "to-do-schema",
+            "category": "behavior",
+            "id": "to-do-schema-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json"
+            ],
+            "text": "The canonical backlog document is a JSON object with required `schema_version`, `source_files`, and `tasks`; `project` is optional, and root-level unknown fields are rejected."
+          },
+          {
+            "capsule_id": "to-do-schema",
+            "category": "behavior",
+            "id": "to-do-schema-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json"
+            ],
+            "text": "Each task requires `id`, non-empty `title`, `priority` from 1 to 5, and `status` in `todo|doing|blocked|done`; optional `details`, list fields, and `created_at`/`updated_at` are string-typed, and task-level unknown fields are rejected."
+          },
+          {
+            "capsule_id": "to-do-schema",
+            "category": "dependency",
+            "id": "to-do-schema-dependency-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.schema.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "to-do.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "to-do.schema.json",
+              "to-do.json"
+            ],
+            "text": "The supporting `to-do.json` snapshot uses `schema_version: 1`, `project`, `source_files`, and `tasks`, showing that this schema governs the repository's active backlog artifact."
+          }
+        ],
+        "constraints": [
+          "Use JSON Schema draft 2020-12 semantics with `schema_version` fixed to `1`.",
+          "Keep `additionalProperties: false` at the root, `project`, and task object levels.",
+          "Keep task `priority` bounded to integers 1 through 5 and task `status` bounded to `todo|doing|blocked|done`."
+        ],
+        "decision": {
+          "rationale": "The full schema snapshot defines the closed backlog contract, and the supporting `to-do.json` snapshot shows it as the live consumer shape.",
+          "statement": "Treat this capsule as the canonical backlog/task schema contract for OutcomeGraph.",
+          "status": "accepted"
+        },
+        "dependencies": [
+          "to-do.schema.json",
+          "to-do.json"
+        ],
+        "errors": [],
+        "goal": "Define the canonical JSON contract for OutcomeGraph backlog/task data so todo documents can be validated and replayed consistently.",
+        "id": "to-do-schema",
+        "invariants": [
+          "A valid backlog document always carries `schema_version`, `source_files`, and `tasks` at the top level.",
+          "`project` remains optional and, when present, only allows `name` and `root` string fields.",
+          "Task metadata collections (`steps`, `blockers`, `tags`, `files`, `depends_on`) remain arrays of strings rather than free-form objects."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "backlog-schema-oracle-gap",
+            "reason": "The payload includes the schema and a truncated consumer example, but it does not include any repository-native schema-validation command or related test hint for this capsule.",
+            "scope": [
+              "to-do.schema.json",
+              "to-do.json"
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.schema.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:b1ed0fe146e9a97f67ed5a1685f1c9ab6211aec14418e5f3aa1ccae042c5cee9",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "to-do.json",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "Backlog JSON schema contract",
+          "to-do.schema.json",
+          "to-do.json"
+        ],
+        "status": "success",
+        "unknowns": [
+          "The supporting `to-do.json` snapshot is truncated, so additional live-task edge cases are not visible in this payload.",
+          "No evidence in the payload shows whether task ID uniqueness is enforced anywhere beyond this schema.",
+          "The schema allows arbitrary strings in `source_files` and task `files`; any repo-relative path policy would have to come from code not included here."
+        ]
+      },
+      {
+        "behavior_claims": [
+          "Recreate the OutcomeGraph Python environment on Python `>=3.11` with the package installed editable from repo root.",
+          "Preserve the direct dependency contract `pydantic>=2,<3` and `typer>=0.24,<1`, resolved here to pinned lock versions.",
+          "Preserve the transitive CLI and validation stack recorded in the lock snapshot so the same runtime surface can be rebuilt."
+        ],
+        "changed_files": [
+          "uv.lock"
+        ],
+        "claims": [
+          {
+            "capsule_id": "uv",
+            "category": "behavior",
+            "id": "uv-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "The lock targets Python `>=3.11` and installs `outcomegraph` version `0.1.0` from editable source `.`."
+          },
+          {
+            "capsule_id": "uv",
+            "category": "behavior",
+            "id": "uv-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "The direct dependency contract is `pydantic>=2,<3` and `typer>=0.24,<1`, resolved in this snapshot to `pydantic 2.12.5` and `typer 0.24.1`."
+          },
+          {
+            "capsule_id": "uv",
+            "category": "dependency",
+            "id": "uv-dependency-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "uv.lock",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "uv.lock"
+            ],
+            "text": "The lock also pins the runtime support stack used by Typer and Pydantic, including `click 8.3.1`, `rich 14.3.3`, `shellingham 1.5.4`, `annotated-doc 0.0.4`, `pydantic-core 2.41.5`, `typing-extensions 4.15.0`, and `typing-inspection 0.4.2`."
+          }
+        ],
+        "constraints": [
+          "Keep `requires-python = \">=3.11\"`.",
+          "Keep `outcomegraph` installed from editable source `.`.",
+          "Keep the direct `requires-dist` specifiers `pydantic>=2,<3` and `typer>=0.24,<1`."
+        ],
+        "decision": {
+          "rationale": "The full `uv.lock` snapshot provides a complete pinned environment contract for the editable OutcomeGraph package and its runtime dependency graph.",
+          "statement": "Treat this capsule as the reproducible Python environment lock for OutcomeGraph.",
+          "status": "accepted"
+        },
+        "dependencies": [
+          "uv.lock",
+          "Python runtime >=3.11",
+          "outcomegraph editable package (.)",
+          "pydantic>=2,<3",
+          "typer>=0.24,<1",
+          "click 8.3.1",
+          "rich 14.3.3",
+          "shellingham 1.5.4",
+          "pydantic-core 2.41.5"
+        ],
+        "errors": [],
+        "goal": "Pin the Python runtime and package resolution needed to recreate the OutcomeGraph editable CLI environment.",
+        "id": "uv",
+        "invariants": [
+          "The editable local package remains `outcomegraph 0.1.0` with direct dependencies on Pydantic and Typer.",
+          "The Pydantic stack remains `pydantic 2.12.5` plus `pydantic-core 2.41.5`, `annotated-types 0.7.0`, `typing-extensions 4.15.0`, and `typing-inspection 0.4.2`.",
+          "The Typer CLI stack remains `typer 0.24.1` plus `click 8.3.1`, `rich 14.3.3`, `shellingham 1.5.4`, `annotated-doc 0.0.4`, `markdown-it-py 4.0.0`, `mdurl 0.1.2`, and `pygments 2.19.2`."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "uv-lock-oracle-gap",
+            "reason": "The payload provides only the final lock snapshot; it does not include a repository-native install, lock-refresh, or test command tied specifically to this capsule.",
+            "scope": [
+              "uv.lock"
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "uv.lock",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "Python runtime and locked package resolution",
+          "uv.lock"
+        ],
+        "status": "success",
+        "unknowns": [
+          "No `pyproject.toml` or previous lock snapshot is included, so the reason this lock changed is unknown.",
+          "The payload does not show any dev/test dependency groups outside the packages present in `uv.lock`.",
+          "The capsule does not include a repository-native verification command proving that this exact lock snapshot was installed or exercised."
+        ]
+      },
+      {
+        "behavior_claims": [
+          "Preserve the end state where worker-produced capsules are compact recreation briefs that state capability, boundary, invariants, dependencies, oracle or oracle-gap reason, and unknowns.",
+          "Preserve the phased refactor sequence: prompt assets, capsule-kind policy, distill input enrichment, distill contract rewrite, apply tightening, replay tightening, evaluation harness, and dogfood/docs.",
+          "Preserve the quality policy that code/test capsules have stricter success bars than doc/config/runtime capsules, while apply keeps evidence gaps honest and replay/oracles serve as proof."
+        ],
+        "changed_files": [
+          "WORKER_CAPSULE_REFACTOR_PLAN.md"
+        ],
+        "claims": [
+          {
+            "capsule_id": "worker_capsule_refactor_plan",
+            "category": "behavior",
+            "id": "worker-plan-behavior-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:f8f62499ecb2a3b74e7470fce93ea0d6363fc3acabfe654019a30eb960f2093c",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "WORKER_CAPSULE_REFACTOR_PLAN.md",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "WORKER_CAPSULE_REFACTOR_PLAN.md"
+            ],
+            "text": "The plan's desired end state is for `.outcomegraph` artifacts to become compact, evidence-backed recreation records rather than snapshot summaries, and it explicitly requires strong capsules to communicate capability, boundary, invariants, dependencies, an acceptance oracle or gap reason, and unknowns."
+          },
+          {
+            "capsule_id": "worker_capsule_refactor_plan",
+            "category": "behavior",
+            "id": "worker-plan-behavior-2",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:f8f62499ecb2a3b74e7470fce93ea0d6363fc3acabfe654019a30eb960f2093c",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "WORKER_CAPSULE_REFACTOR_PLAN.md",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "WORKER_CAPSULE_REFACTOR_PLAN.md"
+            ],
+            "text": "The work is organized into phases 0 through 8 covering prompt assets, capsule-kind classification, distill input enrichment, distill contract rewrite, apply behavior tightening, replay tightening, an evaluation harness, and dogfood/documentation, with whole-refactor acceptance criteria and a recommended execution order."
+          },
+          {
+            "capsule_id": "worker_capsule_refactor_plan",
+            "category": "dependency",
+            "id": "worker-plan-dependency-1",
+            "receipt_pointers": [
+              {
+                "hash": "sha256:f8f62499ecb2a3b74e7470fce93ea0d6363fc3acabfe654019a30eb960f2093c",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "WORKER_CAPSULE_REFACTOR_PLAN.md",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:85fc9ea0d11008a5dfd443bcf39111edbb133056e5ef1a2590be09510e7a836e",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-agent-010/task-plan.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:5920d30153c1e84c3b4f7586e68296662ab0eefe82dd39b560662d224b0666bf",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-agent-012/task-plan.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:cae8cc8306a90efad072d42de07e0ff83647526de169c373c4e25e867d4539e4",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-agent-014/task-plan.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:f3ec9a1833fb9fb3ca58fc41d8a3983cd5bbc078ca5fe91313743d7e25d026a8",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-apply-001/task-plan.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:bea78a6ce4701597e86cb0d96cb1aada5c539481322bbd1e3e996017f5e8007c",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-distill-001/task-plan.json",
+                "type": "file"
+              },
+              {
+                "hash": "sha256:04b138774e272be68e48de063b41e733a6583502195056963abc119675bb672f",
+                "media_type": null,
+                "schema_version": 2,
+                "size": null,
+                "target": "tasks/og-distill-002/task-plan.json",
+                "type": "file"
+              }
+            ],
+            "source_paths": [
+              "WORKER_CAPSULE_REFACTOR_PLAN.md",
+              "tasks/og-agent-010/task-plan.json",
+              "tasks/og-agent-012/task-plan.json",
+              "tasks/og-agent-014/task-plan.json",
+              "tasks/og-apply-001/task-plan.json",
+              "tasks/og-distill-001/task-plan.json",
+              "tasks/og-distill-002/task-plan.json"
+            ],
+            "text": "The downstream task plans for `og-distill-001`, `og-distill-002`, `og-apply-001`, `og-agent-010`, `og-agent-012`, and `og-agent-014` all include `WORKER_CAPSULE_REFACTOR_PLAN.md` in `read_files`, showing that this document is the controlling brief for the workstream and that execution is expected to be validated by focused test/quality commands in those task plans."
+          }
+        ],
+        "constraints": [
+          "Do not store full chat transcripts or mirrored source files as canonical truth in `.outcomegraph`.",
+          "Do not replace the canonical artifact model with prompt text.",
+          "Do not make distill depend on full-repo interactive browsing; inputs must stay bounded and deterministic.",
+          "Keep prompt assets in the main codebase rather than under `.outcomegraph`."
+        ],
+        "decision": {
+          "rationale": "The plan file defines the refactor target, non-goals, phases, and acceptance criteria, and multiple downstream task plans explicitly consume it as required context.",
+          "statement": "Treat this capsule as the controlling roadmap for the worker/capsule recreation-brief refactor.",
+          "status": "accepted"
+        },
+        "dependencies": [
+          "WORKER_CAPSULE_REFACTOR_PLAN.md",
+          "tasks/og-distill-001/task-plan.json",
+          "tasks/og-distill-002/task-plan.json",
+          "tasks/og-apply-001/task-plan.json",
+          "tasks/og-agent-010/task-plan.json",
+          "tasks/og-agent-012/task-plan.json",
+          "tasks/og-agent-014/task-plan.json",
+          "og.py",
+          "tests/test_og_sync_verify_replay_hooks.py",
+          "README.md",
+          "RUNBOOKS.md",
+          "SPEC-v2.md",
+          "to-do.json"
+        ],
+        "errors": [],
+        "goal": "Define the refactor roadmap that turns OutcomeGraph's Codex worker outputs into compact, evidence-backed recreation briefs another agent can use without the full repository or original chat transcript.",
+        "id": "worker_capsule_refactor_plan",
+        "invariants": [
+          "`.outcomegraph` remains the compact canonical artifact store; prompt assets are implementation inputs rather than canonical truth.",
+          "Strong capsules must state capability, boundary, invariants, dependencies, an executable oracle or explicit oracle gap, and unknowns.",
+          "Code and test capsules must satisfy a stricter success bar than doc, config, and runtime capsules.",
+          "Apply should preserve evidence gaps rather than promote weak outputs, and replay/executable oracles are the proof path for recreation quality.",
+          "Dogfood in this repository is the primary acceptance benchmark for the refactor."
+        ],
+        "lineage": {
+          "parent_capsule_ids": []
+        },
+        "oracles": [
+          {
+            "command": null,
+            "name": "worker-plan-oracle-gap",
+            "reason": "The payload shows acceptance criteria and downstream verification commands for related tasks, but it does not include a single repository-native command that validates the plan document and all referenced workstreams end to end.",
+            "scope": [
+              "WORKER_CAPSULE_REFACTOR_PLAN.md",
+              "tasks/og-agent-010/task-plan.json",
+              "tasks/og-agent-012/task-plan.json",
+              "tasks/og-agent-014/task-plan.json",
+              "tasks/og-apply-001/task-plan.json",
+              "tasks/og-distill-001/task-plan.json",
+              "tasks/og-distill-002/task-plan.json"
+            ]
+          }
+        ],
+        "receipts": [
+          {
+            "hash": "sha256:f8f62499ecb2a3b74e7470fce93ea0d6363fc3acabfe654019a30eb960f2093c",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "WORKER_CAPSULE_REFACTOR_PLAN.md",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:85fc9ea0d11008a5dfd443bcf39111edbb133056e5ef1a2590be09510e7a836e",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-agent-010/task-plan.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:5920d30153c1e84c3b4f7586e68296662ab0eefe82dd39b560662d224b0666bf",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-agent-012/task-plan.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:cae8cc8306a90efad072d42de07e0ff83647526de169c373c4e25e867d4539e4",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-agent-014/task-plan.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:f3ec9a1833fb9fb3ca58fc41d8a3983cd5bbc078ca5fe91313743d7e25d026a8",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-apply-001/task-plan.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:bea78a6ce4701597e86cb0d96cb1aada5c539481322bbd1e3e996017f5e8007c",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-distill-001/task-plan.json",
+            "type": "file"
+          },
+          {
+            "hash": "sha256:04b138774e272be68e48de063b41e733a6583502195056963abc119675bb672f",
+            "media_type": null,
+            "schema_version": 2,
+            "size": null,
+            "target": "tasks/og-distill-002/task-plan.json",
+            "type": "file"
+          }
+        ],
+        "scope": [
+          "Worker/capsule refactor roadmap and task-plan continuity",
+          "WORKER_CAPSULE_REFACTOR_PLAN.md",
+          "tasks/og-agent-010/task-plan.json",
+          "tasks/og-agent-012/task-plan.json",
+          "tasks/og-agent-014/task-plan.json",
+          "tasks/og-apply-001/task-plan.json",
+          "tasks/og-distill-001/task-plan.json",
+          "tasks/og-distill-002/task-plan.json"
+        ],
+        "status": "success",
+        "unknowns": [
+          "Only a subset of the workstream task artifacts is present in scope; task artifacts for `OG-PROMPT-001`, `OG-PROMPT-002`, `OG-CAPSULE-001`, `OG-REPLAY-003`, `OG-EVAL-001`, `OG-DOGFOOD-001`, and `OG-DOC-003` are not included here.",
+          "The payload does not include `og.py`, tests, docs, or `.outcomegraph` outputs, so implementation conformance to the plan cannot be verified from this input alone.",
+          "The plan requires a new top-level prompt asset directory, but the provided scope does not name its final path."
+        ]
+      }
+    ],
+    "interface_version": 1,
+    "run_id": "sync-20260307T152510Z-ef16c2ddd5",
+    "schema_version": 2
+  },
+  "prompt_provenance": {
+    "id": "worker-distill",
+    "source_path": "prompts/workers/distill-v1.txt",
+    "version": "1.0.1"
+  },
+  "role": "distill",
+  "schema_version": 2
+}

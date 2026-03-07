@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "command": "status",
+  "status": "warn",
+  "run_id": null,
+  "session_id": null,
+  "data": {
+    "status_schema_version": 1,
+    "status": "warn",
+    "command": "status",
+    "options": {
+      "changed": false,
+      "profile": null,
+      "mode": null,
+      "force_hooks_path": false,
+      "force_full_sync": false,
+      "output_mode": "json",
+      "output_json": true,
+      "strict": false,
+      "non_interactive": false,
+      "validate": false,
+      "dry_run": false,
+      "max_retries": 0,
+      "timeout": null,
+      "configuration": {
+        "config_file": ".outcomegraph/config.yaml",
+        "config_source": "built-in",
+        "policy_file": ".outcomegraph/policy.yaml",
+        "policy_source": "config:.outcomegraph/config.yaml",
+        "codex_home": null,
+        "resolved_from": {
+          "output_mode": "flag:--json"
+        }
+      }
+    },
+    "generated_at": "2026-03-07T16:03:53Z",
+    "message": "status dashboard indicates warnings",
+    "issues": [
+      {
+        "type": "unknown_verification",
+        "message": "no sync or replay summary available"
+      },
+      {
+        "type": "unknown_certificates",
+        "message": "certificate scope is empty"
+      },
+      {
+        "type": "drift_error",
+        "message": "policy/certificate drift checks failed"
+      }
+    ],
+    "freshness": {
+      "sync": {
+        "state": "unknown",
+        "status": "unknown",
+        "run_id": null,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "message": "no sync summary available",
+        "threshold_seconds": 3600
+      },
+      "certificates": {
+        "state": "unknown",
+        "count": 0,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "newest": null,
+        "oldest": null,
+        "message": "certificate scope is empty",
+        "paths": [],
+        "stale_threshold_seconds": 86400
+      },
+      "message": "sync=unknown, certificates=unknown"
+    },
+    "drift": {
+      "status_schema_version": 1,
+      "state": "error",
+      "status": "error",
+      "checks": [
+        {
+          "type": "stale_certificates",
+          "status": "error",
+          "message": "certificate scope is empty",
+          "remediation": [
+            "Run `og sync` to regenerate current certificates.",
+            "Check `.outcomegraph/events` for prior sync summary failures."
+          ],
+          "details": {
+            "state": "unknown",
+            "count": 0,
+            "age_seconds": null
+          },
+          "errors": [
+            {
+              "error_class": "runtime",
+              "error_code": "RUNTIME_ERROR",
+              "message": "certificate scope is empty",
+              "retryable": false,
+              "hint": "Retry only after correcting the underlying runtime issue."
+            }
+          ]
+        },
+        {
+          "type": "export_control_surface",
+          "status": "warn",
+          "message": "Exported control surfaces are out of sync with canonical artifacts.",
+          "remediation": [
+            "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+            "Re-run `og sync` after fixing canonical artifact path/type or payload errors."
+          ],
+          "details": {
+            "total_artifacts": 2,
+            "issues": [
+              {
+                "path": ".outcomegraph/export/AGENTS.md",
+                "type": "missing",
+                "generated_hash": "sha256:977082036e61b8af13443f51def0d77095928ed3b1027cb82c26c9613d0260fc"
+              },
+              {
+                "path": ".outcomegraph/export/README_OUTCOMES.md",
+                "type": "missing",
+                "generated_hash": "sha256:358d210056045677289a7498964dcdde3824a0a84a6fdd8566eb4418c72a9452"
+              },
+              {
+                "path": ".outcomegraph/export/mcp-resources.json",
+                "type": "missing",
+                "generated_hash": "sha256:98f2bdb2691cb68fddd95cf1c58d8cd3e85f7edb0c70f1742f4dafbb9e11f1f1"
+              },
+              {
+                "path": "skills/outcome-steward/SKILL.md",
+                "type": "missing",
+                "generated_hash": "sha256:3def38e1ee98e29f8d47c3ccd9210bb8a2646f4da31ada61a35ef35285399331"
+              }
+            ]
+          }
+        }
+      ],
+      "remediation": [
+        "Check `.outcomegraph/events` for prior sync summary failures.",
+        "Re-run `og sync` after fixing canonical artifact path/type or payload errors.",
+        "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+        "Run `og sync` to regenerate current certificates."
+      ],
+      "certificates": {
+        "state": "unknown",
+        "count": 0,
+        "age_seconds": null,
+        "age_human": "unknown",
+        "newest": null,
+        "oldest": null,
+        "message": "certificate scope is empty",
+        "paths": [],
+        "stale_threshold_seconds": 86400
+      },
+      "policy": {
+        "path": ".outcomegraph/policy.yaml",
+        "present": true,
+        "status": "ok",
+        "message": "policy file validated",
+        "checks": [],
+        "policy": {
+          "schema_version": 2,
+          "mode": "observe",
+          "policy_id": "observe-default-v1",
+          "allow": {
+            "file_writes": [
+              ".outcomegraph/**",
+              "export/**",
+              "skills/outcome-steward/**",
+              "AGENTS.md",
+              "CONTEXT.md"
+            ],
+            "verify_commands": [
+              "npm test --listTests",
+              "npm test",
+              "go test ./...",
+              "pytest -q"
+            ],
+            "sandbox_operations": [
+              "create_isolated_worktree",
+              "read_repo_state",
+              "read_artifacts"
+            ]
+          },
+          "deny": {
+            "file_writes": [
+              "src/**",
+              "lib/**",
+              "app/**",
+              "packages/**"
+            ],
+            "network": [
+              "unrestricted"
+            ],
+            "dependencies": [
+              "npm install",
+              "pip install",
+              "cargo add",
+              "go mod tidy"
+            ],
+            "deployment": [
+              "push",
+              "git commit --amend",
+              "github pr create",
+              "gha workflow_dispatch"
+            ]
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "warn": 0
+        },
+        "parsed": {
+          "schema_version": "2",
+          "created_at": "2026-03-07T16:03:53Z",
+          "name": "observe-policy",
+          "mode": "observe",
+          "allow": {
+            "file_writes": [
+              ".outcomegraph/**",
+              "export/**",
+              "skills/outcome-steward/**",
+              "AGENTS.md",
+              "CONTEXT.md"
+            ],
+            "verify_commands": [
+              "npm test --listTests",
+              "npm test",
+              "go test ./...",
+              "pytest -q"
+            ],
+            "sandbox_operations": [
+              "create_isolated_worktree",
+              "read_repo_state",
+              "read_artifacts"
+            ]
+          },
+          "deny": {
+            "file_writes": [
+              "src/**",
+              "lib/**",
+              "app/**",
+              "packages/**"
+            ],
+            "network": [
+              "unrestricted"
+            ],
+            "dependencies": [
+              "npm install",
+              "pip install",
+              "cargo add",
+              "go mod tidy"
+            ],
+            "deployment": [
+              "push",
+              "git commit --amend",
+              "github pr create",
+              "gha workflow_dispatch"
+            ]
+          }
+        }
+      },
+      "latest_event": null,
+      "errors": [
+        {
+          "error_class": "runtime",
+          "error_code": "RUNTIME_ERROR",
+          "message": "status dashboard indicates warnings",
+          "retryable": false,
+          "hint": "Retry only after correcting the underlying runtime issue."
+        }
+      ]
+    },
+    "integrity": {
+      "state": "ok",
+      "status": "ok",
+      "message": "integrity ledger has no events yet",
+      "valid": true,
+      "event_count": 0,
+      "event_sequence": 0,
+      "event_hash": null,
+      "checkpoint": null
+    },
+    "verification": {
+      "state": "unknown",
+      "status": "unknown",
+      "run_id": null,
+      "age_seconds": null,
+      "age_human": "unknown",
+      "message": "no sync or replay summary available",
+      "steps": [],
+      "threshold_seconds": 86400
+    },
+    "remediation": [
+      "Check `.outcomegraph/events` for prior sync summary failures.",
+      "Re-run `og sync` after fixing canonical artifact path/type or payload errors.",
+      "Run `og export` to regenerate AGENTS/skill/MCP control-surface outputs from canonical artifacts.",
+      "Run `og sync` to regenerate current certificates."
+    ],
+    "runtime": {
+      "status": "initialized",
+      "pending": false,
+      "pending_source": null,
+      "pending_file": {
+        "present": false,
+        "source": null
+      },
+      "last_message": null,
+      "lock": {
+        "status": "unlocked",
+        "age_human": "0s",
+        "holder": null,
+        "session": null
+      },
+      "message": "runtime is idle"
+    },
+    "agent_reliability": {
+      "schema_version": 1,
+      "tracked_at": "2026-03-07T16:03:53Z",
+      "status": "ok",
+      "message": "collecting more observations for: retry_auto_recovery_rate, session_churn",
+      "warn_metrics": [],
+      "unknown_metrics": [
+        "retry_auto_recovery_rate",
+        "session_churn"
+      ],
+      "totals": {
+        "commands": 3,
+        "successful_tasks": 2,
+        "schema_valid_outputs": 3,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "resumable_session_starts": 0,
+        "resumable_session_reuses": 0,
+        "resumable_session_rotations": 0
+      },
+      "current": {
+        "commands_since_successful_task": 1
+      },
+      "latest_command": {
+        "command": "status",
+        "subcommand": null,
+        "status": "warn",
+        "observed_at": "2026-03-07T16:03:53Z",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_transition": "none",
+        "commands_since_successful_task": 1
+      },
+      "commands_per_successful_task": {
+        "value": 1.5,
+        "units": "commands/task",
+        "direction": "lower_is_better",
+        "status": "ok",
+        "total_commands": 3,
+        "successful_tasks": 2
+      },
+      "schema_valid_output_rate": {
+        "value": 1.0,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "ok",
+        "valid_outputs": 3,
+        "total_outputs": 3
+      },
+      "retry_auto_recovery_rate": {
+        "value": null,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "unknown",
+        "retryable_operations": 0,
+        "recovered_operations": 0
+      },
+      "session_churn": {
+        "value": null,
+        "units": "ratio",
+        "direction": "lower_is_better",
+        "status": "unknown",
+        "tracked_session_kinds": [
+          "autopilot",
+          "daemon"
+        ],
+        "session_starts": 0,
+        "reused_sessions": 0,
+        "rotated_sessions": 0,
+        "repeat_observations": 0
+      }
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "agent_reliability": {
+      "observation": {
+        "observed_at": "2026-03-07T16:03:53Z",
+        "command": "status",
+        "subcommand": null,
+        "status": "warn",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_tracked": false,
+        "session_transition": "none",
+        "commands_since_successful_task": 1
+      },
+      "snapshot": {
+        "schema_version": 1,
+        "tracked_at": "2026-03-07T16:03:53Z",
+        "status": "ok",
+        "message": "collecting more observations for: retry_auto_recovery_rate, session_churn",
+        "warn_metrics": [],
+        "unknown_metrics": [
+          "retry_auto_recovery_rate",
+          "session_churn"
+        ],
+        "totals": {
+          "commands": 3,
+          "successful_tasks": 2,
+          "schema_valid_outputs": 3,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "resumable_session_starts": 0,
+          "resumable_session_reuses": 0,
+          "resumable_session_rotations": 0
+        },
+        "current": {
+          "commands_since_successful_task": 1
+        },
+        "latest_command": {
+          "command": "status",
+          "subcommand": null,
+          "status": "warn",
+          "observed_at": "2026-03-07T16:03:53Z",
+          "successful_task": false,
+          "schema_valid_output": true,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "session_kind": null,
+          "session_id": null,
+          "session_transition": "none",
+          "commands_since_successful_task": 1
+        },
+        "commands_per_successful_task": {
+          "value": 1.5,
+          "units": "commands/task",
+          "direction": "lower_is_better",
+          "status": "ok",
+          "total_commands": 3,
+          "successful_tasks": 2
+        },
+        "schema_valid_output_rate": {
+          "value": 1.0,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "ok",
+          "valid_outputs": 3,
+          "total_outputs": 3
+        },
+        "retry_auto_recovery_rate": {
+          "value": null,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "unknown",
+          "retryable_operations": 0,
+          "recovered_operations": 0
+        },
+        "session_churn": {
+          "value": null,
+          "units": "ratio",
+          "direction": "lower_is_better",
+          "status": "unknown",
+          "tracked_session_kinds": [
+            "autopilot",
+            "daemon"
+          ],
+          "session_starts": 0,
+          "reused_sessions": 0,
+          "rotated_sessions": 0,
+          "repeat_observations": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "durations_ms": {
+    "0": 669317,
+    "1": 309135,
+    "2": 272589,
+    "3": 286166,
+    "4": 287057,
+    "5": 274837,
+    "6": 341577,
+    "7": 413594,
+    "9": 308328
+  },
+  "missing_batches": [
+    "8"
+  ],
+  "notes": [
+    "batch 8 never wrote input/result artifacts before the run was cancelled",
+    "dogfood-sync.json stayed zero bytes and no terminal sync summary was emitted"
+  ],
+  "present_batches": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "9"
+  ],
+  "repo_root": "/tmp/outcomegraph-dogfood-ralf-i4rj",
+  "run_id_prefix": "sync-20260307t160354z-ef16c2ddd5"
+}

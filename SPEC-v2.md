@@ -1110,8 +1110,16 @@ allow:
   verify_commands:
     - "npm test --listTests"
     - "npm test"
+    - "npm test*"
     - "go test ./..."
+    - "go test ./...*"
     - "pytest -q"
+    - "pytest -q*"
+    - "uv run --with pytest --no-project pytest -q*"
+    - "uv run --with pytest pytest -q*"
+    - "uv run pytest -q*"
+    - "python -m unittest -q*"
+    - "python3 -m unittest -q*"
   sandbox_operations:
     - create_isolated_worktree
     - read_repo_state

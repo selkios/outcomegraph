@@ -1495,7 +1495,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T12:09:18Z"
+      "updated_at": "2026-03-07T12:17:22Z"
     },
     {
       "id": "OG-AGENT-013",
@@ -1520,14 +1520,14 @@
         "OG-AGENT-004"
       ],
       "files": [
+        ".outcomegraph/export/mcp-resources.json",
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "SPEC-v2.md",
         "og.py",
         "tests/test_cli_mcp_contracts.py",
-        "SPEC-v2.md",
-        "AGENT_FIRST_CLI_REVIEW.md",
-        ".outcomegraph/export/mcp-resources.json",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T13:07:00Z",
+      "updated_at": "2026-03-07T13:08:57Z",
       "blockers": []
     },
     {
@@ -1555,17 +1555,17 @@
         "OG-AGENT-010"
       ],
       "files": [
-        "og.py",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
-        "AGENT_FIRST_CLI_REVIEW.md",
-        "tests/test_og_sync_verify_replay_hooks.py",
+        "og.py",
         "tasks/og-agent-014/TASK.md",
         "tasks/og-agent-014/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T13:19:03Z"
+      "updated_at": "2026-03-07T13:22:24Z"
     },
     {
       "id": "OG-PROD-001",
@@ -1972,19 +1972,19 @@
         "OG-REPLAY-002"
       ],
       "files": [
+        "RUNBOOKS.md",
+        "SPEC-v2.md",
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
         "prompts/workers/manifest.json",
         "prompts/workers/replay-v1.txt",
-        "tests/test_og_sync_verify_replay_hooks.py",
-        "RUNBOOKS.md",
-        "SPEC-v2.md",
         "tasks/og-replay-003/TASK.md",
         "tasks/og-replay-003/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T11:48:16Z"
+      "updated_at": "2026-03-07T11:53:41Z"
     },
     {
       "id": "OG-EVAL-001",
@@ -2012,21 +2012,21 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_capsule_quality_eval.py",
         "skills/og-quality-pass/SKILL.md",
         "tasks/og-eval-001/TASK.md",
         "tasks/og-eval-001/task-plan.json",
+        "tests/test_capsule_quality_eval.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T11:24:50Z"
+      "updated_at": "2026-03-07T11:28:38Z"
     },
     {
       "id": "OG-DOGFOOD-001",
       "title": "Dogfood the refactor with a clean full-repo rebuild and capsule review",
       "priority": 2,
-      "status": "blocked",
-      "details": "Phase 8 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: validate the new prompt system and capsule-quality rules with `og clean`, `og init`, and a full live sync on this repository.",
+      "status": "doing",
+      "details": "Added size-aware bootstrap distill batching and regression coverage, but dogfood remains blocked: the direct repo rerun is still usage-limited, the first corrected clean-clone rerun failed verify on bare uv run pytest oracles, and the second corrected rerun serialized distill to batches 0-3 before the source baseline drifted again.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 8 and run a clean bootstrap plus full sync/review loop against this repo after the refactor lands",
         "Review target capsules called out in the plan (`og`, `tests`, `runbooks`, `spec-v2`, and `uv`) for recreation quality, executable oracle coverage, and stale-doc contradictions",
@@ -2043,30 +2043,24 @@
         "OG-EVAL-001"
       ],
       "files": [
-        ".outcomegraph",
-        ".outcomegraph/events/dogfood-drift.txt",
-        ".outcomegraph/events/dogfood-replay.json",
-        ".outcomegraph/events/dogfood-status-final.json",
-        ".outcomegraph/events/dogfood-status.json",
-        ".outcomegraph/events/dogfood-sync.json",
-        ".outcomegraph/events/dogfood-verify.json",
-        "README.md",
-        "RUNBOOKS.md",
+        ".outcomegraph/events/sync-20260307T151022Z-df8698e4e8.json",
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
-        "skills/outcome-steward/SKILL.md",
+        "og.py",
+        "skills/og-dogfood/scripts/run_dogfood.sh",
         "tasks/og-dogfood-001/TASK.md",
+        "tasks/og-dogfood-001/evidence/clean-clone-corrected-review.md",
+        "tasks/og-dogfood-001/evidence/clean-clone-corrected-trace-summary.json",
         "tasks/og-dogfood-001/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T11:12:41Z",
+      "updated_at": "2026-03-07T17:52:35Z",
       "blockers": [
-        "`dogfood-replay.json` remains `status: \"error\"`; the first actionable replay traces are `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-config-replay-step-0.json` (`/bin/sh: 1: set: Illegal option -o pipefail`) and `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-og-replay-step-1.json` (`/bin/sh: 1: ./og: not found`).",
-        "`dogfood-status.json` remains `status: \"warn\"` and `dogfood-drift.txt` remains `drift: warn` after the failed replay, while `RUNBOOKS.md` and `QUICKSTART.md` still mention the resolved `materials.lock` migration blocker.",
-        "`dogfood-sync.json` remains `status: \"warn\"` because the reviewed target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`) still resolve to warn-only capsules without executable oracle commands.",
-        "dogfood-replay.json remains status=error; replay traces show `/bin/sh: 1: set: Illegal option -o pipefail` in `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-config-replay-step-0.json` and `/bin/sh: 1: ./og: not found` in `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-og-replay-step-1.json`.",
-        "dogfood-status.json remains status=warn and dogfood-drift.txt remains drift=warn after the failed replay, while RUNBOOKS.md and QUICKSTART.md still mention the resolved materials.lock migration blocker.",
-        "dogfood-sync.json remains status=warn because the reviewed target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`) still resolve to warn-only capsules without executable oracle commands."
+        "Direct repo reruns are still externally rate-limited: .outcomegraph/events/sync-20260307T151022Z-df8698e4e8.json fails before distill with a Codex usage-limit error.",
+        "The first corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve failed verify because clone-generated oracles still used bare uv run pytest, and the clean-clone runtime could not spawn pytest.",
+        "The second corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve advanced only through distill batches 0-3 in about 25 minutes, with dogfood-sync.json still at 0 bytes and no terminal sync envelope.",
+        "The workspace copy of og.py drifted during the second rerun while the clean clone stayed on an older hash, so the dogfood source baseline was no longer stable enough for acceptance-quality capsule review."
       ]
     },
     {
@@ -2091,17 +2085,17 @@
         "OG-DOGFOOD-001"
       ],
       "files": [
-        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "ARCHITECTURE.md",
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
-        "ARCHITECTURE.md",
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "tasks/og-doc-003/TASK.md",
         "tasks/og-doc-003/task-plan.json",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T13:29:55Z"
+      "updated_at": "2026-03-07T13:32:13Z"
     }
   ]
 }

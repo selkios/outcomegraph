@@ -1,0 +1,89 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "skill-og",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-skill-og-5deaa0528a.json"
+  ],
+  "created_at": "2026-03-07T21:34:18Z",
+  "id": "cert-skill-og-5deaa0528a",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:fd591bc7d2399ecf79df87fd8b9a1381125277f946c76d278672f60cead1e857",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 698,
+      "target": ".outcomegraph/traces/skill-og-verify-20260307t213332z-6b48f02177-documentation-oracle-from-skills-og-skill-md-for-og-command-s-9a30ea9a54-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:fd591bc7d2399ecf79df87fd8b9a1381125277f946c76d278672f60cead1e857",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 698,
+      "target": "sha256:fd591bc7d2399ecf79df87fd8b9a1381125277f946c76d278672f60cead1e857",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:efde9ebf23898c9ded09a845a495d25f7a21fb7e27e1f972e813a3d2d10e5fad",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 770,
+      "target": ".outcomegraph/traces/skill-og-verify-20260307t213332z-6b48f02177-entrypoint-and-runtime-path-oracle-from-og-and-og-py--the-pay-364671dae5-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:efde9ebf23898c9ded09a845a495d25f7a21fb7e27e1f972e813a3d2d10e5fad",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 770,
+      "target": "sha256:efde9ebf23898c9ded09a845a495d25f7a21fb7e27e1f972e813a3d2d10e5fad",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:49a6645b29dd657c3e1a92e6aa28066f8824789a19911c6d7ccbb9584f927106",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 726,
+      "target": ".outcomegraph/traces/skill-og-verify-20260307t213332z-6b48f02177-filesystem-topology-oracle-from--outcomegraph-snapshots--dire-7368710f90-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:49a6645b29dd657c3e1a92e6aa28066f8824789a19911c6d7ccbb9584f927106",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 726,
+      "target": "sha256:49a6645b29dd657c3e1a92e6aa28066f8824789a19911c6d7ccbb9584f927106",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:5d6c78e4c62d1351f4baf219052daecf5d09c63ff0d99a34898f0a0bf2da1526",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 747,
+      "target": ".outcomegraph/traces/skill-og-verify-20260307t213332z-6b48f02177-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:5d6c78e4c62d1351f4baf219052daecf5d09c63ff0d99a34898f0a0bf2da1526",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 747,
+      "target": "sha256:5d6c78e4c62d1351f4baf219052daecf5d09c63ff0d99a34898f0a0bf2da1526",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260307T213332Z-6b48f02177",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260307T213332Z-6b48f02177",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-07T21:34:18Z"
+}

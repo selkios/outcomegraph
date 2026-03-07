@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "runtime",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-runtime-e8bfbe8b05.json"
+  ],
+  "created_at": "2026-03-07T21:34:02Z",
+  "id": "cert-runtime-e8bfbe8b05",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:3737ac66cc1e620eaa0a2ccd05993a6922a9c5112bb32ea9b478331d589ee1ca",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 819,
+      "target": ".outcomegraph/traces/runtime-verify-20260307t213332z-6b48f02177-no-executable-oracle-was-supplied-in-evidence--verify-the-roo-44e4f5dbec-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:3737ac66cc1e620eaa0a2ccd05993a6922a9c5112bb32ea9b478331d589ee1ca",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 819,
+      "target": "sha256:3737ac66cc1e620eaa0a2ccd05993a6922a9c5112bb32ea9b478331d589ee1ca",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:876efc985ccc55a333c92ff3903cd41ca5be1306f51d7e2c756a8cd7fd29c2e4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 887,
+      "target": ".outcomegraph/traces/runtime-verify-20260307t213332z-6b48f02177-no-executable-oracle-was-supplied-in-evidence--verify-retaine-21c939f8ac-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:876efc985ccc55a333c92ff3903cd41ca5be1306f51d7e2c756a8cd7fd29c2e4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 887,
+      "target": "sha256:876efc985ccc55a333c92ff3903cd41ca5be1306f51d7e2c756a8cd7fd29c2e4",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260307T213332Z-6b48f02177",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260307T213332Z-6b48f02177",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-07T21:34:02Z"
+}

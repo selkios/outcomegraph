@@ -1,0 +1,3 @@
+[console_scripts]
+og = og:og_cli
+ogd = og:ogd_cli

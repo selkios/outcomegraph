@@ -2,7 +2,7 @@
 
 Generated for task `OG-SPEC-001` from `SPEC-v2.md`.
 
-Last updated: 2026-03-05
+Last updated: 2026-03-07
 
 Legend:
 - `implemented`: Requirement is enforced and/or tested in the current implementation.
@@ -13,10 +13,10 @@ Legend:
 
 | Requirement | Status | Owners | Acceptance check (for release/readiness) |
 | --- | --- | --- | --- |
-| §7: "Every canonical artifact must include `schema_version: 2`, `artifact_type`, `id`, and timestamps." | partial | `SPEC-v2.md` (design), `og.py` (artifact bootstrap payloads and schema constants), `.outcomegraph/` examples | Add a conformance test that enumerates canonical objects and fails when any required metadata is missing. Pass: zero violations across `capsules/`, `refs/`, `decisions/`, `claims/`, `certificates/`, and policy/config manifests. |
-| §7: "Every claim must resolve to at least one receipt pointer." | partial | `SPEC-v2.md` (requirement), `og.py` (claim generation templates) | Add a test over `claims/*.yaml` asserting `receipt_pointers` exists and has at least one entry. Pass: no empty/absent `receipt_pointers`. |
-| §7.8: "All mutation commands must validate `schema_version` before writing" (including unsupported/missing, mixed-version hard errors, and explicit migration path) | partial | `og.py` (schema parsing and validation paths), `tests/test_og_sync_verify_replay_hooks.py` | Add/extend integration tests for write operations and invalid schema versions/types. Pass: invalid `schema_version` inputs are rejected with remediation and no partial writes. |
-| §7.8: "Legacy (`1`) artifacts unsupported by default; no silent auto-upgrade." | partial | `SPEC-v2.md`, `og.py` (schema handling utilities) | Add explicit regression test for legacy artifact write/upgrade behavior. Pass: legacy-version inputs are rejected unless migration task is explicit. |
+| §7: "Every canonical artifact must include `schema_version: 2`, `artifact_type`, `id`, and timestamps." | implemented | `SPEC-v2.md` (design), `og.py` (canonical artifact validation), `tests/test_og_sync_verify_replay_hooks.py` | Enforced by `_validate_canonical_artifact_records` and covered by `TestSpecComplianceGates` metadata regression tests. |
+| §7: "Every claim must resolve to at least one receipt pointer." | implemented | `SPEC-v2.md` (requirement), `og.py` (canonical artifact validation + claim builders), `tests/test_og_sync_verify_replay_hooks.py` | Enforced by canonical validation and covered by `test_validate_canonical_artifacts_rejects_claim_without_receipt_pointer`. |
+| §7.8: "All mutation commands must validate `schema_version` before writing" (including unsupported/missing, mixed-version hard errors, and explicit migration path) | implemented | `og.py` (apply/verify/replay canonical pre-write checks), `tests/test_og_sync_verify_replay_hooks.py` | Covered by no-partial-write regressions for apply/verify/replay legacy-canonical inputs in `TestSpecComplianceGates`. |
+| §7.8: "Legacy (`1`) artifacts unsupported by default; no silent auto-upgrade." | implemented | `SPEC-v2.md`, `og.py` (canonical validation), `tests/test_og_sync_verify_replay_hooks.py` | Covered by `test_validate_canonical_artifacts_rejects_non_version_two_schema` and stage-level legacy rejection tests before artifact writes. |
 
 ## 8) Runtime and lock behavior
 

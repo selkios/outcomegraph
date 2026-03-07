@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "skill-og-quality-pass",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-skill-og-quality-pass-9319a9582f.json"
+  ],
+  "created_at": "2026-03-07T21:34:18Z",
+  "id": "cert-skill-og-quality-pass-9319a9582f",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:7bdc405bb54a54506d56c7e69bc0e8e7e7cd913d733bf1f8f62a9c3f4a61a8fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 581,
+      "target": ".outcomegraph/traces/skill-og-quality-pass-verify-20260307t213332z-6b48f02177-run-quality-pass-wrapper--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7bdc405bb54a54506d56c7e69bc0e8e7e7cd913d733bf1f8f62a9c3f4a61a8fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 581,
+      "target": "sha256:7bdc405bb54a54506d56c7e69bc0e8e7e7cd913d733bf1f8f62a9c3f4a61a8fd",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260307T213332Z-6b48f02177",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260307T213332Z-6b48f02177",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-07T21:34:18Z"
+}

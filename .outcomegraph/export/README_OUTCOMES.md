@@ -2,12 +2,12 @@
 
 Derived from `.outcomegraph` canonical artifacts at export time.
 
-- Total artifacts observed: 760
+- Total artifacts observed: 812
 
 ## Scope breakdown
 - `capsules`: 26 file(s)
-- `certificates`: 170 file(s)
-- `claims`: 439 file(s)
+- `certificates`: 196 file(s)
+- `claims`: 465 file(s)
 - `constitution`: 1 file(s)
 - `decisions`: 97 file(s)
 - `materials.lock`: 1 file(s)
@@ -45,6 +45,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-agent_first_cli_review-18ce192caf
   - cert-agent_first_cli_review-2a863eb72f
   - cert-agent_first_cli_review-6319e52ebe
+  - cert-agent_first_cli_review-6ce7e3efa8
   - cert-agent_first_cli_review-7325f76973
   - cert-agent_first_cli_review-b67b155a21
   - cert-agent_first_cli_review-e15054b730
@@ -53,9 +54,11 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-agents-7894c1750a
   - cert-agents-a35844eaec
   - cert-agents-ac77398273
+  - cert-agents-dff571c19d
   - cert-agents-e9d7a96ba5
   - cert-architecture-4cbdf16a00
   - cert-architecture-7a66c9373f
+  - cert-architecture-bca7c4c049
   - cert-architecture-bdac60ce06
   - cert-architecture-c18b8ec535
   - cert-architecture-d7f53d9b60
@@ -65,6 +68,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-config-4a16ba6be5
   - cert-config-6024d69b33
   - cert-config-67f3344df2
+  - cert-config-771dbc4a2b
   - cert-config-890e7aa1bf
   - cert-config-8d7d34a940
   - cert-config-c6dba39afe
@@ -84,14 +88,17 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-constitution-a5b2bca2ca
   - cert-constitution-acd719f194
   - cert-constitution-b3f7ad0220
+  - cert-constitution-c083a7a2a2
   - cert-constitution-cd324d38ae
   - cert-constitution-d79d691001
   - cert-materials-43fc58b3d9
   - cert-materials-5bbafc537b
+  - cert-materials-7532c3c4c6
   - cert-migration_guide-21cf1ab76e
   - cert-migration_guide-3e1e09eb53
   - cert-migration_guide-5c003bb573
   - cert-migration_guide-8b64bf7544
+  - cert-migration_guide-b594190335
   - cert-migration_guide-ce1e4e1a96
   - cert-og-0b1095eef7
   - cert-og-164804e1ad
@@ -100,16 +107,19 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-og-558420c477
   - cert-og-5bf1d24e2a
   - cert-og-608af40163
+  - cert-og-7bb0174795
   - cert-og-7db2f167fd
   - cert-og-81363f0748
   - cert-og-aa68f27429
   - cert-og-e9fd6771c4
   - cert-og-eb2ef1c558
+  - cert-ogd-1fecce75c0
   - cert-ogd-55eadb0694
   - cert-ogd-9e3cc0de21
   - cert-ogd-9fd4dd6ceb
   - cert-ogd-d386186452
   - cert-ogd-fff8d985a4
+  - cert-plugin_api-03abeadf9f
   - cert-plugin_api-39aeded405
   - cert-plugin_api-426e6e59e5
   - cert-plugin_api-90657a7b18
@@ -119,6 +129,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-policy-1516cb12a1
   - cert-policy-1a21b9b4dd
   - cert-policy-3d20fc2039
+  - cert-policy-4aef6b2db3
   - cert-policy-5b95f31a79
   - cert-policy-71f781111a
   - cert-policy-74470741ad
@@ -128,6 +139,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-policy-b8730f2149
   - cert-policy-bf56f8bda6
   - cert-policy-db8d4bb091
+  - cert-pyproject-30ebf41bb7
   - cert-pyproject-495d17b874
   - cert-pyproject-60bb1f9dc9
   - cert-pyproject-77b712e599
@@ -136,13 +148,16 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-quickstart-11e4896f70
   - cert-quickstart-834cc48bb5
   - cert-quickstart-8c7a8bcc59
+  - cert-quickstart-a1beec4726
   - cert-quickstart-a7fe7c6771
   - cert-quickstart-c03056c165
   - cert-readme-4b05843a3e
+  - cert-readme-6ad12b9d37
   - cert-readme-74afd0b2ad
   - cert-readme-e26081bedd
   - cert-readme-ef448a832f
   - cert-readme-f35ca11fd4
+  - cert-runbooks-02271d9fb4
   - cert-runbooks-11469af3c6
   - cert-runbooks-8966bd918f
   - cert-runbooks-90f1fefc70
@@ -153,11 +168,14 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-runtime-886fab10d7
   - cert-runtime-de7b7389a3
   - cert-runtime-e851111fb9
+  - cert-runtime-e8bfbe8b05
   - cert-security_policy-1e39ba1434
   - cert-security_policy-302591264a
   - cert-security_policy-576f437bb2
   - cert-security_policy-9943b9b4dd
   - cert-security_policy-d7746ddd8e
+  - cert-security_policy-dd7bc98fac
+  - cert-skill-og-5deaa0528a
   - cert-skill-og-ae7acc5d87
   - cert-skill-og-af106bbddf
   - cert-skill-og-d72995823c
@@ -168,20 +186,24 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-skill-og-dogfood-890e7f3ced
   - cert-skill-og-dogfood-8a62c9d4af
   - cert-skill-og-dogfood-9b386e16e2
+  - cert-skill-og-dogfood-bf27bbe961
   - cert-skill-og-e61dad2d20
   - cert-skill-og-f2feb1cf51
   - cert-skill-og-quality-pass-439a2b907f
   - cert-skill-og-quality-pass-43bd13df1c
   - cert-skill-og-quality-pass-7550f8840f
   - cert-skill-og-quality-pass-7ae2fad8d6
+  - cert-skill-og-quality-pass-9319a9582f
   - cert-skill-og-quality-pass-aae27c68ad
   - cert-spec-v2-3de3a8b2a1
+  - cert-spec-v2-58dcd18184
   - cert-spec-v2-5cc5846f56
   - cert-spec-v2-67f9547dfe
   - cert-spec-v2-9075d584fb
   - cert-spec-v2-dc046b1fae
   - cert-spec_implementation_matrix-36c7b29ddd
   - cert-spec_implementation_matrix-50d67764cf
+  - cert-spec_implementation_matrix-8d36738580
   - cert-spec_implementation_matrix-ab542d7c49
   - cert-spec_implementation_matrix-d4daf5ba11
   - cert-spec_implementation_matrix-fed7a82b46
@@ -194,6 +216,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-tests-5c9cfe36a4
   - cert-tests-5cd5560edc
   - cert-tests-6b3350b851
+  - cert-tests-6efea0bb8a
   - cert-tests-814042905e
   - cert-tests-bfca37fd60
   - cert-tests-cadc7016a5
@@ -201,13 +224,16 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cert-to-do-506860a9be
   - cert-to-do-8fe1c83ef0
   - cert-to-do-93dd13fb36
+  - cert-to-do-adf6d40977
   - cert-to-do-dd7c426c0a
   - cert-to-do-schema-0242e64665
+  - cert-to-do-schema-24d5d66315
   - cert-to-do-schema-468f48cd53
   - cert-to-do-schema-6a6cda5dfd
   - cert-to-do-schema-6b12a89e75
   - cert-to-do-schema-9483bdd09b
   - cert-uv-04f5395bdb
+  - cert-uv-190eda4787
   - cert-uv-1e7a412d93
   - cert-uv-2e45bc9984
   - cert-uv-5463666b8d
@@ -257,16 +283,20 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cl-81f2d6903e
   - cl-9c5669cccf
   - cl-agent_first_cli_review-2a863eb72f
+  - cl-agent_first_cli_review-6ce7e3efa8
   - cl-agent_first_cli_review-b67b155a21
   - cl-agent_first_cli_review-e15054b730
   - cl-agents-4f2d4780ac
   - cl-agents-a35844eaec
   - cl-agents-ac77398273
+  - cl-agents-dff571c19d
   - cl-architecture-4cbdf16a00
   - cl-architecture-7a66c9373f
+  - cl-architecture-bca7c4c049
   - cl-architecture-c18b8ec535
   - cl-config-4a16ba6be5
   - cl-config-67f3344df2
+  - cl-config-771dbc4a2b
   - cl-config-8d7d34a940
   - cl-config-c6dba39afe
   - cl-config-e73849719f
@@ -276,45 +306,62 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cl-constitution-56284bb914
   - cl-constitution-8c93da2e32
   - cl-constitution-a5b2bca2ca
+  - cl-constitution-c083a7a2a2
   - cl-constitution-d79d691001
   - cl-materials-5bbafc537b
+  - cl-materials-7532c3c4c6
   - cl-migration_guide-21cf1ab76e
   - cl-migration_guide-3e1e09eb53
+  - cl-migration_guide-b594190335
   - cl-og-26e000b279
   - cl-og-2bae05cd83
   - cl-og-558420c477
   - cl-og-608af40163
+  - cl-og-7bb0174795
   - cl-og-81363f0748
   - cl-og-df96b34ef8
+  - cl-ogd-1fecce75c0
   - cl-ogd-55eadb0694
   - cl-ogd-9e3cc0de21
+  - cl-plugin_api-03abeadf9f
   - cl-plugin_api-90657a7b18
   - cl-plugin_api-98f3c94b22
   - cl-policy-1516cb12a1
   - cl-policy-3d20fc2039
+  - cl-policy-4aef6b2db3
   - cl-policy-71f781111a
   - cl-policy-74470741ad
   - cl-policy-8c234fb536
   - cl-policy-db8d4bb091
+  - cl-pyproject-30ebf41bb7
   - cl-pyproject-77b712e599
   - cl-pyproject-be6a30a6de
   - cl-quickstart-11e4896f70
   - cl-quickstart-834cc48bb5
+  - cl-quickstart-a1beec4726
   - cl-readme-4b05843a3e
+  - cl-readme-6ad12b9d37
   - cl-readme-f35ca11fd4
+  - cl-runbooks-02271d9fb4
   - cl-runbooks-11469af3c6
   - cl-runbooks-8966bd918f
   - cl-runtime-0476092972
   - cl-runtime-5f0904d546
+  - cl-runtime-e8bfbe8b05
   - cl-security_policy-1e39ba1434
   - cl-security_policy-d7746ddd8e
+  - cl-security_policy-dd7bc98fac
+  - cl-skill-og-5deaa0528a
   - cl-skill-og-af106bbddf
   - cl-skill-og-dogfood-104d0924fd
   - cl-skill-og-dogfood-51887540a6
   - cl-skill-og-dogfood-9b386e16e2
+  - cl-skill-og-dogfood-bf27bbe961
   - cl-skill-og-e61dad2d20
   - cl-skill-og-quality-pass-7550f8840f
   - cl-skill-og-quality-pass-7ae2fad8d6
+  - cl-skill-og-quality-pass-9319a9582f
+  - cl-spec-v2-58dcd18184
   - cl-spec-v2-9075d584fb
   - cl-spec-v2-adapters
   - cl-spec-v2-artifacts
@@ -324,18 +371,23 @@ Derived from `.outcomegraph` canonical artifacts at export time.
   - cl-spec-v2-identities
   - cl-spec-v2-output
   - cl-spec-v2-runtime-policy
+  - cl-spec_implementation_matrix-8d36738580
   - cl-spec_implementation_matrix-ab542d7c49
   - cl-spec_implementation_matrix-d4daf5ba11
   - cl-tests-01ed091969
   - cl-tests-0bb60d5c32
   - cl-tests-5c9cfe36a4
+  - cl-tests-6efea0bb8a
   - cl-tests-814042905e
   - cl-tests-bfca37fd60
   - cl-tests-fd26cf41ef
   - cl-to-do-506860a9be
+  - cl-to-do-adf6d40977
   - cl-to-do-dd7c426c0a
+  - cl-to-do-schema-24d5d66315
   - cl-to-do-schema-6a6cda5dfd
   - cl-to-do-schema-6b12a89e75
+  - cl-uv-190eda4787
   - cl-uv-1e7a412d93
   - cl-uv-5463666b8d
   - claim-1
@@ -813,6 +865,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-agent_first_cli_review-18ce192caf.json` (certificate)
 - `.outcomegraph/certificates/cert-agent_first_cli_review-2a863eb72f.json` (certificate)
 - `.outcomegraph/certificates/cert-agent_first_cli_review-6319e52ebe.json` (certificate)
+- `.outcomegraph/certificates/cert-agent_first_cli_review-6ce7e3efa8.json` (certificate)
 - `.outcomegraph/certificates/cert-agent_first_cli_review-7325f76973.json` (certificate)
 - `.outcomegraph/certificates/cert-agent_first_cli_review-b67b155a21.json` (certificate)
 - `.outcomegraph/certificates/cert-agent_first_cli_review-e15054b730.json` (certificate)
@@ -821,9 +874,11 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-agents-7894c1750a.json` (certificate)
 - `.outcomegraph/certificates/cert-agents-a35844eaec.json` (certificate)
 - `.outcomegraph/certificates/cert-agents-ac77398273.json` (certificate)
+- `.outcomegraph/certificates/cert-agents-dff571c19d.json` (certificate)
 - `.outcomegraph/certificates/cert-agents-e9d7a96ba5.json` (certificate)
 - `.outcomegraph/certificates/cert-architecture-4cbdf16a00.json` (certificate)
 - `.outcomegraph/certificates/cert-architecture-7a66c9373f.json` (certificate)
+- `.outcomegraph/certificates/cert-architecture-bca7c4c049.json` (certificate)
 - `.outcomegraph/certificates/cert-architecture-bdac60ce06.json` (certificate)
 - `.outcomegraph/certificates/cert-architecture-c18b8ec535.json` (certificate)
 - `.outcomegraph/certificates/cert-architecture-d7f53d9b60.json` (certificate)
@@ -833,6 +888,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-config-4a16ba6be5.json` (certificate)
 - `.outcomegraph/certificates/cert-config-6024d69b33.json` (certificate)
 - `.outcomegraph/certificates/cert-config-67f3344df2.json` (certificate)
+- `.outcomegraph/certificates/cert-config-771dbc4a2b.json` (certificate)
 - `.outcomegraph/certificates/cert-config-890e7aa1bf.json` (certificate)
 - `.outcomegraph/certificates/cert-config-8d7d34a940.json` (certificate)
 - `.outcomegraph/certificates/cert-config-c6dba39afe.json` (certificate)
@@ -852,14 +908,17 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-constitution-a5b2bca2ca.json` (certificate)
 - `.outcomegraph/certificates/cert-constitution-acd719f194.json` (certificate)
 - `.outcomegraph/certificates/cert-constitution-b3f7ad0220.json` (certificate)
+- `.outcomegraph/certificates/cert-constitution-c083a7a2a2.json` (certificate)
 - `.outcomegraph/certificates/cert-constitution-cd324d38ae.json` (certificate)
 - `.outcomegraph/certificates/cert-constitution-d79d691001.json` (certificate)
 - `.outcomegraph/certificates/cert-materials-43fc58b3d9.json` (certificate)
 - `.outcomegraph/certificates/cert-materials-5bbafc537b.json` (certificate)
+- `.outcomegraph/certificates/cert-materials-7532c3c4c6.json` (certificate)
 - `.outcomegraph/certificates/cert-migration_guide-21cf1ab76e.json` (certificate)
 - `.outcomegraph/certificates/cert-migration_guide-3e1e09eb53.json` (certificate)
 - `.outcomegraph/certificates/cert-migration_guide-5c003bb573.json` (certificate)
 - `.outcomegraph/certificates/cert-migration_guide-8b64bf7544.json` (certificate)
+- `.outcomegraph/certificates/cert-migration_guide-b594190335.json` (certificate)
 - `.outcomegraph/certificates/cert-migration_guide-ce1e4e1a96.json` (certificate)
 - `.outcomegraph/certificates/cert-og-0b1095eef7.json` (certificate)
 - `.outcomegraph/certificates/cert-og-164804e1ad.json` (certificate)
@@ -868,16 +927,19 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-og-558420c477.json` (certificate)
 - `.outcomegraph/certificates/cert-og-5bf1d24e2a.json` (certificate)
 - `.outcomegraph/certificates/cert-og-608af40163.json` (certificate)
+- `.outcomegraph/certificates/cert-og-7bb0174795.json` (certificate)
 - `.outcomegraph/certificates/cert-og-7db2f167fd.json` (certificate)
 - `.outcomegraph/certificates/cert-og-81363f0748.json` (certificate)
 - `.outcomegraph/certificates/cert-og-aa68f27429.json` (certificate)
 - `.outcomegraph/certificates/cert-og-e9fd6771c4.json` (certificate)
 - `.outcomegraph/certificates/cert-og-eb2ef1c558.json` (certificate)
+- `.outcomegraph/certificates/cert-ogd-1fecce75c0.json` (certificate)
 - `.outcomegraph/certificates/cert-ogd-55eadb0694.json` (certificate)
 - `.outcomegraph/certificates/cert-ogd-9e3cc0de21.json` (certificate)
 - `.outcomegraph/certificates/cert-ogd-9fd4dd6ceb.json` (certificate)
 - `.outcomegraph/certificates/cert-ogd-d386186452.json` (certificate)
 - `.outcomegraph/certificates/cert-ogd-fff8d985a4.json` (certificate)
+- `.outcomegraph/certificates/cert-plugin_api-03abeadf9f.json` (certificate)
 - `.outcomegraph/certificates/cert-plugin_api-39aeded405.json` (certificate)
 - `.outcomegraph/certificates/cert-plugin_api-426e6e59e5.json` (certificate)
 - `.outcomegraph/certificates/cert-plugin_api-90657a7b18.json` (certificate)
@@ -887,6 +949,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-policy-1516cb12a1.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-1a21b9b4dd.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-3d20fc2039.json` (certificate)
+- `.outcomegraph/certificates/cert-policy-4aef6b2db3.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-5b95f31a79.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-71f781111a.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-74470741ad.json` (certificate)
@@ -896,6 +959,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-policy-b8730f2149.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-bf56f8bda6.json` (certificate)
 - `.outcomegraph/certificates/cert-policy-db8d4bb091.json` (certificate)
+- `.outcomegraph/certificates/cert-pyproject-30ebf41bb7.json` (certificate)
 - `.outcomegraph/certificates/cert-pyproject-495d17b874.json` (certificate)
 - `.outcomegraph/certificates/cert-pyproject-60bb1f9dc9.json` (certificate)
 - `.outcomegraph/certificates/cert-pyproject-77b712e599.json` (certificate)
@@ -904,13 +968,16 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-quickstart-11e4896f70.json` (certificate)
 - `.outcomegraph/certificates/cert-quickstart-834cc48bb5.json` (certificate)
 - `.outcomegraph/certificates/cert-quickstart-8c7a8bcc59.json` (certificate)
+- `.outcomegraph/certificates/cert-quickstart-a1beec4726.json` (certificate)
 - `.outcomegraph/certificates/cert-quickstart-a7fe7c6771.json` (certificate)
 - `.outcomegraph/certificates/cert-quickstart-c03056c165.json` (certificate)
 - `.outcomegraph/certificates/cert-readme-4b05843a3e.json` (certificate)
+- `.outcomegraph/certificates/cert-readme-6ad12b9d37.json` (certificate)
 - `.outcomegraph/certificates/cert-readme-74afd0b2ad.json` (certificate)
 - `.outcomegraph/certificates/cert-readme-e26081bedd.json` (certificate)
 - `.outcomegraph/certificates/cert-readme-ef448a832f.json` (certificate)
 - `.outcomegraph/certificates/cert-readme-f35ca11fd4.json` (certificate)
+- `.outcomegraph/certificates/cert-runbooks-02271d9fb4.json` (certificate)
 - `.outcomegraph/certificates/cert-runbooks-11469af3c6.json` (certificate)
 - `.outcomegraph/certificates/cert-runbooks-8966bd918f.json` (certificate)
 - `.outcomegraph/certificates/cert-runbooks-90f1fefc70.json` (certificate)
@@ -921,11 +988,14 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-runtime-886fab10d7.json` (certificate)
 - `.outcomegraph/certificates/cert-runtime-de7b7389a3.json` (certificate)
 - `.outcomegraph/certificates/cert-runtime-e851111fb9.json` (certificate)
+- `.outcomegraph/certificates/cert-runtime-e8bfbe8b05.json` (certificate)
 - `.outcomegraph/certificates/cert-security_policy-1e39ba1434.json` (certificate)
 - `.outcomegraph/certificates/cert-security_policy-302591264a.json` (certificate)
 - `.outcomegraph/certificates/cert-security_policy-576f437bb2.json` (certificate)
 - `.outcomegraph/certificates/cert-security_policy-9943b9b4dd.json` (certificate)
 - `.outcomegraph/certificates/cert-security_policy-d7746ddd8e.json` (certificate)
+- `.outcomegraph/certificates/cert-security_policy-dd7bc98fac.json` (certificate)
+- `.outcomegraph/certificates/cert-skill-og-5deaa0528a.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-ae7acc5d87.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-af106bbddf.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-d72995823c.json` (certificate)
@@ -936,20 +1006,24 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-skill-og-dogfood-890e7f3ced.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-dogfood-8a62c9d4af.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-dogfood-9b386e16e2.json` (certificate)
+- `.outcomegraph/certificates/cert-skill-og-dogfood-bf27bbe961.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-e61dad2d20.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-f2feb1cf51.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-quality-pass-439a2b907f.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-quality-pass-43bd13df1c.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-quality-pass-7550f8840f.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-quality-pass-7ae2fad8d6.json` (certificate)
+- `.outcomegraph/certificates/cert-skill-og-quality-pass-9319a9582f.json` (certificate)
 - `.outcomegraph/certificates/cert-skill-og-quality-pass-aae27c68ad.json` (certificate)
 - `.outcomegraph/certificates/cert-spec-v2-3de3a8b2a1.json` (certificate)
+- `.outcomegraph/certificates/cert-spec-v2-58dcd18184.json` (certificate)
 - `.outcomegraph/certificates/cert-spec-v2-5cc5846f56.json` (certificate)
 - `.outcomegraph/certificates/cert-spec-v2-67f9547dfe.json` (certificate)
 - `.outcomegraph/certificates/cert-spec-v2-9075d584fb.json` (certificate)
 - `.outcomegraph/certificates/cert-spec-v2-dc046b1fae.json` (certificate)
 - `.outcomegraph/certificates/cert-spec_implementation_matrix-36c7b29ddd.json` (certificate)
 - `.outcomegraph/certificates/cert-spec_implementation_matrix-50d67764cf.json` (certificate)
+- `.outcomegraph/certificates/cert-spec_implementation_matrix-8d36738580.json` (certificate)
 - `.outcomegraph/certificates/cert-spec_implementation_matrix-ab542d7c49.json` (certificate)
 - `.outcomegraph/certificates/cert-spec_implementation_matrix-d4daf5ba11.json` (certificate)
 - `.outcomegraph/certificates/cert-spec_implementation_matrix-fed7a82b46.json` (certificate)
@@ -962,6 +1036,7 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-tests-5c9cfe36a4.json` (certificate)
 - `.outcomegraph/certificates/cert-tests-5cd5560edc.json` (certificate)
 - `.outcomegraph/certificates/cert-tests-6b3350b851.json` (certificate)
+- `.outcomegraph/certificates/cert-tests-6efea0bb8a.json` (certificate)
 - `.outcomegraph/certificates/cert-tests-814042905e.json` (certificate)
 - `.outcomegraph/certificates/cert-tests-bfca37fd60.json` (certificate)
 - `.outcomegraph/certificates/cert-tests-cadc7016a5.json` (certificate)
@@ -969,13 +1044,16 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/certificates/cert-to-do-506860a9be.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-8fe1c83ef0.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-93dd13fb36.json` (certificate)
+- `.outcomegraph/certificates/cert-to-do-adf6d40977.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-dd7c426c0a.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-schema-0242e64665.json` (certificate)
+- `.outcomegraph/certificates/cert-to-do-schema-24d5d66315.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-schema-468f48cd53.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-schema-6a6cda5dfd.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-schema-6b12a89e75.json` (certificate)
 - `.outcomegraph/certificates/cert-to-do-schema-9483bdd09b.json` (certificate)
 - `.outcomegraph/certificates/cert-uv-04f5395bdb.json` (certificate)
+- `.outcomegraph/certificates/cert-uv-190eda4787.json` (certificate)
 - `.outcomegraph/certificates/cert-uv-1e7a412d93.json` (certificate)
 - `.outcomegraph/certificates/cert-uv-2e45bc9984.json` (certificate)
 - `.outcomegraph/certificates/cert-uv-5463666b8d.json` (certificate)
@@ -1024,16 +1102,20 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/claims/cl-81f2d6903e.json` (claim)
 - `.outcomegraph/claims/cl-9c5669cccf.json` (claim)
 - `.outcomegraph/claims/cl-agent_first_cli_review-2a863eb72f.json` (claim)
+- `.outcomegraph/claims/cl-agent_first_cli_review-6ce7e3efa8.json` (claim)
 - `.outcomegraph/claims/cl-agent_first_cli_review-b67b155a21.json` (claim)
 - `.outcomegraph/claims/cl-agent_first_cli_review-e15054b730.json` (claim)
 - `.outcomegraph/claims/cl-agents-4f2d4780ac.json` (claim)
 - `.outcomegraph/claims/cl-agents-a35844eaec.json` (claim)
 - `.outcomegraph/claims/cl-agents-ac77398273.json` (claim)
+- `.outcomegraph/claims/cl-agents-dff571c19d.json` (claim)
 - `.outcomegraph/claims/cl-architecture-4cbdf16a00.json` (claim)
 - `.outcomegraph/claims/cl-architecture-7a66c9373f.json` (claim)
+- `.outcomegraph/claims/cl-architecture-bca7c4c049.json` (claim)
 - `.outcomegraph/claims/cl-architecture-c18b8ec535.json` (claim)
 - `.outcomegraph/claims/cl-config-4a16ba6be5.json` (claim)
 - `.outcomegraph/claims/cl-config-67f3344df2.json` (claim)
+- `.outcomegraph/claims/cl-config-771dbc4a2b.json` (claim)
 - `.outcomegraph/claims/cl-config-8d7d34a940.json` (claim)
 - `.outcomegraph/claims/cl-config-c6dba39afe.json` (claim)
 - `.outcomegraph/claims/cl-config-e73849719f.json` (claim)
@@ -1043,45 +1125,62 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/claims/cl-constitution-56284bb914.json` (claim)
 - `.outcomegraph/claims/cl-constitution-8c93da2e32.json` (claim)
 - `.outcomegraph/claims/cl-constitution-a5b2bca2ca.json` (claim)
+- `.outcomegraph/claims/cl-constitution-c083a7a2a2.json` (claim)
 - `.outcomegraph/claims/cl-constitution-d79d691001.json` (claim)
 - `.outcomegraph/claims/cl-materials-5bbafc537b.json` (claim)
+- `.outcomegraph/claims/cl-materials-7532c3c4c6.json` (claim)
 - `.outcomegraph/claims/cl-migration_guide-21cf1ab76e.json` (claim)
 - `.outcomegraph/claims/cl-migration_guide-3e1e09eb53.json` (claim)
+- `.outcomegraph/claims/cl-migration_guide-b594190335.json` (claim)
 - `.outcomegraph/claims/cl-og-26e000b279.json` (claim)
 - `.outcomegraph/claims/cl-og-2bae05cd83.json` (claim)
 - `.outcomegraph/claims/cl-og-558420c477.json` (claim)
 - `.outcomegraph/claims/cl-og-608af40163.json` (claim)
+- `.outcomegraph/claims/cl-og-7bb0174795.json` (claim)
 - `.outcomegraph/claims/cl-og-81363f0748.json` (claim)
 - `.outcomegraph/claims/cl-og-df96b34ef8.json` (claim)
+- `.outcomegraph/claims/cl-ogd-1fecce75c0.json` (claim)
 - `.outcomegraph/claims/cl-ogd-55eadb0694.json` (claim)
 - `.outcomegraph/claims/cl-ogd-9e3cc0de21.json` (claim)
+- `.outcomegraph/claims/cl-plugin_api-03abeadf9f.json` (claim)
 - `.outcomegraph/claims/cl-plugin_api-90657a7b18.json` (claim)
 - `.outcomegraph/claims/cl-plugin_api-98f3c94b22.json` (claim)
 - `.outcomegraph/claims/cl-policy-1516cb12a1.json` (claim)
 - `.outcomegraph/claims/cl-policy-3d20fc2039.json` (claim)
+- `.outcomegraph/claims/cl-policy-4aef6b2db3.json` (claim)
 - `.outcomegraph/claims/cl-policy-71f781111a.json` (claim)
 - `.outcomegraph/claims/cl-policy-74470741ad.json` (claim)
 - `.outcomegraph/claims/cl-policy-8c234fb536.json` (claim)
 - `.outcomegraph/claims/cl-policy-db8d4bb091.json` (claim)
+- `.outcomegraph/claims/cl-pyproject-30ebf41bb7.json` (claim)
 - `.outcomegraph/claims/cl-pyproject-77b712e599.json` (claim)
 - `.outcomegraph/claims/cl-pyproject-be6a30a6de.json` (claim)
 - `.outcomegraph/claims/cl-quickstart-11e4896f70.json` (claim)
 - `.outcomegraph/claims/cl-quickstart-834cc48bb5.json` (claim)
+- `.outcomegraph/claims/cl-quickstart-a1beec4726.json` (claim)
 - `.outcomegraph/claims/cl-readme-4b05843a3e.json` (claim)
+- `.outcomegraph/claims/cl-readme-6ad12b9d37.json` (claim)
 - `.outcomegraph/claims/cl-readme-f35ca11fd4.json` (claim)
+- `.outcomegraph/claims/cl-runbooks-02271d9fb4.json` (claim)
 - `.outcomegraph/claims/cl-runbooks-11469af3c6.json` (claim)
 - `.outcomegraph/claims/cl-runbooks-8966bd918f.json` (claim)
 - `.outcomegraph/claims/cl-runtime-0476092972.json` (claim)
 - `.outcomegraph/claims/cl-runtime-5f0904d546.json` (claim)
+- `.outcomegraph/claims/cl-runtime-e8bfbe8b05.json` (claim)
 - `.outcomegraph/claims/cl-security_policy-1e39ba1434.json` (claim)
 - `.outcomegraph/claims/cl-security_policy-d7746ddd8e.json` (claim)
+- `.outcomegraph/claims/cl-security_policy-dd7bc98fac.json` (claim)
+- `.outcomegraph/claims/cl-skill-og-5deaa0528a.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-af106bbddf.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-dogfood-104d0924fd.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-dogfood-51887540a6.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-dogfood-9b386e16e2.json` (claim)
+- `.outcomegraph/claims/cl-skill-og-dogfood-bf27bbe961.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-e61dad2d20.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-quality-pass-7550f8840f.json` (claim)
 - `.outcomegraph/claims/cl-skill-og-quality-pass-7ae2fad8d6.json` (claim)
+- `.outcomegraph/claims/cl-skill-og-quality-pass-9319a9582f.json` (claim)
+- `.outcomegraph/claims/cl-spec-v2-58dcd18184.json` (claim)
 - `.outcomegraph/claims/cl-spec-v2-9075d584fb.json` (claim)
 - `.outcomegraph/claims/cl-spec-v2-adapters.json` (claim)
 - `.outcomegraph/claims/cl-spec-v2-artifacts.json` (claim)
@@ -1091,18 +1190,23 @@ Derived from `.outcomegraph` canonical artifacts at export time.
 - `.outcomegraph/claims/cl-spec-v2-identities.json` (claim)
 - `.outcomegraph/claims/cl-spec-v2-output.json` (claim)
 - `.outcomegraph/claims/cl-spec-v2-runtime-policy.json` (claim)
+- `.outcomegraph/claims/cl-spec_implementation_matrix-8d36738580.json` (claim)
 - `.outcomegraph/claims/cl-spec_implementation_matrix-ab542d7c49.json` (claim)
 - `.outcomegraph/claims/cl-spec_implementation_matrix-d4daf5ba11.json` (claim)
 - `.outcomegraph/claims/cl-tests-01ed091969.json` (claim)
 - `.outcomegraph/claims/cl-tests-0bb60d5c32.json` (claim)
 - `.outcomegraph/claims/cl-tests-5c9cfe36a4.json` (claim)
+- `.outcomegraph/claims/cl-tests-6efea0bb8a.json` (claim)
 - `.outcomegraph/claims/cl-tests-814042905e.json` (claim)
 - `.outcomegraph/claims/cl-tests-bfca37fd60.json` (claim)
 - `.outcomegraph/claims/cl-tests-fd26cf41ef.json` (claim)
 - `.outcomegraph/claims/cl-to-do-506860a9be.json` (claim)
+- `.outcomegraph/claims/cl-to-do-adf6d40977.json` (claim)
 - `.outcomegraph/claims/cl-to-do-dd7c426c0a.json` (claim)
+- `.outcomegraph/claims/cl-to-do-schema-24d5d66315.json` (claim)
 - `.outcomegraph/claims/cl-to-do-schema-6a6cda5dfd.json` (claim)
 - `.outcomegraph/claims/cl-to-do-schema-6b12a89e75.json` (claim)
+- `.outcomegraph/claims/cl-uv-190eda4787.json` (claim)
 - `.outcomegraph/claims/cl-uv-1e7a412d93.json` (claim)
 - `.outcomegraph/claims/cl-uv-5463666b8d.json` (claim)
 - `.outcomegraph/claims/claim-1.json` (claim)

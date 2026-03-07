@@ -33,9 +33,12 @@ Rules:
 - Prefer concrete validation commands already used in this repository when they fit the capsule, including repo-native wrappers such as `uv run ...` when the repository uses them
 - Do not turn documentation examples, allowlists, or generic command catalogs into live oracle commands unless repository evidence shows they are the capsule's actual verification contract
 - When a command is only mentioned as an example or policy allowance, emit command=null and explain the gap instead of inventing an executable oracle
+- For code or test capsules, treat changed test files and related_test_hints as strong evidence for the narrowest repository-native executable oracle you can justify from the payload; prefer scoped commands over generic full-suite commands when the scope is explicit
+- For Python test evidence in this repository, prefer `uv run --with pytest --no-project pytest -q <path>` when the payload points to a concrete `tests/...` file and the repository already uses `uv run`, so the oracle stays runnable in a clean clone without mutating project metadata
 - For code or test capsules, use status='success' only when repository evidence supports at least one executable oracle command for the capsule; snapshot-only or doc-like evidence should stay at warn
-- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable only when they are the strongest honest evidence and the oracle reason is explicit
-- Use status='warn' when the capsule is materially useful but still missing important supporting context
+- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable when they are the strongest honest evidence and the oracle reason is explicit
+- For doc, config, or runtime capsules, use status='success' when the capsule is materially reusable and the remaining gap is only the explicit advisory oracle reason; use status='warn' only when important recreation context is still missing, contradictory, or stale
+- Use status='warn' when the capsule is materially useful but still missing important supporting context that would block faithful recreation
 - Use status='pending' only when repository evidence is too thin to produce a reusable capsule record
 
 Input payload JSON:

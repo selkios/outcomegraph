@@ -1,0 +1,16 @@
+{
+  "repo_root": "/tmp/outcomegraph-dogfood-final-Nwve",
+  "run_id_prefix": "sync-20260307t171816z-380642d421",
+  "present_batches": [0, 1, 2, 3],
+  "missing_batches": [4, 5, 6, 7, 8, 9, 10, 11],
+  "dogfood_sync_bytes": 0,
+  "workspace_og_py_hash_at_capture": "398c2ad9a35a21d0c81dee0e60e6f304841d0259bc657713d2c1b4f9e73a9800",
+  "clone_og_py_hash": "46d14c45b8a9ff80f431633cae5aa5ff385c13950592f46aeda4a1d21fd0860f",
+  "notes": [
+    "The corrected rerun used the current clone path after the earlier tasks/tests/to-do batch stall was fixed by size-aware batching.",
+    "A prior corrected rerun from the same clone advanced into verify and exposed clone-generated bare uv run pytest oracles that could not spawn pytest in the clean-clone runtime.",
+    "After refreshing the clone and rebuilding .venv, the follow-up rerun progressed serially with one active distill worker at a time and only batches 0 through 3 completed over roughly 25 minutes.",
+    "The wrapper was terminated with dogfood-sync.json still empty, and the orphaned worker process group 897885 was cleaned up manually.",
+    "The workspace og.py hash drifted away from the clone during the rerun, so the staged dogfood source baseline was no longer stable."
+  ]
+}
