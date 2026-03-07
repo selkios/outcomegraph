@@ -192,6 +192,7 @@ class TestHelpContracts(TestCase):
             (["verify", "--help"], "Usage: og verify"),
             (["replay", "--help"], "Usage: og replay"),
             (["status", "--help"], "Usage: og status"),
+            (["doctor", "--help"], "Usage: og doctor"),
             (["export", "--help"], "Usage: og export"),
             (["clean", "--help"], "Usage: og clean"),
             (["explain", "--help"], "Usage: og explain"),
@@ -237,7 +238,7 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(data["schema_version"], og.COMMAND_INTROSPECTION_SCHEMA_VERSION)
         self.assertEqual(data["command_count"], len(data["commands"]))
         signatures = {entry["command"]: entry for entry in data["commands"]}
-        for command_name in {"schema", "describe", "sync", "daemon status", "optimize prompts", "verify", "replay", "explain", "mcp-server"}:
+        for command_name in {"schema", "describe", "sync", "doctor", "daemon status", "optimize prompts", "verify", "replay", "explain", "mcp-server"}:
             self.assertIn(command_name, signatures, msg=f"missing signature for {command_name}")
             signature = signatures[command_name]
             self.assertIn("usage", signature)
@@ -249,11 +250,20 @@ class TestCommandIntrospectionContracts(TestCase):
             if command_name == "optimize prompts":
                 self.assertIn("--params", request_field_names)
                 self.assertIn("--strict", request_field_names)
+            if command_name == "doctor":
+                response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
+                self.assertIn("checks", response_field_names)
             if command_name in {"verify", "replay", "explain", "mcp-server"}:
                 response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
                 for flag_name in {"--output", "--fields", "--limit", "--offset"}:
                     self.assertIn(flag_name, request_field_names, msg=f"missing request field {flag_name} for {command_name}")
                 self.assertIn("list_window", response_field_names, msg=f"missing list_window response field for {command_name}")
+            if command_name in {"sync", "verify", "replay"}:
+                for flag_name in {"--validate", "--dry-run", "--max-retries", "--timeout"}:
+                    self.assertIn(flag_name, request_field_names, msg=f"missing request field {flag_name} for {command_name}")
+            if command_name == "export":
+                for flag_name in {"--validate", "--dry-run"}:
+                    self.assertIn(flag_name, request_field_names)
             self.assertIn("--non-interactive", request_field_names)
 
         autopilot_init_signature = signatures["autopilot init"]
@@ -311,6 +321,38 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(payload["command"], "describe")
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
+
+
+class TestRecoveryContracts(_RepoTestCase):
+    def test_doctor_command_reports_machine_readable_checks(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", "doctor"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertIn(code, {0, 1})
+        self.assertEqual(payload["command"], "doctor")
+        self.assertIn(payload["status"], {"ok", "warn", "error"})
+        data = payload["data"]
+        self.assertIn("checks", data)
+        self.assertTrue(any(check["name"] == "runtime" for check in data["checks"]))
+
+    def test_sync_dry_run_reports_plan_without_writing_events(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", "sync", "--dry-run"])
+        payload = json.loads(buffer.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["command"], "sync")
+        data = payload["data"]
+        self.assertTrue(data["dry_run"])
+        self.assertIn("plan", data)
+        self.assertFalse(any((self.repo / ".outcomegraph" / "events").iterdir()))
 
 
 class TestJsonEnvelopeContract(TestCase):
@@ -1045,7 +1087,7 @@ class TestSyncWorkflows(_RepoTestCase):
             )
 
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(run_codex_worker.call_args.args[5], og.WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS)
+        self.assertEqual(run_codex_worker.call_args.kwargs["timeout_seconds"], og.WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS)
 
     def test_run_distill_stage_uses_bootstrap_timeout_for_source_heavy_snapshot(self) -> None:
         (self.repo / "og.py").write_text("print('x')\n", encoding="utf-8")
@@ -1088,7 +1130,7 @@ class TestSyncWorkflows(_RepoTestCase):
             )
 
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(run_codex_worker.call_args.args[5], og.WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS)
+        self.assertEqual(run_codex_worker.call_args.kwargs["timeout_seconds"], og.WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS)
 
     def test_sync_parse_accepts_force_full_sync(self) -> None:
         options, _ = og.parse_command_flags(
@@ -2248,6 +2290,92 @@ class TestReplayWorkflows(_RepoTestCase):
         self.assertEqual(payload["replay_results"][0]["status"], "error")
         self.assertEqual(envelope["errors"][0]["error_code"], og.RUNTIME_ERROR_CODE)
         self.assertFalse(bool(envelope["errors"][0]["retryable"]))
+
+    def test_run_replay_stage_retries_transient_worker_timeout(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+        replay_plan = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-1",
+            "capsule_id": "default",
+            "steps": [{"command": "echo ok"}],
+            "status": "ok",
+        }
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(og, "_collect_changed_materials", return_value=[]), patch.object(
+            og,
+            "_run_codex_worker",
+            side_effect=[
+                og.WorkerAdapterError("codex exec timed out after 5s (replay)"),
+                (replay_plan, []),
+            ],
+        ):
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "observe",
+                changed_only=True,
+                timeout_seconds=5,
+                max_retries=1,
+            )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["recovery"]["retried_operations"], 1)
+        self.assertEqual(payload["recovery"]["recovered_operations"], 1)
+        self.assertEqual(payload["recovery"]["details"][0]["timeout_seconds"], 5)
+
+
+class TestVerifyRecovery(_RepoTestCase):
+    def test_run_verify_stage_timeout_errors_are_retryable_in_envelope(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            policy = {
+                "schema_version": 2,
+                "mode": "observe",
+                "allow": {
+                    "file_writes": [".outcomegraph/**", "export/**", "skills/outcome-steward/**"],
+                    "verify_commands": ["sleep 1"],
+                    "sandbox_operations": ["read_artifacts"],
+                },
+                "deny": {
+                    "file_writes": ["src/**"],
+                    "network": [],
+                    "dependencies": [],
+                    "deployment": [],
+                    "verify_commands": [],
+                    "sandbox_operations": [],
+                },
+            }
+
+            with patch.object(
+                og,
+                "_load_capsule_oracles",
+                return_value=[{"name": "slow-oracle", "command": "sleep 1", "scope": []}],
+            ), patch.object(
+                og.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(cmd="sleep 1", timeout=1),
+            ):
+                payload = og._run_verify_stage(
+                    str(self.repo),
+                    ["default"],
+                    ["og.py"],
+                    "run-1",
+                    "observe",
+                    policy=policy,
+                    timeout_seconds=1,
+                    max_retries=1,
+                )
+
+        envelope = og._build_command_result_envelope("verify", payload)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.TIMEOUT_EXPIRED_CODE)
+        self.assertTrue(bool(envelope["errors"][0]["retryable"]))
+        self.assertEqual(payload["recovery"]["exhausted_operations"], 1)
 
     def test_exit_code_maps_error_class_semantics(self) -> None:
         self.assertEqual(

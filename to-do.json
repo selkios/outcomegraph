@@ -1355,8 +1355,8 @@
       "id": "OG-AGENT-009",
       "title": "Expand recovery tooling (`validate`, `doctor`, retries, and timeout controls)",
       "priority": 2,
-      "status": "doing",
-      "details": "Shift from best-effort execution to explicit validate-before-mutate and bounded auto-recovery controls. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Added explicit recovery preflight modes (`--validate`, `--dry-run`) for `sync`/`verify`/`replay`/`export`, shipped `og doctor`, exposed bounded retry and timeout controls, and recorded recovery summaries plus retryable timeout metadata in command payloads/events.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Add validate/dry-run modes for mutating commands beyond `clean`",
@@ -1378,10 +1378,11 @@
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T17:31:37Z"
+      "updated_at": "2026-03-07T08:52:31Z"
     },
     {
       "id": "OG-AGENT-010",

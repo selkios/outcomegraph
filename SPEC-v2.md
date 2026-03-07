@@ -150,7 +150,8 @@ og sync [--profile analyze|propose|apply] [--mode observe|autonomous]
 og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]
 og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous]
 og status
-og export
+og doctor
+og export [--validate] [--dry-run]
 og explain
 og drift
 og mcp-server
@@ -176,6 +177,12 @@ Core parsing rules:
 - `--strict` is supported globally and can be set per-run to enforce strictness (`--strict=true` or `--strict=false`).
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
+- `sync`, `verify`, `replay`, and `export` accept explicit no-write recovery modes:
+  - `--validate` performs contract/policy/integrity preflight without mutating artifacts.
+  - `--dry-run` returns a no-write execution plan (targets, write intent, and staged work) without mutating artifacts.
+- `sync`, `verify`, and `replay` accept bounded recovery controls for subprocess-heavy paths:
+  - `--max-retries <n>` retries transient worker/oracle/replay-step failures up to a bounded ceiling.
+  - `--timeout <seconds>` overrides subprocess timeouts for worker/oracle/replay-step execution.
 - `verify`, `replay`, `explain`, and `mcp-server` support output shaping flags:
   - `--output json|jsonl|human` (human-readable default, explicit JSON envelope, or JSONL stream mode).
   - `--fields <field>[,<field>...]` for top-level payload projection.
@@ -187,6 +194,7 @@ Machine introspection is supported:
 
 - `og schema` emits all supported command signatures, request fields, response envelope shape, and known error codes in machine-readable form.
 - `og describe <command>` emits the signature for one command, including nested command names like `daemon status`.
+- `og doctor` emits structured diagnostics and remediation hints for runtime, integrity, drift, export control surfaces, and daemon state.
 
 `og optimize prompts` accepts:
 
@@ -1048,6 +1056,7 @@ Budget controls are required:
 - max replay jobs per hour
 - per-repo concurrency cap
 - timeout and retry policies
+- CLI recovery overrides (`--max-retries`, `--timeout`) must remain bounded and surface recovery outcomes in command payloads and summary events.
 
 ## 15) Integrity and provenance
 

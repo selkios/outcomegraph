@@ -74,6 +74,8 @@ INTEGRITY_CHECK_FAILED_CODE = "INTEGRITY_CHECK_FAILED"
 ADAPTER_MANIFEST_INVALID_CODE = "ADAPTER_MANIFEST_INVALID"
 ADAPTER_DUPLICATE_CODE = "ADAPTER_DUPLICATE"
 ADAPTER_INTERFACE_MISMATCH_CODE = "ADAPTER_INTERFACE_MISMATCH"
+TIMEOUT_EXPIRED_CODE = "TIMEOUT_EXPIRED"
+RECOVERY_RETRY_EXHAUSTED_CODE = "RECOVERY_RETRY_EXHAUSTED"
 POLICY_SCHEMA_VERSION = 2
 POLICY_DENIED_CODE = "POLICY_DENIED"
 POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
@@ -139,6 +141,16 @@ ERROR_CLASS_BY_CODE: dict[str, dict[str, object]] = {
         "error_class": ERROR_CLASS_RUNTIME,
         "retryable": True,
         "hint": "Retry after worker runtime service becomes available.",
+    },
+    TIMEOUT_EXPIRED_CODE: {
+        "error_class": ERROR_CLASS_RUNTIME,
+        "retryable": True,
+        "hint": "Increase timeout or retry after transient command delay clears.",
+    },
+    RECOVERY_RETRY_EXHAUSTED_CODE: {
+        "error_class": ERROR_CLASS_RUNTIME,
+        "retryable": True,
+        "hint": "Retry with a higher retry budget only if the underlying dependency is transient.",
     },
     RUNTIME_ERROR_CODE: {
         "error_class": ERROR_CLASS_RUNTIME,
@@ -309,6 +321,8 @@ WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 TRACE_SEGMENT_MAX_LENGTH = 72
 SNAPSHOT_DIFF_CONTEXT_LINES = 40
 SNAPSHOT_DIFF_MAX_SNIPPETS = 8
+RECOVERY_MAX_RETRIES_LIMIT = 5
+ORACLE_COMMAND_DEFAULT_TIMEOUT_SECONDS = 30
 REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
 ADAPTER_SCHEMA_VERSION = 2
 ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
@@ -1074,6 +1088,7 @@ Core commands:
   og verify [--changed]
   og replay [--changed]
   og status
+  og doctor
   og export
   og clean [--scope runtime|generated|all] [--dry-run] [--yes]
   og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]]
@@ -1138,23 +1153,29 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "sync":
         return _command_help(
-            "og sync [--profile analyze|propose|apply] [--mode observe|autonomous] [--force-full-sync[=true|false]]",
+            "og sync [--profile analyze|propose|apply] [--mode observe|autonomous] [--force-full-sync[=true|false]] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
             "Collect changes, distill/categorize them, apply artifacts, verify, and export outputs.",
             [
                 "--json",
                 "--profile analyze|propose|apply",
                 "--mode observe|autonomous",
                 "--force-full-sync[=true|false]",
+                "--validate[=true|false]",
+                "--dry-run[=true|false]",
+                "--max-retries <n>",
+                "--timeout <seconds>",
             ],
             [
                 "og sync",
                 "og sync --profile propose --mode autonomous",
                 "og sync --force-full-sync=true",
+                "og sync --validate --json",
+                "og sync --dry-run --timeout 180 --max-retries 1",
             ],
         )
     if normalized == "verify":
         return _command_help(
-            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
+            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
             "Run verification for known or changed capsules and emit verification artifacts.",
             [
                 "--json",
@@ -1165,12 +1186,21 @@ def _help_for_command(command: str) -> str:
                 "--changed[=true|false]",
                 "--profile analyze|propose|apply",
                 "--mode observe|autonomous",
+                "--validate[=true|false]",
+                "--dry-run[=true|false]",
+                "--max-retries <n>",
+                "--timeout <seconds>",
             ],
-            ["og verify", "og verify --changed", "og verify --changed=false --json"],
+            [
+                "og verify",
+                "og verify --changed",
+                "og verify --changed=false --json",
+                "og verify --validate --json",
+            ],
         )
     if normalized == "replay":
         return _command_help(
-            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
+            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
             "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
             [
                 "--json",
@@ -1181,8 +1211,17 @@ def _help_for_command(command: str) -> str:
                 "--changed[=true|false]",
                 "--profile analyze|propose|apply",
                 "--mode observe|autonomous",
+                "--validate[=true|false]",
+                "--dry-run[=true|false]",
+                "--max-retries <n>",
+                "--timeout <seconds>",
             ],
-            ["og replay", "og replay --changed", "og replay --json"],
+            [
+                "og replay",
+                "og replay --changed",
+                "og replay --json",
+                "og replay --dry-run --timeout 180",
+            ],
         )
     if normalized == "status":
         return _command_help(
@@ -1191,12 +1230,23 @@ def _help_for_command(command: str) -> str:
             ["--json"],
             ["og status", "og status --json"],
         )
+    if normalized == "doctor":
+        return _command_help(
+            "og doctor",
+            "Run machine-readable diagnostics with remediation hints for policy, integrity, exports, and runtime health.",
+            ["--json"],
+            ["og doctor", "og doctor --json"],
+        )
     if normalized == "export":
         return _command_help(
-            "og export",
+            "og export [--validate[=true|false]] [--dry-run[=true|false]]",
             "Render configured export surfaces from canonical artifacts.",
-            ["--json"],
-            ["og export", "og export --json"],
+            [
+                "--json",
+                "--validate[=true|false]",
+                "--dry-run[=true|false]",
+            ],
+            ["og export", "og export --json", "og export --dry-run --json"],
         )
     if normalized == "clean":
         return _command_help(
@@ -1587,6 +1637,10 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                     "Rebuild from all non-runtime files instead of the current git diff baseline.",
                     default=False,
                 ),
+                _command_schema_field("--validate", "boolean", "Run preflight validation without mutating artifacts.", default=False),
+                _command_schema_field("--dry-run", "boolean", "Render a no-write execution plan for the command.", default=False),
+                _command_schema_field("--max-retries", "integer", "Maximum retries for transient worker and oracle failures.", default=0),
+                _command_schema_field("--timeout", "integer", "Override subprocess timeout in seconds for worker and oracle steps."),
             ],
             [
                 _command_schema_field("status", "string", "Command status (`ok`, `error`, or `warn`)."),
@@ -1594,10 +1648,18 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("options", "object", "Parsed command options."),
                 _command_schema_field("steps", "array", "Pipeline stage results."),
                 _command_schema_field("summary_event", "string", "Summary event path."),
+                _command_schema_field("recovery", "object", "Retry/timeout recovery summary for nested operations."),
                 _command_schema_field("errors", "array", "Typed error records when status is error."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, INTEGRITY_CHECK_FAILED_CODE, WORKER_RUNTIME_UNAVAILABLE_CODE],
-            examples=["og sync", "og sync --profile propose", "og sync --force-full-sync"],
+            [
+                USAGE_ERROR_CODE,
+                RUNTIME_ERROR_CODE,
+                INTEGRITY_CHECK_FAILED_CODE,
+                WORKER_RUNTIME_UNAVAILABLE_CODE,
+                TIMEOUT_EXPIRED_CODE,
+                RECOVERY_RETRY_EXHAUSTED_CODE,
+            ],
+            examples=["og sync", "og sync --profile propose", "og sync --force-full-sync", "og sync --validate --json"],
         ),
         _command_signature_entry(
             "verify",
@@ -1618,6 +1680,10 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("--changed", "boolean", "Verify only changed capsules.", default=False),
                 _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
                 _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
+                _command_schema_field("--validate", "boolean", "Run preflight validation without mutating artifacts.", default=False),
+                _command_schema_field("--dry-run", "boolean", "Render a no-write execution plan for the command.", default=False),
+                _command_schema_field("--max-retries", "integer", "Maximum retries for transient oracle failures.", default=0),
+                _command_schema_field("--timeout", "integer", "Override oracle timeout in seconds."),
             ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
@@ -1625,9 +1691,10 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("options", "object", "Parsed command options."),
                 _command_schema_field("results", "array", "Verification results for each stage."),
                 _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
+                _command_schema_field("recovery", "object", "Retry/timeout recovery summary for nested operations."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
-            examples=["og verify --changed", "og verify --json"],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE],
+            examples=["og verify --changed", "og verify --json", "og verify --validate --json"],
         ),
         _command_signature_entry(
             "replay",
@@ -1648,6 +1715,10 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("--changed", "boolean", "Replay only changed capsules.", default=False),
                 _command_schema_field("--profile", "string", "Worker profile selection.", enum=sorted(PROFILE_VALUES)),
                 _command_schema_field("--mode", "string", "Operational mode.", enum=sorted(MODE_VALUES)),
+                _command_schema_field("--validate", "boolean", "Run preflight validation without mutating artifacts.", default=False),
+                _command_schema_field("--dry-run", "boolean", "Render a no-write execution plan for the command.", default=False),
+                _command_schema_field("--max-retries", "integer", "Maximum retries for transient worker, replay-step, and oracle failures.", default=0),
+                _command_schema_field("--timeout", "integer", "Override worker, replay-step, and oracle timeouts in seconds."),
             ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
@@ -1657,9 +1728,16 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("replay_results", "array", "Replay execution results."),
                 _command_schema_field("certificate_ids", "array", "Replay certificates issued."),
                 _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
+                _command_schema_field("recovery", "object", "Retry/timeout recovery summary for nested operations."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, WORKER_RUNTIME_UNAVAILABLE_CODE],
-            examples=["og replay --changed", "og replay --json"],
+            [
+                USAGE_ERROR_CODE,
+                RUNTIME_ERROR_CODE,
+                WORKER_RUNTIME_UNAVAILABLE_CODE,
+                TIMEOUT_EXPIRED_CODE,
+                RECOVERY_RETRY_EXHAUSTED_CODE,
+            ],
+            examples=["og replay --changed", "og replay --json", "og replay --dry-run --json"],
         ),
         _command_signature_entry(
             "status",
@@ -1675,17 +1753,36 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             examples=["og status", "og status --json"],
         ),
         _command_signature_entry(
+            "doctor",
+            "og doctor",
+            "Run machine-readable diagnostics with remediation hints for runtime recovery.",
+            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
+                _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("checks", "array", "Structured diagnostic checks with remediation."),
+                _command_schema_field("remediation", "array", "Deduplicated remediation hints."),
+            ],
+            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, INTEGRITY_CHECK_FAILED_CODE],
+            examples=["og doctor", "og doctor --json"],
+        ),
+        _command_signature_entry(
             "export",
             "og export",
             "Render configured export surfaces from canonical artifacts.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--validate", "boolean", "Run preflight validation without mutating artifacts.", default=False),
+                _command_schema_field("--dry-run", "boolean", "Render a no-write execution plan for the command.", default=False),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("updated_exports", "array", "Exports updated by the command."),
+                _command_schema_field("planned_exports", "array", "Exports that would be updated by a dry-run."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
-            examples=["og export", "og export --json"],
+            examples=["og export", "og export --json", "og export --dry-run --json"],
         ),
         _command_signature_entry(
             "clean",
@@ -1989,6 +2086,172 @@ _CLI_COMMAND_SIGNATURE_BY_NAME = {entry["command"]: entry for entry in _CLI_COMM
 def _normalize_command_signature_target(raw_target: str) -> str:
     return " ".join(raw_target.split())
 
+
+
+def _build_recovery_record(
+    operation: str,
+    *,
+    attempts: int,
+    max_retries: int,
+    timeout_seconds: int | None,
+    recovered: bool = False,
+    exhausted: bool = False,
+    retryable: bool = False,
+    retryable_failures: list[dict[str, object]] | None = None,
+    error_code: str | None = None,
+    message: str | None = None,
+) -> dict[str, object]:
+    retries_used = max(attempts - 1, 0)
+    payload: dict[str, object] = {
+        "operation": operation,
+        "attempts": attempts,
+        "max_retries": max_retries,
+        "retries_used": retries_used,
+        "recovered": recovered,
+        "exhausted": exhausted,
+        "retryable": retryable,
+        "timed_out": any(bool(item.get("timed_out")) for item in retryable_failures or []),
+    }
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
+    if retryable_failures:
+        payload["retryable_failures"] = retryable_failures
+    if error_code:
+        payload["error_code"] = error_code
+    if message:
+        payload["message"] = message
+    return payload
+
+
+def _summarize_recovery_records(records: list[dict[str, object]]) -> dict[str, object]:
+    relevant = [record for record in records if isinstance(record, dict)]
+    if not relevant:
+        return {
+            "operations": 0,
+            "retried_operations": 0,
+            "recovered_operations": 0,
+            "exhausted_operations": 0,
+            "timeout_operations": 0,
+            "total_retries_used": 0,
+        }
+
+    return {
+        "operations": len(relevant),
+        "retried_operations": sum(1 for record in relevant if int(record.get("retries_used") or 0) > 0),
+        "recovered_operations": sum(1 for record in relevant if bool(record.get("recovered"))),
+        "exhausted_operations": sum(1 for record in relevant if bool(record.get("exhausted"))),
+        "timeout_operations": sum(1 for record in relevant if bool(record.get("timed_out"))),
+        "total_retries_used": sum(int(record.get("retries_used") or 0) for record in relevant),
+        "details": relevant,
+    }
+
+
+def _recovery_error_code_for_message(message: str) -> str:
+    lowered = str(message or "").lower()
+    if "timed out" in lowered:
+        return TIMEOUT_EXPIRED_CODE
+    if _is_worker_unavailable_error(message):
+        return WORKER_RUNTIME_UNAVAILABLE_CODE
+    return RUNTIME_ERROR_CODE
+
+
+def _run_worker_with_retries(
+    role: str,
+    payload: dict[str, object],
+    repo_root: str,
+    trace_path: str,
+    adapter: dict[str, object] | None,
+    *,
+    timeout_seconds: int,
+    max_retries: int,
+) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+    attempts = 0
+    retryable_failures: list[dict[str, object]] = []
+    while True:
+        attempts += 1
+        try:
+            output, receipts = _run_codex_worker(
+                role,
+                payload,
+                repo_root,
+                trace_path,
+                adapter=adapter,
+                timeout_seconds=timeout_seconds,
+            )
+        except WorkerAdapterError as exc:
+            error_message = str(exc)
+            retryable = _is_worker_unavailable_error(error_message)
+            error_code = _recovery_error_code_for_message(error_message)
+            if retryable and attempts <= max_retries:
+                retryable_failures.append(
+                    {
+                        "attempt": attempts,
+                        "error_code": error_code,
+                        "message": error_message,
+                        "timed_out": error_code == TIMEOUT_EXPIRED_CODE,
+                    }
+                )
+                continue
+            recovery = _build_recovery_record(
+                f"worker:{role}",
+                attempts=attempts,
+                max_retries=max_retries,
+                timeout_seconds=timeout_seconds,
+                recovered=False,
+                exhausted=retryable and attempts > 1,
+                retryable=retryable,
+                retryable_failures=retryable_failures,
+                error_code=RECOVERY_RETRY_EXHAUSTED_CODE if retryable_failures else error_code,
+                message=error_message,
+            )
+            setattr(exc, "recovery", recovery)
+            raise
+
+        recovery = _build_recovery_record(
+            f"worker:{role}",
+            attempts=attempts,
+            max_retries=max_retries,
+            timeout_seconds=timeout_seconds,
+            recovered=bool(retryable_failures),
+            exhausted=False,
+            retryable=False,
+            retryable_failures=retryable_failures,
+        )
+        return output, receipts, recovery
+
+
+def _preflight_status_for_checks(checks: list[dict[str, object]]) -> str:
+    status = "ok"
+    for check in checks:
+        check_status = str(check.get("status") or "ok").lower()
+        if check_status in {"error", "degraded"}:
+            return "error"
+        if check_status in {"warn", "stale", "unknown"}:
+            status = "warn"
+    return status
+
+
+def _preflight_messages_for_checks(checks: list[dict[str, object]]) -> tuple[list[dict[str, object]], list[str]]:
+    errors: list[dict[str, object]] = []
+    warnings: list[str] = []
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        status = str(check.get("status") or "ok").lower()
+        message = str(check.get("message") or "").strip()
+        if status in {"error", "degraded"}:
+            errors.append(
+                _normalize_error_record(
+                    {
+                        "error_code": check.get("error_code") or check.get("code") or RUNTIME_ERROR_CODE,
+                        "message": message or "preflight validation failed",
+                        "hint": check.get("hint"),
+                    }
+                )
+            )
+        elif status in {"warn", "stale", "unknown"} and message:
+            warnings.append(message)
+    return errors, warnings
 
 
 def _ensure_text_list(raw: object) -> list[str]:
@@ -3709,6 +3972,619 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
     if overall_status == "error":
         payload["message"] = "status dashboard indicates degraded sync/verification state"
     return payload
+
+
+def _sync_write_targets(*, include_exports: bool = False) -> list[str]:
+    targets = [
+        f"{OG_ROOT}/traces/**",
+        f"{OG_ROOT}/objects/**",
+        f"{OG_ROOT}/capsules/**",
+        f"{OG_ROOT}/refs/**",
+        f"{OG_ROOT}/decisions/**",
+        f"{OG_ROOT}/claims/**",
+        f"{OG_ROOT}/certificates/**",
+        f"{OG_ROOT}/materials.lock",
+        f"{OG_ROOT}/events/**",
+        f"{INTEGRITY_CHECKPOINT_DIR}/**",
+        INTEGRITY_STATE_FILE,
+    ]
+    if include_exports:
+        targets.extend(sorted(EXPORT_PATHS.values()))
+    return targets
+
+
+def _make_preflight_check(
+    name: str,
+    status: str,
+    message: str,
+    *,
+    error_code: str | None = None,
+    remediation: list[str] | None = None,
+    details: dict[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "name": name,
+        "status": status,
+        "message": message,
+    }
+    if error_code:
+        payload["error_code"] = error_code
+    if remediation:
+        payload["remediation"] = remediation
+    if details:
+        payload["details"] = details
+    return payload
+
+
+def _build_preflight_payload(
+    command: str,
+    options: dict[str, object],
+    checks: list[dict[str, object]],
+    *,
+    message: str,
+    run_id: str | None = None,
+    plan: dict[str, object] | None = None,
+    write_targets: list[str] | None = None,
+    extra: dict[str, object] | None = None,
+) -> dict[str, object]:
+    status = _preflight_status_for_checks(checks)
+    errors, warnings = _preflight_messages_for_checks(checks)
+    payload: dict[str, object] = {
+        "status": status,
+        "command": command,
+        "options": options,
+        "validate": bool(options.get("validate")),
+        "dry_run": bool(options.get("dry_run")),
+        "checks": checks,
+        "message": message,
+        "errors": errors,
+        "warnings": warnings,
+    }
+    if run_id:
+        payload["run_id"] = run_id
+    if plan is not None:
+        payload["plan"] = plan
+    if write_targets is not None:
+        payload["write_targets"] = sorted(set(write_targets))
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _run_export_preflight(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    checks: list[dict[str, object]] = []
+    planned_exports: list[str] = []
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error:
+        checks.append(
+            _make_preflight_check(
+                "policy",
+                "error",
+                str(policy_error.get("message") or "policy configuration is invalid"),
+                error_code=POLICY_CONFIG_ERROR_CODE,
+            )
+        )
+    else:
+        write_check = _evaluate_policy_writes(policy_payload, "export", "observe", list(EXPORT_PATHS.values()))
+        if write_check is None:
+            checks.append(_make_preflight_check("policy", "ok", "export write targets are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "policy",
+                    "error",
+                    str(write_check.get("message") or "policy denied export writes"),
+                    error_code=str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(write_check.get("remediation")),
+                )
+            )
+
+    drift = _collect_export_drift_check(repo_root)
+    if drift is None:
+        checks.append(_make_preflight_check("exports", "ok", "export surfaces are already in sync"))
+    else:
+        issues = drift.get("details", {}).get("issues", []) if isinstance(drift.get("details"), dict) else []
+        planned_exports = sorted(
+            {
+                str(item.get("path"))
+                for item in issues
+                if isinstance(item, dict) and isinstance(item.get("path"), str) and item.get("path")
+            }
+        )
+        checks.append(
+            _make_preflight_check(
+                "exports",
+                "warn" if planned_exports else str(drift.get("status") or "warn"),
+                str(drift.get("message") or "export surfaces need regeneration"),
+                remediation=_safe_string_list(drift.get("remediation")),
+                details={"planned_exports": planned_exports},
+            )
+        )
+
+    plan = {"planned_exports": planned_exports} if bool(options.get("dry_run")) else None
+    return _build_preflight_payload(
+        "export",
+        options,
+        checks,
+        message="export dry-run completed." if bool(options.get("dry_run")) else "export validation completed.",
+        plan=plan,
+        write_targets=list(EXPORT_PATHS.values()),
+        extra={"planned_exports": planned_exports},
+    )
+
+
+def _run_verify_preflight(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    changed_only = bool(options.get("changed"))
+    timeout_override = options.get("timeout")
+    max_retries = int(options.get("max_retries") or 0)
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    changed_files = [str(item) for item in snapshot.get("changed_files", [])] if isinstance(snapshot.get("changed_files"), list) else []
+    changed_capsules = _collect_affected_capsules(changed_files) if changed_only else _list_known_capsules(repo_root)
+    if not changed_capsules and not changed_only:
+        changed_only = True
+        changed_capsules = ["default"]
+    run_id = _build_run_id("verify", _short_hash(f"{profile}:{mode}:{'changed' if changed_only else 'all'}", 10))
+
+    checks: list[dict[str, object]] = []
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error:
+        checks.append(
+            _make_preflight_check(
+                "policy",
+                "error",
+                str(policy_error.get("message") or "policy configuration is invalid"),
+                error_code=POLICY_CONFIG_ERROR_CODE,
+            )
+        )
+    else:
+        autonomous_block = _build_autonomous_write_block_payload(repo_root, mode, name="verify", command="verify")
+        if autonomous_block is not None:
+            checks.append(
+                _make_preflight_check(
+                    "autonomous_writes",
+                    "error",
+                    str(autonomous_block.get("message") or "autonomous writes are blocked"),
+                    error_code=AUTONOMOUS_WRITE_BLOCKED_CODE,
+                    remediation=_safe_string_list(autonomous_block.get("remediation")),
+                )
+            )
+        sandbox_check = _ensure_policy_action_allowed(
+            policy_payload,
+            command="verify",
+            category="sandbox_operations",
+            target="read_artifacts",
+            mode=mode,
+        )
+        if sandbox_check is None:
+            checks.append(_make_preflight_check("sandbox", "ok", "verify sandbox reads are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "sandbox",
+                    "error",
+                    str(sandbox_check.get("message") or "policy denied sandbox reads"),
+                    error_code=str(sandbox_check.get("error_code") or sandbox_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(sandbox_check.get("remediation")),
+                )
+            )
+        write_targets = _command_write_targets("verify", include_exports=True)
+        write_check = _evaluate_policy_writes(policy_payload, "verify", mode, write_targets)
+        if write_check is None:
+            checks.append(_make_preflight_check("writes", "ok", "verify write targets are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "writes",
+                    "error",
+                    str(write_check.get("message") or "policy denied verify writes"),
+                    error_code=str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(write_check.get("remediation")),
+                )
+            )
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        checks.append(_make_preflight_check("canonical", "error", f"Canonical artifact validation failed: {exc}"))
+    else:
+        checks.append(_make_preflight_check("canonical", "ok", "canonical artifacts validate before verify"))
+
+    planned_oracles: dict[str, list[str]] = {}
+    if bool(options.get("dry_run")):
+        for capsule in changed_capsules:
+            capsule_oracles = _load_capsule_oracles(repo_root, capsule)
+            impacted_oracles = [
+                oracle
+                for oracle in capsule_oracles
+                if isinstance(oracle, dict) and _oracle_scopes_match(oracle, changed_files)
+            ]
+            if not impacted_oracles:
+                impacted_oracles = capsule_oracles[:1]
+            planned_oracles[capsule] = [str(oracle.get("name") or "unknown-oracle") for oracle in impacted_oracles]
+
+    return _build_preflight_payload(
+        "verify",
+        options,
+        checks,
+        message="verify dry-run completed." if bool(options.get("dry_run")) else "verify validation completed.",
+        run_id=run_id,
+        plan=(
+            {
+                "changed_only": changed_only,
+                "changed_files": changed_files if changed_only else [],
+                "planned_capsules": changed_capsules,
+                "planned_oracles": planned_oracles,
+                "max_retries": max_retries,
+                "timeout_seconds": timeout_override,
+            }
+            if bool(options.get("dry_run"))
+            else None
+        ),
+        write_targets=_command_write_targets("verify", include_exports=True),
+        extra={
+            "changed_only": changed_only,
+            "changed_files": changed_files if changed_only else [],
+            "planned_capsules": changed_capsules,
+            "planned_oracles": planned_oracles,
+        },
+    )
+
+
+def _run_replay_preflight(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    changed_only = bool(options.get("changed"))
+    timeout_override = options.get("timeout")
+    max_retries = int(options.get("max_retries") or 0)
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode)
+    run_id = _build_run_id("replay", _short_hash(f"{profile}:{mode}:{snapshot.get('changed_count', 0)}", 8))
+    changed_files = [str(item) for item in snapshot.get("changed_files", [])] if isinstance(snapshot.get("changed_files"), list) else []
+    targets = _collect_affected_capsules(changed_files) if changed_only else _list_known_capsules(repo_root)
+    if not targets:
+        targets = ["default"]
+
+    checks: list[dict[str, object]] = []
+    adapter_errors = _initialize_adapter_runtime(repo_root)
+    if adapter_errors:
+        first_error = adapter_errors[0]
+        checks.append(
+            _make_preflight_check(
+                "adapter",
+                "error",
+                str(first_error.get("message") or "adapter initialization failed"),
+                error_code=str(first_error.get("code") or ADAPTER_INTERFACE_MISMATCH_CODE),
+                remediation=_safe_string_list(first_error.get("remediation")),
+            )
+        )
+    else:
+        checks.append(_make_preflight_check("adapter", "ok", "worker adapter initialized for replay"))
+
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error:
+        checks.append(
+            _make_preflight_check(
+                "policy",
+                "error",
+                str(policy_error.get("message") or "policy configuration is invalid"),
+                error_code=POLICY_CONFIG_ERROR_CODE,
+            )
+        )
+    else:
+        autonomous_block = _build_autonomous_write_block_payload(repo_root, mode, name="replay", command="replay")
+        if autonomous_block is not None:
+            checks.append(
+                _make_preflight_check(
+                    "autonomous_writes",
+                    "error",
+                    str(autonomous_block.get("message") or "autonomous writes are blocked"),
+                    error_code=AUTONOMOUS_WRITE_BLOCKED_CODE,
+                    remediation=_safe_string_list(autonomous_block.get("remediation")),
+                )
+            )
+        sandbox_check = _ensure_policy_action_allowed(
+            policy_payload,
+            command="replay",
+            category="sandbox_operations",
+            target="create_isolated_worktree",
+            mode=mode,
+        )
+        if sandbox_check is None:
+            sandbox_check = _ensure_policy_action_allowed(
+                policy_payload,
+                command="replay",
+                category="sandbox_operations",
+                target="read_artifacts",
+                mode=mode,
+            )
+        if sandbox_check is None:
+            checks.append(_make_preflight_check("sandbox", "ok", "replay sandbox operations are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "sandbox",
+                    "error",
+                    str(sandbox_check.get("message") or "policy denied sandbox operations"),
+                    error_code=str(sandbox_check.get("error_code") or sandbox_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(sandbox_check.get("remediation")),
+                )
+            )
+        write_targets = _command_write_targets("replay", include_exports=True)
+        write_check = _evaluate_policy_writes(policy_payload, "replay", mode, write_targets)
+        if write_check is None:
+            checks.append(_make_preflight_check("writes", "ok", "replay write targets are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "writes",
+                    "error",
+                    str(write_check.get("message") or "policy denied replay writes"),
+                    error_code=str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(write_check.get("remediation")),
+                )
+            )
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        checks.append(_make_preflight_check("canonical", "error", f"Canonical artifact validation failed: {exc}"))
+    else:
+        checks.append(_make_preflight_check("canonical", "ok", "canonical artifacts validate before replay"))
+
+    return _build_preflight_payload(
+        "replay",
+        options,
+        checks,
+        message="replay dry-run completed." if bool(options.get("dry_run")) else "replay validation completed.",
+        run_id=run_id,
+        plan=(
+            {
+                "planned_capsules": targets,
+                "changed_files": changed_files if changed_only else [],
+                "max_retries": max_retries,
+                "timeout_seconds": timeout_override,
+            }
+            if bool(options.get("dry_run"))
+            else None
+        ),
+        write_targets=_command_write_targets("replay", include_exports=True),
+        extra={"planned_capsules": targets},
+    )
+
+
+def _run_sync_preflight(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    profile = str(options.get("profile") or "analyze")
+    mode = str(options.get("mode") or "observe")
+    force_full_sync = bool(options.get("force_full_sync", False))
+    timeout_override = options.get("timeout")
+    max_retries = int(options.get("max_retries") or 0)
+    snapshot = _collect_sync_snapshot(repo_root, profile, mode, force_full_sync=force_full_sync)
+    idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
+    run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
+    changed_files = [str(item) for item in snapshot.get("changed_files", [])] if isinstance(snapshot.get("changed_files"), list) else []
+    changed_capsules = _collect_affected_capsules(changed_files)
+    checks: list[dict[str, object]] = []
+
+    integrity = _validate_event_chain(repo_root)
+    if str(integrity.get("status") or "ok") != "ok":
+        checks.append(
+            _make_preflight_check(
+                "integrity",
+                "error",
+                str(integrity.get("message") or "integrity ledger is degraded"),
+                error_code=INTEGRITY_CHECK_FAILED_CODE,
+                remediation=["Repair integrity index before running sync."],
+            )
+        )
+    else:
+        checks.append(_make_preflight_check("integrity", "ok", "integrity ledger validates before sync"))
+
+    lock_state = _read_lock_status(repo_root, datetime.datetime.now(tz=datetime.timezone.utc))
+    lock_status = str(lock_state.get("status") or "free")
+    if lock_status == "locked":
+        checks.append(_make_preflight_check("lock", "warn", "sync lock is currently held; sync would queue pending work"))
+    elif lock_status == "stale":
+        checks.append(_make_preflight_check("lock", "warn", "sync lock appears stale and may require operator review"))
+    else:
+        checks.append(_make_preflight_check("lock", "ok", "sync lock is free"))
+
+    adapter_errors = _initialize_adapter_runtime(repo_root)
+    if adapter_errors:
+        first_error = adapter_errors[0]
+        checks.append(
+            _make_preflight_check(
+                "adapter",
+                "error",
+                str(first_error.get("message") or "adapter initialization failed"),
+                error_code=str(first_error.get("code") or ADAPTER_INTERFACE_MISMATCH_CODE),
+                remediation=_safe_string_list(first_error.get("remediation")),
+            )
+        )
+    else:
+        checks.append(_make_preflight_check("adapter", "ok", "worker adapter initialized for sync"))
+
+    policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
+    if policy_error:
+        checks.append(
+            _make_preflight_check(
+                "policy",
+                "error",
+                str(policy_error.get("message") or "policy configuration is invalid"),
+                error_code=POLICY_CONFIG_ERROR_CODE,
+            )
+        )
+    else:
+        write_check = _evaluate_policy_writes(policy_payload, "sync", mode, _sync_write_targets(include_exports=True))
+        if write_check is None:
+            checks.append(_make_preflight_check("writes", "ok", "sync write targets are allowed by policy"))
+        else:
+            checks.append(
+                _make_preflight_check(
+                    "writes",
+                    "error",
+                    str(write_check.get("message") or "policy denied sync writes"),
+                    error_code=str(write_check.get("error_code") or write_check.get("code") or POLICY_DENIED_CODE),
+                    remediation=_safe_string_list(write_check.get("remediation")),
+                )
+            )
+    try:
+        _validate_canonical_artifact_records(repo_root)
+    except ValueError as exc:
+        checks.append(_make_preflight_check("canonical", "error", f"Canonical artifact validation failed: {exc}"))
+    else:
+        checks.append(_make_preflight_check("canonical", "ok", "canonical artifacts validate before sync"))
+
+    current_state = _read_work_state(repo_root)
+    short_circuit = not force_full_sync and current_state.get("last_idempotency_key") == idempotency_key
+    if short_circuit:
+        checks.append(_make_preflight_check("idempotency", "warn", "sync would short-circuit because the idempotency key is unchanged"))
+    else:
+        checks.append(_make_preflight_check("idempotency", "ok", "sync would execute a full reconciliation pass"))
+
+    planned_steps = ["distill", "apply", "verify", "export"]
+    if short_circuit:
+        planned_steps = ["short_circuit"]
+
+    return _build_preflight_payload(
+        "sync",
+        options,
+        checks,
+        message="sync dry-run completed." if bool(options.get("dry_run")) else "sync validation completed.",
+        run_id=run_id,
+        plan=(
+            {
+                "changed_files": changed_files,
+                "affected_capsules": changed_capsules,
+                "planned_steps": planned_steps,
+                "idempotency_key": idempotency_key,
+                "max_retries": max_retries,
+                "timeout_seconds": timeout_override,
+            }
+            if bool(options.get("dry_run"))
+            else None
+        ),
+        write_targets=_sync_write_targets(include_exports=True),
+        extra={
+            "snapshot": snapshot,
+            "idempotency_key": idempotency_key,
+            "affected_capsules": changed_capsules,
+            "short_circuit": short_circuit,
+        },
+    )
+
+
+def _build_doctor_payload(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+    status_payload = _build_status_payload(repo_root, options)
+    drift = status_payload.get("drift") if isinstance(status_payload.get("drift"), dict) else {}
+    integrity = status_payload.get("integrity") if isinstance(status_payload.get("integrity"), dict) else {}
+    runtime = status_payload.get("runtime") if isinstance(status_payload.get("runtime"), dict) else {}
+    freshness = status_payload.get("freshness") if isinstance(status_payload.get("freshness"), dict) else {}
+    verification = status_payload.get("verification") if isinstance(status_payload.get("verification"), dict) else {}
+    sync = freshness.get("sync") if isinstance(freshness.get("sync"), dict) else {}
+    certificates = freshness.get("certificates") if isinstance(freshness.get("certificates"), dict) else {}
+    policy = drift.get("policy") if isinstance(drift.get("policy"), dict) else {}
+    daemon_payload = _daemon_status_payload(repo_root, *_daemon_running_state(repo_root))
+
+    checks: list[dict[str, object]] = [
+        {
+            "name": "runtime",
+            "status": status_payload.get("status", "ok"),
+            "message": runtime.get("message", "runtime status unavailable"),
+            "details": {"runtime": runtime},
+        },
+        {
+            "name": "sync",
+            "status": sync.get("state", sync.get("status", "unknown")),
+            "message": sync.get("message", "sync freshness unavailable"),
+            "details": {"sync": sync},
+        },
+        {
+            "name": "verification",
+            "status": verification.get("status", verification.get("state", "unknown")),
+            "message": verification.get("message", "verification status unavailable"),
+            "details": {"verification": verification},
+        },
+        {
+            "name": "certificates",
+            "status": certificates.get("state", certificates.get("status", "unknown")),
+            "message": certificates.get("message", "certificate freshness unavailable"),
+            "details": {"certificates": certificates},
+        },
+        {
+            "name": "integrity",
+            "status": integrity.get("state", integrity.get("status", "unknown")),
+            "message": integrity.get("message", "integrity status unavailable"),
+            "details": {"integrity": integrity},
+        },
+        {
+            "name": "daemon",
+            "status": daemon_payload.get("status", "warn"),
+            "message": daemon_payload.get("message", "daemon status unavailable"),
+            "details": {"daemon": daemon_payload.get("runtime", {})},
+        },
+    ]
+    for raw_check in drift.get("checks", []) if isinstance(drift.get("checks"), list) else []:
+        if not isinstance(raw_check, dict):
+            continue
+        checks.append(
+            {
+                "name": str(raw_check.get("type") or "drift"),
+                "status": str(raw_check.get("status") or "warn"),
+                "message": str(raw_check.get("message") or "drift check requires attention"),
+                "remediation": raw_check.get("remediation", []),
+                "details": raw_check.get("details", {}),
+            }
+        )
+    for raw_check in policy.get("checks", []) if isinstance(policy.get("checks"), list) else []:
+        if not isinstance(raw_check, dict):
+            continue
+        checks.append(
+            {
+                "name": f"policy:{raw_check.get('type') or 'check'}",
+                "status": str(raw_check.get("status") or "warn"),
+                "message": str(raw_check.get("message") or "policy check requires attention"),
+                "remediation": raw_check.get("remediation", []),
+                "details": raw_check,
+            }
+        )
+
+    remediation: list[str] = []
+    for item in status_payload.get("remediation", []):
+        if isinstance(item, str):
+            remediation.append(item)
+    for check in checks:
+        for item in check.get("remediation", []):
+            if isinstance(item, str):
+                remediation.append(item)
+
+    payload = {
+        "status": _preflight_status_for_checks(checks),
+        "command": "doctor",
+        "options": options,
+        "checks": checks,
+        "remediation": sorted(set(remediation)),
+        "runtime_snapshot": status_payload,
+        "message": "doctor diagnostics completed",
+    }
+    if payload["status"] == "ok":
+        payload["message"] = "doctor found no blocking diagnostics"
+    elif payload["status"] == "warn":
+        payload["message"] = "doctor found warnings that may require operator attention"
+    else:
+        payload["message"] = "doctor found blocking diagnostics"
+    return payload
+
+
+def _render_doctor(payload: dict[str, object]) -> str:
+    lines = [f"doctor: {payload.get('status', 'unknown')}", ""]
+    for check in payload.get("checks", []):
+        if not isinstance(check, dict):
+            continue
+        lines.append(f"{check.get('name', 'check')}: {check.get('status', 'unknown')} - {check.get('message', '')}")
+    remediation = [item for item in payload.get("remediation", []) if isinstance(item, str)]
+    if remediation:
+        lines.extend(["", "remediation:"])
+        lines.extend(f"- {item}" for item in remediation)
+    return "\n".join(lines) + "\n"
 
 
 def _render_status(payload: dict[str, object]) -> str:
@@ -7375,6 +8251,9 @@ def parse_command_flags(
     allow_certificate_filter: bool = False,
     allow_output_controls: bool = False,
     allow_yes: bool = False,
+    allow_validate: bool = False,
+    allow_dry_run: bool = False,
+    allow_recovery_controls: bool = False,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
@@ -7391,6 +8270,10 @@ def parse_command_flags(
     limit: int | None = None
     confirmed = False
     offset = 0
+    validate_only = False
+    dry_run = False
+    max_retries = 0
+    timeout_seconds: int | None = None
 
     def normalize_identifier_csv(raw_value: str, field: str) -> list[str]:
         try:
@@ -7432,6 +8315,33 @@ def parse_command_flags(
             raise
         if parsed == 0:
             emit_error("invalid --limit value: limit must be greater than 0", command, EXIT_USAGE, output_json)
+        return parsed
+
+    def parse_max_retries_value(raw_value: str) -> int:
+        try:
+            parsed = parse_int_option(raw_value, "max-retries")
+        except ValueError as exc:
+            emit_error(f"invalid --max-retries value: {exc}", command, EXIT_USAGE, output_json)
+            raise
+        if parsed < 0:
+            emit_error("invalid --max-retries value: max-retries must be >= 0", command, EXIT_USAGE, output_json)
+        if parsed > RECOVERY_MAX_RETRIES_LIMIT:
+            emit_error(
+                f"invalid --max-retries value: max-retries must be <= {RECOVERY_MAX_RETRIES_LIMIT}",
+                command,
+                EXIT_USAGE,
+                output_json,
+            )
+        return parsed
+
+    def parse_timeout_value(raw_value: str) -> int:
+        try:
+            parsed = parse_int_option(raw_value, "timeout")
+        except ValueError as exc:
+            emit_error(f"invalid --timeout value: {exc}", command, EXIT_USAGE, output_json)
+            raise
+        if parsed <= 0:
+            emit_error("invalid --timeout value: timeout must be greater than 0", command, EXIT_USAGE, output_json)
         return parsed
 
     i = 0
@@ -7550,6 +8460,64 @@ def parse_command_flags(
                 confirmed = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --yes value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--validate":
+            if not allow_validate:
+                emit_error(f"{command} does not accept --validate", command, EXIT_USAGE, output_json)
+            validate_only = True
+            i += 1
+            continue
+        if arg.startswith("--validate="):
+            if not allow_validate:
+                emit_error(f"{command} does not accept --validate", command, EXIT_USAGE, output_json)
+            try:
+                validate_only = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --validate value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--dry-run":
+            if not allow_dry_run:
+                emit_error(f"{command} does not accept --dry-run", command, EXIT_USAGE, output_json)
+            dry_run = True
+            i += 1
+            continue
+        if arg.startswith("--dry-run="):
+            if not allow_dry_run:
+                emit_error(f"{command} does not accept --dry-run", command, EXIT_USAGE, output_json)
+            try:
+                dry_run = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --dry-run value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--max-retries":
+            if not allow_recovery_controls:
+                emit_error(f"{command} does not accept --max-retries", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --max-retries", command, EXIT_USAGE, output_json)
+            max_retries = parse_max_retries_value(args[i + 1])
+            i += 2
+            continue
+        if arg.startswith("--max-retries="):
+            if not allow_recovery_controls:
+                emit_error(f"{command} does not accept --max-retries", command, EXIT_USAGE, output_json)
+            max_retries = parse_max_retries_value(arg.split("=", 1)[1])
+            i += 1
+            continue
+        if arg == "--timeout":
+            if not allow_recovery_controls:
+                emit_error(f"{command} does not accept --timeout", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --timeout", command, EXIT_USAGE, output_json)
+            timeout_seconds = parse_timeout_value(args[i + 1])
+            i += 2
+            continue
+        if arg.startswith("--timeout="):
+            if not allow_recovery_controls:
+                emit_error(f"{command} does not accept --timeout", command, EXIT_USAGE, output_json)
+            timeout_seconds = parse_timeout_value(arg.split("=", 1)[1])
             i += 1
             continue
         if arg == "--profile":
@@ -7703,6 +8671,10 @@ def parse_command_flags(
         "output_mode": output_mode,
         "output_json": output_json,
         "strict": strict,
+        "validate": validate_only,
+        "dry_run": dry_run,
+        "max_retries": max_retries,
+        "timeout": timeout_seconds,
     }
     if capsule_filters:
         options["capsule"] = capsule_filters
@@ -8655,6 +9627,8 @@ def _run_oracle_check(
     policy: dict[str, object] | None = None,
     exec_root: str | None = None,
     trace_label: str = "verify",
+    timeout_seconds: int | None = None,
+    max_retries: int = 0,
 ) -> dict[str, object]:
     oracle_name = str(oracle.get("name", "unknown-oracle"))
     command = oracle.get("command")
@@ -8723,49 +9697,114 @@ def _run_oracle_check(
             result_payload["trace"] = trace_path
             return result_payload
 
+    resolved_timeout = timeout_seconds if isinstance(timeout_seconds, int) and timeout_seconds > 0 else ORACLE_COMMAND_DEFAULT_TIMEOUT_SECONDS
     if not command_text:
         result_payload["status"] = "pass"
         result_payload["observed_code"] = 0
         result_payload["message"] = "No oracle command configured; marked pass."
+        result_payload["recovery"] = _build_recovery_record(
+            f"oracle:{oracle_name}",
+            attempts=1,
+            max_retries=max_retries,
+            timeout_seconds=resolved_timeout,
+        )
         payload_bytes = (json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode(
             "utf-8"
         )
     else:
-        try:
-            executed = subprocess.run(
-                command_text,
-                shell=True,
-                cwd=exec_root or repo_root,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except subprocess.TimeoutExpired:
-            result_payload["status"] = "error"
-            result_payload["observed_code"] = 124
-            result_payload["error"] = "oracle command timed out"
-            payload_bytes = (
-                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-            ).encode("utf-8")
-        except Exception as exc:
-            result_payload["status"] = "error"
-            result_payload["observed_code"] = 1
-            result_payload["error"] = f"oracle command failed to execute: {exc}"
-            payload_bytes = (
-                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-            ).encode("utf-8")
-        else:
-            result_payload["observed_code"] = executed.returncode
-            if executed.returncode == 0:
-                result_payload["status"] = "pass"
+        attempts = 0
+        retryable_failures: list[dict[str, object]] = []
+        executed: subprocess.CompletedProcess[str] | None = None
+        final_error_message: str | None = None
+        final_error_code: str | None = None
+        while True:
+            attempts += 1
+            try:
+                executed = subprocess.run(
+                    command_text,
+                    shell=True,
+                    cwd=exec_root or repo_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=resolved_timeout,
+                )
+            except subprocess.TimeoutExpired:
+                final_error_message = f"oracle command timed out after {resolved_timeout}s"
+                final_error_code = TIMEOUT_EXPIRED_CODE
+                if attempts <= max_retries:
+                    retryable_failures.append(
+                        {
+                            "attempt": attempts,
+                            "error_code": final_error_code,
+                            "message": final_error_message,
+                            "timed_out": True,
+                        }
+                    )
+                    continue
+                result_payload["status"] = "error"
+                result_payload["code"] = RECOVERY_RETRY_EXHAUSTED_CODE if retryable_failures else final_error_code
+                result_payload["observed_code"] = 124
+                result_payload["error"] = final_error_message
+                result_payload["message"] = final_error_message
+                result_payload["recovery"] = _build_recovery_record(
+                    f"oracle:{oracle_name}",
+                    attempts=attempts,
+                    max_retries=max_retries,
+                    timeout_seconds=resolved_timeout,
+                    exhausted=bool(retryable_failures),
+                    retryable=True,
+                    retryable_failures=retryable_failures,
+                    error_code=result_payload["code"],
+                    message=final_error_message,
+                )
+                break
+            except Exception as exc:
+                final_error_message = f"oracle command failed to execute: {exc}"
+                final_error_code = RUNTIME_ERROR_CODE
+                result_payload["status"] = "error"
+                result_payload["code"] = final_error_code
+                result_payload["observed_code"] = 1
+                result_payload["error"] = final_error_message
+                result_payload["message"] = final_error_message
+                result_payload["recovery"] = _build_recovery_record(
+                    f"oracle:{oracle_name}",
+                    attempts=attempts,
+                    max_retries=max_retries,
+                    timeout_seconds=resolved_timeout,
+                    retryable=False,
+                    error_code=final_error_code,
+                    message=final_error_message,
+                )
+                break
             else:
-                result_payload["status"] = "fail"
-            result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
-            result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
-            result_payload["message"] = "oracle command executed."
-            payload_bytes = (
-                json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
-            ).encode("utf-8")
+                result_payload["observed_code"] = executed.returncode
+                result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
+                result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
+                result_payload["message"] = "oracle command executed."
+                if executed.returncode == 0:
+                    result_payload["status"] = "pass"
+                    result_payload["recovery"] = _build_recovery_record(
+                        f"oracle:{oracle_name}",
+                        attempts=attempts,
+                        max_retries=max_retries,
+                        timeout_seconds=resolved_timeout,
+                        recovered=bool(retryable_failures),
+                        retryable_failures=retryable_failures,
+                    )
+                else:
+                    result_payload["status"] = "fail"
+                    result_payload["recovery"] = _build_recovery_record(
+                        f"oracle:{oracle_name}",
+                        attempts=attempts,
+                        max_retries=max_retries,
+                        timeout_seconds=resolved_timeout,
+                        retryable_failures=retryable_failures,
+                    )
+                break
+
+        payload_bytes = (
+            json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+        ).encode("utf-8")
 
     result_payload["duration_ms"] = int((time.perf_counter() - start) * 1000)
     trace_full_path = os.path.join(repo_root, trace_path)
@@ -8956,12 +9995,15 @@ def _run_replay_step(
     capsule_id: str,
     step_index: int,
     step: dict[str, object],
+    *,
+    timeout_seconds: int | None = None,
+    max_retries: int = 0,
 ) -> dict[str, object]:
     command = str(step.get("command") or "").strip()
     expected_exit_code = step.get("expected_exit_code")
     if not isinstance(expected_exit_code, int):
         expected_exit_code = 0
-    timeout_s = step.get("timeout_s")
+    timeout_s = timeout_seconds if isinstance(timeout_seconds, int) and timeout_seconds > 0 else step.get("timeout_s")
     if not isinstance(timeout_s, int) or timeout_s <= 0:
         timeout_s = REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS
     raw_cwd = step.get("cwd")
@@ -9000,39 +10042,92 @@ def _run_replay_step(
         result_payload["observed_exit_code"] = 1
         result_payload["message"] = "Replay step has no command."
         result_payload["failures"] = ["Replay step has no command."]
+        result_payload["recovery"] = _build_recovery_record(
+            f"replay-step:{capsule_id}:{step_index}",
+            attempts=1,
+            max_retries=max_retries,
+            timeout_seconds=timeout_s,
+        )
     else:
-        try:
-            executed = subprocess.run(
-                command,
-                shell=True,
-                cwd=step_cwd,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-            )
-            observed_exit_code = executed.returncode
-            result_payload["observed_exit_code"] = observed_exit_code
-            result_payload["status"] = "pass" if observed_exit_code == expected_exit_code else "fail"
-            result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
-            result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
-            result_payload["message"] = "replay step executed."
-            if result_payload["status"] != "pass":
-                result_payload["failures"] = [
-                    f"Replay step {step_index} failed with code {observed_exit_code}, expected {expected_exit_code}."
-                ]
-            else:
-                result_payload["failures"] = []
-        except subprocess.TimeoutExpired as exc:
-            result_payload["status"] = "fail"
-            result_payload["observed_exit_code"] = -1
-            result_payload["message"] = f"Replay step timed out after {timeout_s}s"
-            result_payload["failures"] = [f"Replay step {step_index} timed out after {timeout_s}s"]
-            result_payload["timeout_error"] = str(exc)
-        except Exception as exc:
-            result_payload["status"] = "fail"
-            result_payload["observed_exit_code"] = 1
-            result_payload["message"] = "Replay step failed to execute"
-            result_payload["failures"] = [f"Replay step {step_index} failed: {exc}"]
+        attempts = 0
+        retryable_failures: list[dict[str, object]] = []
+        while True:
+            attempts += 1
+            try:
+                executed = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=step_cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_s,
+                )
+                observed_exit_code = executed.returncode
+                result_payload["observed_exit_code"] = observed_exit_code
+                result_payload["status"] = "pass" if observed_exit_code == expected_exit_code else "fail"
+                result_payload["stdout"] = (executed.stdout or "").splitlines()[-5:]
+                result_payload["stderr"] = (executed.stderr or "").splitlines()[-5:]
+                result_payload["message"] = "replay step executed."
+                if result_payload["status"] != "pass":
+                    result_payload["failures"] = [
+                        f"Replay step {step_index} failed with code {observed_exit_code}, expected {expected_exit_code}."
+                    ]
+                else:
+                    result_payload["failures"] = []
+                result_payload["recovery"] = _build_recovery_record(
+                    f"replay-step:{capsule_id}:{step_index}",
+                    attempts=attempts,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_s,
+                    recovered=bool(retryable_failures) and result_payload["status"] == "pass",
+                    retryable_failures=retryable_failures,
+                )
+                break
+            except subprocess.TimeoutExpired as exc:
+                if attempts <= max_retries:
+                    retryable_failures.append(
+                        {
+                            "attempt": attempts,
+                            "error_code": TIMEOUT_EXPIRED_CODE,
+                            "message": f"Replay step {step_index} timed out after {timeout_s}s",
+                            "timed_out": True,
+                        }
+                    )
+                    continue
+                result_payload["status"] = "fail"
+                result_payload["code"] = RECOVERY_RETRY_EXHAUSTED_CODE if retryable_failures else TIMEOUT_EXPIRED_CODE
+                result_payload["observed_exit_code"] = -1
+                result_payload["message"] = f"Replay step timed out after {timeout_s}s"
+                result_payload["failures"] = [f"Replay step {step_index} timed out after {timeout_s}s"]
+                result_payload["timeout_error"] = str(exc)
+                result_payload["recovery"] = _build_recovery_record(
+                    f"replay-step:{capsule_id}:{step_index}",
+                    attempts=attempts,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_s,
+                    exhausted=bool(retryable_failures),
+                    retryable=True,
+                    retryable_failures=retryable_failures,
+                    error_code=result_payload["code"],
+                    message=result_payload["message"],
+                )
+                break
+            except Exception as exc:
+                result_payload["status"] = "fail"
+                result_payload["code"] = RUNTIME_ERROR_CODE
+                result_payload["observed_exit_code"] = 1
+                result_payload["message"] = "Replay step failed to execute"
+                result_payload["failures"] = [f"Replay step {step_index} failed: {exc}"]
+                result_payload["recovery"] = _build_recovery_record(
+                    f"replay-step:{capsule_id}:{step_index}",
+                    attempts=attempts,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_s,
+                    retryable=False,
+                    error_code=RUNTIME_ERROR_CODE,
+                    message=str(result_payload["failures"][0]),
+                )
+                break
 
     result_payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
     trace_path = _build_trace_path(run_id, capsule_id, "replay-step", step_index)
@@ -10080,6 +11175,9 @@ def _run_distill_stage(
     run_id: str,
     profile: str,
     mode: str,
+    *,
+    max_retries: int = 0,
+    timeout_seconds: int | None = None,
 ) -> dict[str, object]:
     adapter_errors = _initialize_adapter_runtime(repo_root)
     if adapter_errors:
@@ -10129,7 +11227,7 @@ def _run_distill_stage(
             "generated_deltas": [],
             "errors": [str(exc)],
         }
-    distill_timeout_seconds = _select_distill_worker_timeout(repo_root, snapshot)
+    distill_timeout_seconds = int(timeout_seconds) if isinstance(timeout_seconds, int) and timeout_seconds > 0 else _select_distill_worker_timeout(repo_root, snapshot)
     diff_baseline = None
     if isinstance(snapshot, dict):
         baseline = snapshot.get("diff_baseline")
@@ -10159,7 +11257,7 @@ def _run_distill_stage(
             trace_path = _build_trace_path(run_id, "distill-batch", batch_index // WORKER_ADAPTER_DISTILL_BATCH_SIZE)
             batch_specs.append((batch_index, batch_capsules, sorted(set(batch_changed_files)), trace_path))
 
-        completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]]]] = {}
+        completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]], dict[str, object]]] = {}
         max_workers = min(WORKER_ADAPTER_DISTILL_MAX_WORKERS, max(len(batch_specs), 1))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {}
@@ -10174,21 +11272,24 @@ def _run_distill_stage(
                     materials_lock_ref=f"{OG_ROOT}/materials.lock",
                 )
                 future = executor.submit(
-                    _run_codex_worker,
+                    _run_worker_with_retries,
                     "distill",
                     distill_input,
                     repo_root,
                     trace_path,
                     worker_adapter,
-                    distill_timeout_seconds,
+                    timeout_seconds=distill_timeout_seconds,
+                    max_retries=max_retries,
                 )
                 future_map[future] = batch_index
             for future in as_completed(future_map):
                 batch_index = future_map[future]
                 completed_batches[batch_index] = future.result()
 
+        recovery_records: list[dict[str, object]] = []
         for batch_index, batch_capsules, _, _ in batch_specs:
-            output, receipts = completed_batches[batch_index]
+            output, receipts, recovery = completed_batches[batch_index]
+            recovery_records.append(recovery)
             delta_payload = _normalize_distill_delta(output)
             for update in delta_payload["capsule_updates"]:
                 raw_delta = update if isinstance(update, dict) else {}
@@ -10220,6 +11321,7 @@ def _run_distill_stage(
             delta["adapter_name"] = adapter_name
     except WorkerAdapterError as exc:
         error_message = str(exc)
+        recovery = cast(dict[str, object] | None, getattr(exc, "recovery", None))
         if _is_worker_unavailable_error(error_message):
             _set_pending_state(repo_root, f"worker runtime unavailable during distill: {error_message}")
             error_code = WORKER_RUNTIME_UNAVAILABLE_CODE
@@ -10238,6 +11340,16 @@ def _run_distill_stage(
             "generated_deltas": [],
             "errors": [{"error_code": error_code, "message": error_message}],
             "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
+            "recovery": recovery
+            or _build_recovery_record(
+                "worker:distill",
+                attempts=1,
+                max_retries=max_retries,
+                timeout_seconds=distill_timeout_seconds,
+                retryable=_is_worker_unavailable_error(error_message),
+                error_code=_recovery_error_code_for_message(error_message),
+                message=error_message,
+            ),
         }
     return {
         "name": "distill",
@@ -10248,6 +11360,7 @@ def _run_distill_stage(
         "affected_capsules": changed_capsules,
         "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         "generated_deltas": deltas,
+        "recovery": _summarize_recovery_records(recovery_records),
     }
 
 
@@ -10759,6 +11872,9 @@ def _run_replay_stage(
     mode: str,
     changed_only: bool = True,
     policy: dict[str, object] | None = None,
+    *,
+    timeout_seconds: int | None = None,
+    max_retries: int = 0,
 ) -> dict[str, object]:
     def _preserve_certificate_refs(capsule_ids: list[str] | None = None) -> list[str]:
         try:
@@ -10952,9 +12068,10 @@ def _run_replay_stage(
     certificate_ids: list[str] = []
     certificate_refs: list[str] = []
     failed_capsules: list[str] = []
-    errors: list[str] = []
+    errors: list[object] = []
     overall_failed = False
     replay_error_code: str | None = None
+    recovery_records: list[dict[str, object]] = []
 
     for capsule in targets:
         trace_path = _build_trace_path(capsule, run_id, "replay")
@@ -10972,26 +12089,32 @@ def _run_replay_stage(
                 scope_materials=scope_materials,
                 baseline_equivalence=baseline_equivalence,
             )
-            output, receipts = _run_codex_worker(
+            output, receipts, worker_recovery = _run_worker_with_retries(
                 "replay",
                 input_payload,
                 repo_root,
                 trace_path,
-                adapter=worker_adapter,
+                worker_adapter,
+                timeout_seconds=int(timeout_seconds) if isinstance(timeout_seconds, int) and timeout_seconds > 0 else WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS,
+                max_retries=max_retries,
             )
+            recovery_records.append(worker_recovery)
             plan = _normalize_replay_plan(output)
             plan["adapter_receipts"] = receipts
             plans.append(plan)
         except WorkerAdapterError as exc:
             error_message = str(exc)
+            recovery = cast(dict[str, object] | None, getattr(exc, "recovery", None))
             if _is_worker_unavailable_error(error_message):
                 _set_pending_state(repo_root, f"worker runtime unavailable during replay: {error_message}")
                 replay_error_code = WORKER_RUNTIME_UNAVAILABLE_CODE
                 replay_status = "pending"
             else:
-                replay_error_code = RUNTIME_ERROR_CODE
+                replay_error_code = str((recovery or {}).get("error_code") or RUNTIME_ERROR_CODE)
                 replay_status = "error"
-            errors.append(error_message)
+            if recovery:
+                recovery_records.append(recovery)
+            errors.append({"error_code": replay_error_code, "message": error_message})
             overall_failed = True
             failed_capsules.append(capsule)
             replay_results.append(
@@ -11003,6 +12126,7 @@ def _run_replay_stage(
                     "trace": trace_path,
                     "failures": [error_message],
                     "parity_results": None,
+                    "recovery": recovery,
                 }
             )
             continue
@@ -11064,14 +12188,21 @@ def _run_replay_stage(
                         capsule_id=capsule,
                         step_index=step_index,
                         step=raw_step,
+                        timeout_seconds=timeout_seconds if isinstance(timeout_seconds, int) and timeout_seconds > 0 else None,
+                        max_retries=max_retries,
                     )
                     replay_steps.append(step_result)
                     replay_result["replay_steps"] = replay_steps
+                    recovery = step_result.get("recovery")
+                    if isinstance(recovery, dict):
+                        recovery_records.append(recovery)
                     replay_receipts.extend(_safe_object_list(step_result.get("receipt_pointers")))
                     if str(step_result.get("status") or "") != "pass":
                         replay_status = "failed"
                         overall_failed = True
                         replay_failures.extend(_safe_string_list(step_result.get("failures")))
+                        if str(step_result.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
+                            replay_error_code = str(step_result.get("code"))
                         break
 
                 oracle_checks: list[dict[str, object]] = []
@@ -11087,8 +12218,13 @@ def _run_replay_stage(
                         policy=policy_payload,
                         exec_root=sandbox_exec_root,
                         trace_label="replay",
+                        timeout_seconds=timeout_seconds,
+                        max_retries=max_retries,
                     )
                     oracle_checks.append(check)
+                    recovery = check.get("recovery")
+                    if isinstance(recovery, dict):
+                        recovery_records.append(recovery)
                     replay_receipts.extend(_safe_object_list(check.get("receipt_pointers")))
                     if str(check.get("status") or "") not in {"pass", "skipped"}:
                         replay_status = "failed"
@@ -11096,6 +12232,8 @@ def _run_replay_stage(
                         replay_failures.append(
                             f"Replay oracle {check.get('oracle_name', 'unknown-oracle')} finished with status {check.get('status', 'unknown')}."
                         )
+                        if str(check.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
+                            replay_error_code = str(check.get("code"))
                 replay_result["oracle_results"] = oracle_checks
 
                 baseline_hash = _collect_replay_equivalence_baseline(repo_root, capsule)
@@ -11139,7 +12277,7 @@ def _run_replay_stage(
                 claim_payload,
             )
         except Exception as exc:
-            errors.append(f"Failed to write replay claim for {capsule}: {exc}")
+            errors.append({"error_code": RUNTIME_ERROR_CODE, "message": f"Failed to write replay claim for {capsule}: {exc}"})
             overall_failed = True
             failed_capsules.append(capsule)
             replay_result["status"] = "error"
@@ -11186,7 +12324,7 @@ def _run_replay_stage(
             certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
             replay_result["certificate_id"] = certificate_id
         except Exception as exc:
-            errors.append(f"Failed to write replay certificate for {capsule}: {exc}")
+            errors.append({"error_code": RUNTIME_ERROR_CODE, "message": f"Failed to write replay certificate for {capsule}: {exc}"})
             overall_failed = True
             failed_capsules.append(capsule)
             replay_result["status"] = "error"
@@ -11202,6 +12340,21 @@ def _run_replay_stage(
         for ref in _preserve_certificate_refs(failed_capsules):
             final_certificate_refs.add(ref)
 
+    if not errors and overall_failed:
+        for replay_result in replay_results:
+            if not isinstance(replay_result, dict):
+                continue
+            failures = _safe_string_list(replay_result.get("failures"))
+            if not failures:
+                continue
+            errors.append(
+                {
+                    "error_code": replay_error_code or RUNTIME_ERROR_CODE,
+                    "message": failures[0],
+                }
+            )
+            break
+
     return {
         "name": "replay",
         "status": "error" if overall_failed else "ok",
@@ -11213,7 +12366,8 @@ def _run_replay_stage(
         "certificate_ids": certificate_ids,
         "certificate_refs": sorted(final_certificate_refs),
         "failed_capsules": sorted(set(failed_capsules)),
-        "errors": [{"error_code": replay_error_code or RUNTIME_ERROR_CODE, "message": error} for error in errors] if errors else [],
+        "errors": errors,
+        "recovery": _summarize_recovery_records(recovery_records),
     }
 
 
@@ -11272,6 +12426,8 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         run_id=run_id,
         mode=mode,
         policy=policy_payload if policy_error is None else None,
+        timeout_seconds=cast(int | None, options.get("timeout")),
+        max_retries=int(options.get("max_retries") or 0),
     )
     verify_status = str(verify.get("status") or "error").lower()
 
@@ -11292,6 +12448,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
     payload = {
         "status": payload_status,
         "command": "verify",
+        "code": verify.get("code"),
         "options": options,
         "run_id": run_id,
         "snapshot": snapshot,
@@ -11307,6 +12464,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": verify.get("errors", []),
         "warnings": verify.get("warnings", []),
+        "recovery": verify.get("recovery", {}),
     }
 
     if policy_error is None and verify_status == "ok":
@@ -11355,10 +12513,13 @@ def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         mode=mode,
         changed_only=changed_only,
         policy=policy_payload if policy_error is None else None,
+        timeout_seconds=cast(int | None, options.get("timeout")),
+        max_retries=int(options.get("max_retries") or 0),
     )
     payload = {
         "status": "ok" if replay.get("status") == "ok" else "error",
         "command": "replay",
+        "code": replay.get("code"),
         "options": options,
         "run_id": run_id,
         "steps": [replay],
@@ -11368,6 +12529,7 @@ def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "certificate_ids": replay.get("certificate_ids", []),
         "certificate_refs": replay.get("certificate_refs", []),
         "errors": replay.get("errors", []),
+        "recovery": replay.get("recovery", {}),
     }
     if policy_error is None and str(replay.get("status") or "").lower() == "ok":
         _append_export_refresh_step(payload, repo_root, mode, policy_payload)
@@ -11884,6 +13046,9 @@ def _run_verify_stage(
     run_id: str,
     mode: str,
     policy: dict[str, object] | None = None,
+    *,
+    timeout_seconds: int | None = None,
+    max_retries: int = 0,
 ) -> dict[str, object]:
     def _preserve_certificate_refs(capsule_ids: list[str] | None = None) -> list[str]:
         try:
@@ -12021,8 +13186,10 @@ def _run_verify_stage(
     certificate_refs: list[str] = []
     overall_failed = False
     failed_capsules: list[str] = []
-    errors: list[str] = []
+    errors: list[object] = []
     configuration_failed = False
+    recovery_records: list[dict[str, object]] = []
+    timed_out = False
 
     for capsule in changed_capsules:
         try:
@@ -12069,11 +13236,17 @@ def _run_verify_stage(
                     run_id,
                     mode,
                     policy_payload,
+                    timeout_seconds=timeout_seconds,
+                    max_retries=max_retries,
                 )
             )
 
         receipt_records: list[dict[str, object]] = []
         for check in checks:
+            recovery = check.get("recovery")
+            if isinstance(recovery, dict):
+                recovery_records.append(recovery)
+                timed_out = timed_out or bool(recovery.get("timed_out"))
             for pointer in check.get("receipt_pointers", []):
                 if isinstance(pointer, dict):
                     receipt_records.append(pointer)
@@ -12087,6 +13260,8 @@ def _run_verify_stage(
                 capsule_status = "failed"
                 overall_failed = True
                 failed_capsules.append(capsule)
+                if str(raw_result.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
+                    timed_out = True
                 break
 
         claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:verify')}"
@@ -12116,7 +13291,7 @@ def _run_verify_stage(
             )
         except Exception as exc:
             error_message = f"Failed to write verify claim for {capsule}: {exc}"
-            errors.append(error_message)
+            errors.append({"error_code": RUNTIME_ERROR_CODE, "message": error_message})
             overall_failed = True
             failed_capsules.append(capsule)
             continue
@@ -12146,7 +13321,7 @@ def _run_verify_stage(
                 certificate_refs.append(f"{OG_ROOT}/certificates/{certificate_id}.json")
             except Exception as exc:
                 error_message = f"Failed to write verify certificate for {capsule}: {exc}"
-                errors.append(error_message)
+                errors.append({"error_code": RUNTIME_ERROR_CODE, "message": error_message})
                 overall_failed = True
                 failed_capsules.append(capsule)
 
@@ -12176,9 +13351,21 @@ def _run_verify_stage(
         status = "warn"
         warnings.extend(policy_denied_messages)
 
+    if not errors:
+        for check_group in oracle_results.values():
+            for raw_result in check_group:
+                if str(raw_result.get("status") or "") in {"error", "fail"}:
+                    message = str(raw_result.get("message") or raw_result.get("error") or "oracle execution failed")
+                    code = str(raw_result.get("code") or (TIMEOUT_EXPIRED_CODE if timed_out else RUNTIME_ERROR_CODE))
+                    errors.append({"error_code": code, "message": message})
+                    break
+            if errors:
+                break
+
     return {
         "name": "verify",
         "status": status,
+        "code": TIMEOUT_EXPIRED_CODE if timed_out and status == "error" else (RUNTIME_ERROR_CODE if status == "error" else None),
         "message": (
             "Oracle-driven verify loop completed with policy-skipped oracles."
             if policy_denied and not (overall_failed or configuration_failed)
@@ -12199,6 +13386,7 @@ def _run_verify_stage(
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": errors,
         "warnings": warnings,
+        "recovery": _summarize_recovery_records(recovery_records),
     }
 
 
@@ -12291,6 +13479,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
         "created_at": _utc_timestamp(),
         "snapshot": payload["snapshot"],
         "steps": payload["steps"],
+        "recovery": payload.get("recovery", {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -12308,6 +13497,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
         "created_at": _utc_timestamp(),
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
+        "recovery": payload.get("recovery", {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -12325,6 +13515,7 @@ def _record_verify_summary_event(repo_root: str, payload: dict[str, object], tot
         "created_at": _utc_timestamp(),
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
+        "recovery": payload.get("recovery", {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -12377,6 +13568,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
         "profile": profile,
         "mode": mode,
         "force_full_sync": force_full_sync,
+        "max_retries": int(options.get("max_retries") or 0),
+        "timeout": options.get("timeout"),
     }
     policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
     if policy_error:
@@ -12545,7 +13738,15 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     _build_work_payload(repo_root, status="distill", last_message="starting distill", last_idempotency_key=idempotency_key)
     distill = _time_step(
         "distill",
-        lambda: _run_distill_stage(repo_root, snapshot, run_id, profile=profile, mode=mode),
+        lambda: _run_distill_stage(
+            repo_root,
+            snapshot,
+            run_id,
+            profile=profile,
+            mode=mode,
+            max_retries=int(options.get("max_retries") or 0),
+            timeout_seconds=cast(int | None, options.get("timeout")),
+        ),
     )
     steps.append(distill)
 
@@ -12573,6 +13774,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             run_id,
             mode=mode,
             policy=policy_payload,
+            max_retries=int(options.get("max_retries") or 0),
+            timeout_seconds=cast(int | None, options.get("timeout")),
         ),
     )
     steps.append(verify)
@@ -12602,6 +13805,14 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
     payload = {
         "status": run_status,
         "command": "sync",
+        "code": next(
+            (
+                str(step.get("code"))
+                for step in steps
+                if isinstance(step, dict) and str(step.get("status") or "").lower() == "error" and step.get("code")
+            ),
+            None,
+        ),
         "subcommand": None,
         "run_id": run_id,
         "idempotency_key": idempotency_key,
@@ -12614,6 +13825,25 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
         "options": sync_options,
         "diff_baseline": snapshot.get("diff_baseline"),
         "force_full_sync": force_full_sync,
+        "recovery": _summarize_recovery_records(
+            [
+                recovery
+                for step in steps
+                for recovery in ([step.get("recovery")] if isinstance(step, dict) and isinstance(step.get("recovery"), dict) else [])
+            ]
+        ),
+        "errors": [
+            error
+            for step in steps
+            if isinstance(step, dict)
+            for error in (
+                step.get("errors")
+                if isinstance(step.get("errors"), list)
+                else ([{"error_code": step.get("code") or RUNTIME_ERROR_CODE, "message": step.get("message")}]
+                      if str(step.get("status") or "").lower() == "error"
+                      else [])
+            )
+        ],
     }
     duration_ms = int((time.perf_counter() - start_at) * 1000)
     summary_path = _record_sync_summary_event(repo_root, payload, duration_ms)
@@ -12794,9 +14024,16 @@ def run_command(
             True,
             output_json,
             allow_force_full_sync=True,
+            allow_validate=True,
+            allow_dry_run=True,
+            allow_recovery_controls=True,
             default_strict=strict,
         )
         repo_root = _git_root()
+        if bool(options.get("validate")) or bool(options.get("dry_run")):
+            payload = _run_sync_preflight(repo_root, options)
+            emit_command_result(payload, output_json)
+            return _command_exit_code(payload)
         integrity = _validate_event_chain(repo_root)
         if integrity.get("status") != "ok":
             repair = _repair_integrity_index(repo_root)
@@ -12853,11 +14090,22 @@ def run_command(
             True,
             output_json,
             allow_output_controls=True,
+            allow_validate=True,
+            allow_dry_run=True,
+            allow_recovery_controls=True,
             default_strict=strict,
         )
         repo_root = _git_root()
-        payload = _run_verify_job(repo_root, options)
         output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        if bool(options.get("validate")) or bool(options.get("dry_run")):
+            payload = _run_verify_preflight(repo_root, options)
+            if output_mode == OUTPUT_MODE_HUMAN:
+                payload["message"] = str(payload.get("message") or "verify preflight completed")
+                emit_command_result(payload, False)
+            else:
+                emit_command_result(payload, True)
+            return _command_exit_code(payload)
+        payload = _run_verify_job(repo_root, options)
         payload = _apply_output_controls(payload, options, output_mode=output_mode)
         if output_mode == OUTPUT_MODE_HUMAN:
             payload["message"] = _render_verify(payload)
@@ -12876,11 +14124,18 @@ def run_command(
             True,
             output_json,
             allow_output_controls=True,
+            allow_validate=True,
+            allow_dry_run=True,
+            allow_recovery_controls=True,
             default_strict=strict,
         )
         repo_root = _git_root()
-        payload = _run_replay_job(repo_root, options)
         output_mode = str(options.get("output_mode") or OUTPUT_MODE_JSON)
+        if bool(options.get("validate")) or bool(options.get("dry_run")):
+            payload = _run_replay_preflight(repo_root, options)
+            emit_command_result(payload, output_mode != OUTPUT_MODE_HUMAN)
+            return _command_exit_code(payload)
+        payload = _run_replay_job(repo_root, options)
         payload = _apply_output_controls(payload, options, output_mode=output_mode)
         if output_mode == OUTPUT_MODE_JSONL:
             emit_command_result_jsonl(payload, "replay")
@@ -12897,9 +14152,32 @@ def run_command(
         emit_command_result(payload, output_json)
         return _command_exit_code(payload)
 
-    if command == "export":
-        options, _ = parse_command_flags(rest, "export", False, False, False, output_json, default_strict=strict)
+    if command == "doctor":
+        options, _ = parse_command_flags(rest, "doctor", False, False, False, output_json, default_strict=strict)
         repo_root = _git_root()
+        payload = _build_doctor_payload(repo_root, options)
+        if not output_json:
+            payload["message"] = _render_doctor(payload)
+        emit_command_result(payload, output_json)
+        return _command_exit_code(payload)
+
+    if command == "export":
+        options, _ = parse_command_flags(
+            rest,
+            "export",
+            False,
+            False,
+            False,
+            output_json,
+            allow_validate=True,
+            allow_dry_run=True,
+            default_strict=strict,
+        )
+        repo_root = _git_root()
+        if bool(options.get("validate")) or bool(options.get("dry_run")):
+            payload = _run_export_preflight(repo_root, options)
+            emit_command_result(payload, output_json)
+            return _command_exit_code(payload)
         export = _run_export_stage(repo_root, mode="observe")
         status = "ok" if export.get("status") == "ok" else "error"
         payload = {

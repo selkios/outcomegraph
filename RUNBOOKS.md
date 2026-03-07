@@ -24,6 +24,7 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 4. Run `og verify --changed` for uncertain surfaces; it now refreshes exports before writing the verify summary.
 5. Run `og explain` when traceability is needed.
 6. If needed, run `og replay --changed` for stronger behavioral confirmation; it also refreshes exports before the replay summary is recorded.
+7. If the runtime looks degraded or stale, run `og doctor --json` before retrying mutating commands.
 
 ### 1.3 Autonomous flow
 
@@ -37,6 +38,8 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 
 - `.outcomegraph` and generated exports are writable in default flow.
 - `verify` and `replay` preflight all expected writes, including traces, claims, certificates, events, integrity checkpoints, and export refresh targets, before mutating canonical artifacts.
+- `sync`, `verify`, `replay`, and `export` now support `--validate` and `--dry-run` for explicit no-write recovery checks.
+- `sync`, `verify`, and `replay` expose bounded `--max-retries` and `--timeout` controls for transient subprocess failures.
 - code writes, dependency mutators, or deployment actions require explicit autonomy mode and allowlist policy.
 
 ### 1.5 Daemon provenance
@@ -65,6 +68,7 @@ Recovery:
 - Review target action against policy category.
 - Add explicit allowlist entry in `.outcomegraph/policy.yaml` where safe.
 - Re-run using required autonomy mode if policy requires it.
+- Use `og doctor --json` to confirm whether policy, integrity, or export drift is the blocking surface.
 
 ### 2.3 Autonomous writes blocked by degraded state
 
@@ -95,7 +99,8 @@ Symptom: verification state becomes stale/unknown with failed certificates.
 Recovery:
 
 - Fix oracle command/runtime.
-- Re-run `og verify --changed`.
+- Re-run `og verify --validate --json` first if you need a no-write preflight.
+- Re-run `og verify --changed --max-retries 1 --timeout 60` when the oracle failure is transient or timeout-related.
 - For persistent failures, run `og replay --changed` to confirm behavioral evidence separately.
 
 ### 2.6 Adapter/interface mismatch
@@ -123,17 +128,21 @@ Recovery:
 ### 3.1 Recover from pending/degraded state
 
 1. Capture current status: `og status`.
-2. Inspect pending marker and latest sync summary.
-3. Fix underlying dependency (policy, runtime, oracle, adapter).
-4. Re-run `og sync`.
-5. Confirm status transitions to healthy/fresh and certificates are emitted again.
+2. Capture structured diagnostics: `og doctor --json`.
+3. Inspect pending marker and latest sync summary.
+4. Fix underlying dependency (policy, runtime, oracle, adapter).
+5. Re-run `og sync --validate --json` before mutating if the cause was ambiguous.
+6. Re-run `og sync`.
+7. Confirm status transitions to healthy/fresh and certificates are emitted again.
 
 ### 3.2 Re-run with narrowed scope
 
 Use changed-scope commands to isolate regressions:
 
-- `og verify --changed`
-- `og replay --changed`
+- `og verify --changed --validate`
+- `og verify --changed --max-retries 1 --timeout 60`
+- `og replay --changed --dry-run`
+- `og replay --changed --max-retries 1 --timeout 120`
 - `og sync` after baseline cleanup.
 
 ### 3.3 Escalation

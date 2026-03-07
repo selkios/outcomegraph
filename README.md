@@ -97,6 +97,7 @@ Typical CI/automation loop:
 
 ```bash
 og status --json            # guard: if status != ok -> fail fast
+og doctor --json            # collect machine-readable diagnostics + remediation
 og sync --json              # performs deterministic reconciliation
 og verify --changed --json  # checks changed capsules only and refreshes exports
 og replay --changed --json  # optional stronger confirmation; also refreshes exports
@@ -112,6 +113,7 @@ og drift --json             # should stay clean after the standalone flows above
 - `verify [--changed]`
 - `replay [--changed]`
 - `status`
+- `doctor`
 - `export`
 - `explain [--capsule --ref --certificate]`
 - `drift`
@@ -146,6 +148,10 @@ Common flags:
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
 - `--changed` (for focused sync/verify/replay behavior)
+- `--validate` / `--validate=true|false` (preflight mutating commands without writing)
+- `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
+- `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
+- `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
 
 Command help contracts also list output modes and exit semantics:
 
@@ -236,6 +242,8 @@ Validates impacted capsules and writes structured verify artifacts for drift and
 
 - `--changed`: verify only capsules impacted by current working-tree changes.
 - Without `--changed`: verify known capsules (falls back to safe defaults).
+- `--validate` / `--dry-run`: inspect affected capsules, oracle selection, and write targets without mutating artifacts.
+- `--max-retries` / `--timeout`: bound retry and timeout behavior for oracle subprocesses.
 
 ### `og replay`
 
@@ -243,6 +251,14 @@ Builds reproducible replay plans and writes replay claims/certificates, includin
 execution parity records where applicable.
 
 - `--changed`: replay only impacted capsules based on working-tree deltas.
+- `--validate` / `--dry-run`: inspect replay targets and write intent without mutating artifacts.
+- `--max-retries` / `--timeout`: bound retry and timeout behavior for worker, replay-step, and replay-oracle subprocesses.
+
+### `og doctor`
+
+Runs machine-readable diagnostics for runtime health, drift, integrity, daemon state,
+and remediation hints. Use it before escalation or when `status`/`sync` failures need
+structured operator guidance.
 
 ### `og explain`
 
@@ -349,6 +365,8 @@ If you see unexpected status or stale diagnostics:
   - stage-level `steps` for `sync`
   - daemon `last_sync_status`
 - check lock state with `og status --json`.
+- run `og doctor --json` to collect consolidated diagnostics and remediation hints.
+- use `og sync --validate --json`, `og verify --validate --json`, or `og replay --dry-run --json` before re-running mutating commands after a failure.
 - repair ledger state intentionally via sync repair flow if integrity is degraded (the CLI emits repair artifacts when possible).
 
 ## Documentation index
