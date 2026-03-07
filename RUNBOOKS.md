@@ -169,7 +169,26 @@ Use changed-scope commands to isolate regressions:
 - `og sync` after baseline cleanup.
 - `og daemon status --session-id <id> --json` when validating daemon continuity explicitly.
 
-### 3.3 Escalation
+### 3.3 Agent reliability metrics
+
+Use `og status --json` or `og doctor --json` and inspect `data.agent_reliability`.
+
+Interpret the four tracked metrics this way:
+
+- `commands_per_successful_task`: `total commands / successful task commands`; lower is better. Values above `2.0` mean the agent is needing extra retries or diagnostic calls before landing a successful task.
+- `schema_valid_output_rate`: `schema-valid outputs / total command outputs`; higher is better. Anything below `1.0` means at least one command envelope fell back to the runtime error shape instead of validating cleanly.
+- `retry_auto_recovery_rate`: `recovered retryable operations / retried operations`; higher is better. If it drops below `1.0`, bounded retries are being consumed without consistently self-healing.
+- `session_churn`: `resumable session rotations / resumable repeat observations`; lower is better. Values above `0.25` mean daemon or autopilot sessions are rotating more often than they are being reused.
+
+Regression workflow:
+
+1. Capture `og status --json` before and after the failing sequence.
+2. Compare `data.agent_reliability.warn_metrics` and `data.agent_reliability.latest_command`.
+3. If `schema_valid_output_rate` regressed, inspect the top-level command `errors` plus any `validation_errors`.
+4. If `retry_auto_recovery_rate` regressed, inspect the latest summary event `agent_reliability.observation.retryable_operations` and `recovery` block.
+5. If `session_churn` regressed, compare the emitted `session_id` values for `daemon` or `autopilot` lifecycle commands.
+
+### 3.4 Escalation
 
 If recovery remains blocked:
 

@@ -1,0 +1,56 @@
+{
+  "task_id": "OG-AGENT-014",
+  "title": "Track and report agent-native reliability metrics",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "RUNBOOKS.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-agent-010/TASK.md",
+    "tasks/og-agent-010/task-plan.json",
+    "tasks/og-agent-012/TASK.md",
+    "tasks/og-agent-012/task-plan.json"
+  ],
+  "write_files": [
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "README.md",
+    "RUNBOOKS.md",
+    "SPEC-v2.md",
+    "og.py",
+    "tasks/og-agent-014/TASK.md",
+    "tasks/og-agent-014/task-plan.json",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Implement a rolling agent reliability tracker and wire it into command envelopes plus summary events",
+      "status": "done"
+    },
+    {
+      "step": "Expose the rolling reliability snapshot via status, doctor, and schema-described response fields",
+      "status": "done"
+    },
+    {
+      "step": "Update docs and runbooks with the new metric definitions and interpretation guidance",
+      "status": "done"
+    },
+    {
+      "step": "Add regression coverage and run the focused plus repo quality verification passes",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m py_compile /home/agent/outcomegraph/og.py /home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py",
+    "uv run pytest /home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py -q",
+    "bash /home/agent/outcomegraph/skills/og-quality-pass/scripts/run_quality_pass.sh /home/agent/outcomegraph"
+  ]
+}

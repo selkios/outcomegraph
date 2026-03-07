@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import tomllib
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 import subprocess
 import tempfile
 import warnings
@@ -27,8 +27,12 @@ class _RepoTestCase(TestCase):
     def tearDown(self) -> None:
         self._tmpdir.cleanup()
 
+    @contextmanager
     def git_root_patch(self):
-        return patch.object(og, "_git_root", return_value=str(self.repo))
+        with patch.object(og, "_git_root", return_value=str(self.repo)), patch.object(
+            og, "_maybe_git_root", return_value=str(self.repo)
+        ):
+            yield
 
     def _git_completed(self, returncode: int, stdout: str = "", stderr: str = ""):
         return subprocess.CompletedProcess(args=["git"], returncode=returncode, stdout=stdout, stderr=stderr)
@@ -592,6 +596,10 @@ class TestCommandIntrospectionContracts(TestCase):
             if command_name == "doctor":
                 response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
                 self.assertIn("checks", response_field_names)
+                self.assertIn("agent_reliability", response_field_names)
+            if command_name == "status":
+                response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
+                self.assertIn("agent_reliability", response_field_names)
             if command_name in {"verify", "replay", "explain", "mcp-server"}:
                 response_field_names = {field["name"] for field in signature["response"]["data_fields"] if isinstance(field, dict)}
                 for flag_name in {"--output", "--fields", "--limit", "--offset"}:
@@ -731,6 +739,9 @@ class TestRecoveryContracts(_RepoTestCase):
         data = payload["data"]
         self.assertIn("checks", data)
         self.assertTrue(any(check["name"] == "runtime" for check in data["checks"]))
+        self.assertTrue(any(check["name"] == "agent_reliability" for check in data["checks"]))
+        self.assertIn("agent_reliability", data)
+        self.assertIn("agent_reliability", payload["metrics"])
 
     def test_sync_dry_run_reports_plan_without_writing_events(self) -> None:
         with self.git_root_patch():
@@ -847,6 +858,135 @@ class TestJsonEnvelopeContract(TestCase):
         )
 
         self.assertEqual(envelope["session_id"], "daemon-20260307t000000z-abcdef1234")
+
+
+class TestAgentReliabilityMetrics(_RepoTestCase):
+    def test_status_command_emits_agent_reliability_snapshot(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", "status"])
+
+        self.assertEqual(code, og.EXIT_SUCCESS)
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(payload["command"], "status")
+        snapshot = payload["metrics"]["agent_reliability"]["snapshot"]
+        self.assertEqual(snapshot["totals"]["commands"], 1)
+        self.assertEqual(snapshot["totals"]["schema_valid_outputs"], 1)
+        self.assertEqual(snapshot["schema_valid_output_rate"]["value"], 1.0)
+        self.assertEqual(payload["data"]["agent_reliability"]["totals"]["commands"], 1)
+
+    def test_record_sync_summary_event_includes_projected_agent_reliability(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            summary_path = og._record_sync_summary_event(
+                str(self.repo),
+                {
+                    "status": "ok",
+                    "command": "sync",
+                    "run_id": "sync-20260307T000000Z-metrics",
+                    "session_id": "sync-20260307t000000z-metrics",
+                    "session": og._build_session_record(
+                        og.SESSION_KIND_SYNC,
+                        og.SESSION_LIFECYCLE_EPHEMERAL,
+                        og.SESSION_STATE_ACTIVE,
+                        session_id="sync-20260307t000000z-metrics",
+                    ),
+                    "idempotency_key": "metrics-key",
+                    "snapshot": {"changed_files": [], "changed_count": 0},
+                    "steps": [],
+                    "recovery": {},
+                    "message": "sync ok",
+                },
+                12,
+            )
+
+        event_payload = json.loads(Path(summary_path).read_text(encoding="utf-8"))
+        self.assertIn("agent_reliability", event_payload)
+        self.assertEqual(event_payload["agent_reliability"]["snapshot"]["totals"]["commands"], 1)
+        self.assertEqual(event_payload["agent_reliability"]["snapshot"]["totals"]["successful_tasks"], 1)
+
+    def test_agent_reliability_snapshot_tracks_retry_recovery_and_session_churn(self) -> None:
+        state = og._agent_reliability_state_record("2026-03-07T00:00:00Z")
+        daemon_session = og._build_session_record(
+            og.SESSION_KIND_DAEMON,
+            og.SESSION_LIFECYCLE_RESUMABLE,
+            og.SESSION_STATE_ACTIVE,
+            session_id="daemon-20260307t000000z-aaaabbbbcc",
+        )
+        first_daemon = og._build_command_result_envelope(
+            "daemon",
+            {
+                "status": "ok",
+                "command": "daemon",
+                "subcommand": "start",
+                "session": daemon_session,
+                "session_id": daemon_session["session_id"],
+            },
+        )
+        state, _ = og._apply_agent_reliability_observation(
+            state,
+            og._build_agent_reliability_observation(first_daemon, schema_valid_output=True),
+        )
+        second_daemon = og._build_command_result_envelope(
+            "daemon",
+            {
+                "status": "ok",
+                "command": "daemon",
+                "subcommand": "start",
+                "session": daemon_session,
+                "session_id": daemon_session["session_id"],
+            },
+        )
+        state, _ = og._apply_agent_reliability_observation(
+            state,
+            og._build_agent_reliability_observation(second_daemon, schema_valid_output=True),
+        )
+        rotated_session = og._build_session_record(
+            og.SESSION_KIND_DAEMON,
+            og.SESSION_LIFECYCLE_RESUMABLE,
+            og.SESSION_STATE_ACTIVE,
+            session_id="daemon-20260307t000100z-ddddeeeeff",
+        )
+        rotated_daemon = og._build_command_result_envelope(
+            "daemon",
+            {
+                "status": "ok",
+                "command": "daemon",
+                "subcommand": "start",
+                "session": rotated_session,
+                "session_id": rotated_session["session_id"],
+            },
+        )
+        state, _ = og._apply_agent_reliability_observation(
+            state,
+            og._build_agent_reliability_observation(rotated_daemon, schema_valid_output=True),
+        )
+        successful_sync = og._build_command_result_envelope(
+            "sync",
+            {
+                "status": "ok",
+                "command": "sync",
+                "run_id": "sync-1",
+                "idempotency_key": "sync-key",
+                "snapshot": {"changed_files": [], "changed_count": 0},
+                "steps": [],
+                "recovery": {
+                    "retried_operations": 1,
+                    "recovered_operations": 1,
+                },
+            },
+        )
+        state, _ = og._apply_agent_reliability_observation(
+            state,
+            og._build_agent_reliability_observation(successful_sync, schema_valid_output=True),
+        )
+
+        snapshot = og._build_agent_reliability_snapshot(state)
+        self.assertEqual(snapshot["retry_auto_recovery_rate"]["value"], 1.0)
+        self.assertEqual(snapshot["session_churn"]["value"], 0.5)
+        self.assertEqual(snapshot["commands_per_successful_task"]["value"], 1.0)
 
 
 class TestHookLifecycle(_RepoTestCase):

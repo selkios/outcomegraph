@@ -241,7 +241,7 @@ Return contract:
   - `hint`: bounded short remediation hint
 - Session resume/expiry/conflict failures are surfaced both in `data` and in the top-level `errors` list.
 - `warnings` are strings and remain informational.
-- `metrics` holds command-level timing and counters.
+- `metrics` holds command-level timing/counters plus `agent_reliability` (`observation` + rolling `snapshot`).
 - `data.list_window` advertises list pagination metadata when `--fields`, `--limit`, or `--offset` are used.
 - `--output jsonl` emits one envelope line plus one `event: "item"` line per streamed list entry.
 - In non-JSON mode, command output remains human-readable (`message` is still shown).
@@ -301,7 +301,8 @@ execution parity records where applicable.
 
 Runs machine-readable diagnostics for runtime health, drift, integrity, daemon state,
 and remediation hints. Use it before escalation or when `status`/`sync` failures need
-structured operator guidance.
+structured operator guidance. `doctor` now includes an `agent_reliability` check and
+echoes the current rolling metric snapshot under `data.agent_reliability`.
 
 ### `og explain`
 
@@ -323,6 +324,9 @@ Builds a runtime/freshness dashboard used by operators and daemons:
 - verification freshness
 - certificate freshness
 - drift and integrity status
+- rolling `agent_reliability` metrics for commands-per-successful-task, schema-valid output rate, retry auto-recovery rate, and resumable session churn
+
+`status --json` publishes the same rolling snapshot under `data.agent_reliability`.
 
 ### `og mcp-server`
 

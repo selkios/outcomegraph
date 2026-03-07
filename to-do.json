@@ -1534,7 +1534,7 @@
       "id": "OG-AGENT-014",
       "title": "Track and report agent-native reliability metrics",
       "priority": 3,
-      "status": "todo",
+      "status": "done",
       "details": "Add first-class metrics to evaluate AI-native usability and recovery effectiveness. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1559,9 +1559,13 @@
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "tasks/og-agent-014/TASK.md",
+        "tasks/og-agent-014/task-plan.json",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-07T13:19:03Z"
     },
     {
       "id": "OG-PROD-001",

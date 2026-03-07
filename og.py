@@ -214,6 +214,7 @@ OUTCOME_GITIGNORE = f"{OG_ROOT}/.gitignore"
 WORK_STATE_FILE = ".outcomegraph/work/state.json"
 WORK_LOCK_FILE = ".outcomegraph/work/lock"
 WORK_PENDING_FILE = ".outcomegraph/work/pending"
+AGENT_RELIABILITY_STATE_FILE = ".outcomegraph/work/agent_reliability.json"
 EVENTS_DIR = ".outcomegraph/events"
 INTEGRITY_CHECKPOINT_DIR = f"{EVENTS_DIR}/checkpoints"
 INTEGRITY_STATE_FILE = f"{EVENTS_DIR}/integrity_state.json"
@@ -402,10 +403,18 @@ STATUS_SCHEMA_VERSION = 1
 DRIFT_REPORT_SCHEMA_VERSION = 1
 COMMAND_RESULT_SCHEMA_VERSION = 1
 COMMAND_INTROSPECTION_SCHEMA_VERSION = 1
+AGENT_RELIABILITY_SCHEMA_VERSION = 1
 COMMAND_RESULT_ALLOWED_STATUSES = frozenset({"ok", "warn", "error"})
 STATUS_SYNC_STALE_SECONDS = 3600
 STATUS_VERIFY_STALE_SECONDS = 24 * 60 * 60
 STATUS_CERTIFICATE_STALE_SECONDS = 24 * 60 * 60
+AGENT_RELIABILITY_COMMANDS_PER_SUCCESSFUL_TASK_WARN = 2.0
+AGENT_RELIABILITY_SESSION_CHURN_WARN = 0.25
+AGENT_RELIABILITY_TRACKED_SESSION_KINDS = frozenset({SESSION_KIND_AUTOPILOT, SESSION_KIND_DAEMON})
+AGENT_RELIABILITY_TASK_COMMANDS = frozenset(
+    {"init", "sync", "verify", "replay", "export", "clean", "drift", "optimize", "autopilot", "daemon"}
+)
+AGENT_RELIABILITY_TASK_SUBCOMMAND_EXCLUSIONS = frozenset({("daemon", "run"), ("daemon", "status")})
 TRACKED_EVIDENCE_TAG = "file"
 UNTRACKED_EVIDENCE_TAG = "cas"
 WORKER_ADAPTER_NAME = "codex"
@@ -1758,6 +1767,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
                 _command_schema_field("schema_version", "integer", "Status schema version."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("agent_reliability", "object", "Rolling agent-native reliability metric snapshot."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og status", "og status --json"],
@@ -1774,6 +1784,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("checks", "array", "Structured diagnostic checks with remediation."),
                 _command_schema_field("remediation", "array", "Deduplicated remediation hints."),
+                _command_schema_field("agent_reliability", "object", "Rolling agent-native reliability metric snapshot."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, INTEGRITY_CHECK_FAILED_CODE],
             examples=["og doctor", "og doctor --json"],
@@ -2537,10 +2548,10 @@ def _normalize_errors_recursive(
     return raw
 
 
-def _build_command_result_envelope(
+def _build_command_result_envelope_with_meta(
     command: str,
     payload: dict[str, object] | None,
-) -> dict[str, object]:
+) -> tuple[dict[str, object], bool]:
     if payload is None or not isinstance(payload, dict):
         payload = {}
     payload = _normalize_errors_recursive(payload)
@@ -2608,10 +2619,18 @@ def _build_command_result_envelope(
     subcommand = payload.get("subcommand")
     if isinstance(subcommand, str):
         envelope["subcommand"] = subcommand
-    return _validate_command_result_envelope(envelope)
+    return _validate_command_result_envelope_with_meta(envelope)
 
 
-def _validate_command_result_envelope(envelope: dict[str, object]) -> dict[str, object]:
+def _build_command_result_envelope(
+    command: str,
+    payload: dict[str, object] | None,
+) -> dict[str, object]:
+    envelope, _ = _build_command_result_envelope_with_meta(command, payload)
+    return envelope
+
+
+def _validate_command_result_envelope_with_meta(envelope: dict[str, object]) -> tuple[dict[str, object], bool]:
     try:
         validated = _CommandResultEnvelopeModel.model_validate(envelope)
     except ValidationError as exc:
@@ -2643,11 +2662,404 @@ def _validate_command_result_envelope(envelope: dict[str, object]) -> dict[str, 
         fallback_payload = cast(dict[str, object], fallback.model_dump(mode="python"))
         if "subcommand" not in envelope and fallback_payload.get("subcommand") is None:
             fallback_payload.pop("subcommand", None)
-        return fallback_payload
+        return fallback_payload, False
     validated_payload = cast(dict[str, object], validated.model_dump(mode="python"))
     if "subcommand" not in envelope and validated_payload.get("subcommand") is None:
         validated_payload.pop("subcommand", None)
+    return validated_payload, True
+
+
+def _validate_command_result_envelope(envelope: dict[str, object]) -> dict[str, object]:
+    validated_payload, _ = _validate_command_result_envelope_with_meta(envelope)
     return validated_payload
+
+
+def _agent_reliability_state_record(created_at: str) -> dict[str, object]:
+    return {
+        "schema_version": AGENT_RELIABILITY_SCHEMA_VERSION,
+        "updated_at": created_at,
+        "totals": {
+            "commands": 0,
+            "successful_tasks": 0,
+            "schema_valid_outputs": 0,
+            "retryable_operations": 0,
+            "retry_auto_recoveries": 0,
+            "resumable_session_starts": 0,
+            "resumable_session_reuses": 0,
+            "resumable_session_rotations": 0,
+        },
+        "current": {
+            "commands_since_successful_task": 0,
+        },
+        "last_session_ids": {},
+        "last_command": None,
+    }
+
+
+def _normalize_counter(raw: object) -> int:
+    if isinstance(raw, bool):
+        return 0
+    if isinstance(raw, int):
+        return max(raw, 0)
+    try:
+        return max(int(str(raw).strip()), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_agent_reliability_state(raw: object) -> dict[str, object]:
+    baseline = _agent_reliability_state_record(_utc_timestamp())
+    if not isinstance(raw, dict):
+        return baseline
+    if _normalize_counter(raw.get("schema_version")) != AGENT_RELIABILITY_SCHEMA_VERSION:
+        return baseline
+
+    totals = raw.get("totals") if isinstance(raw.get("totals"), dict) else {}
+    current = raw.get("current") if isinstance(raw.get("current"), dict) else {}
+    last_session_ids_raw = raw.get("last_session_ids") if isinstance(raw.get("last_session_ids"), dict) else {}
+    last_session_ids: dict[str, str] = {}
+    for kind, session_id in last_session_ids_raw.items():
+        if not isinstance(kind, str) or not kind.strip():
+            continue
+        if not isinstance(session_id, str) or not session_id.strip():
+            continue
+        last_session_ids[kind.strip()] = session_id.strip()
+
+    last_command = raw.get("last_command") if isinstance(raw.get("last_command"), dict) else None
+    if isinstance(last_command, dict):
+        last_command = {
+            key: value
+            for key, value in last_command.items()
+            if key
+            in {
+                "command",
+                "subcommand",
+                "status",
+                "observed_at",
+                "successful_task",
+                "schema_valid_output",
+                "retryable_operations",
+                "retry_auto_recoveries",
+                "session_kind",
+                "session_id",
+                "session_transition",
+                "commands_since_successful_task",
+            }
+        }
+
+    return {
+        "schema_version": AGENT_RELIABILITY_SCHEMA_VERSION,
+        "updated_at": str(raw.get("updated_at") or baseline["updated_at"]),
+        "totals": {
+            "commands": _normalize_counter(totals.get("commands")),
+            "successful_tasks": _normalize_counter(totals.get("successful_tasks")),
+            "schema_valid_outputs": _normalize_counter(totals.get("schema_valid_outputs")),
+            "retryable_operations": _normalize_counter(totals.get("retryable_operations")),
+            "retry_auto_recoveries": _normalize_counter(totals.get("retry_auto_recoveries")),
+            "resumable_session_starts": _normalize_counter(totals.get("resumable_session_starts")),
+            "resumable_session_reuses": _normalize_counter(totals.get("resumable_session_reuses")),
+            "resumable_session_rotations": _normalize_counter(totals.get("resumable_session_rotations")),
+        },
+        "current": {
+            "commands_since_successful_task": _normalize_counter(current.get("commands_since_successful_task")),
+        },
+        "last_session_ids": last_session_ids,
+        "last_command": last_command,
+    }
+
+
+def _read_agent_reliability_state(repo_root: str) -> dict[str, object]:
+    return _normalize_agent_reliability_state(_read_json_file(os.path.join(repo_root, AGENT_RELIABILITY_STATE_FILE)))
+
+
+def _write_agent_reliability_state(repo_root: str, state: dict[str, object]) -> None:
+    _write_json_file(os.path.join(repo_root, AGENT_RELIABILITY_STATE_FILE), state)
+
+
+def _agent_reliability_counts_as_successful_task(command: str, subcommand: str | None, status: str) -> bool:
+    if status != "ok":
+        return False
+    if command not in AGENT_RELIABILITY_TASK_COMMANDS:
+        return False
+    if (command, str(subcommand or "").strip()) in AGENT_RELIABILITY_TASK_SUBCOMMAND_EXCLUSIONS:
+        return False
+    return True
+
+
+def _infer_session_kind(session_id: object) -> str | None:
+    if not isinstance(session_id, str) or not session_id.strip():
+        return None
+    prefix = session_id.strip().split("-", 1)[0].strip().lower()
+    return prefix or None
+
+
+def _build_agent_reliability_observation(
+    envelope: dict[str, object],
+    *,
+    schema_valid_output: bool,
+) -> dict[str, object]:
+    command = str(envelope.get("command") or "og").strip() or "og"
+    subcommand = envelope.get("subcommand")
+    normalized_subcommand = str(subcommand).strip() if isinstance(subcommand, str) and subcommand.strip() else None
+    status = str(envelope.get("status") or "error").strip().lower() or "error"
+    data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
+    recovery = data.get("recovery") if isinstance(data.get("recovery"), dict) else {}
+    session = _session_from_payload(data.get("session"))
+    session_id = envelope.get("session_id")
+    if not isinstance(session_id, str) or not session_id.strip():
+        session_id = session.get("session_id") if isinstance(session, dict) else None
+    session_kind = str(session.get("kind") or "").strip() if isinstance(session, dict) else ""
+    if not session_kind:
+        session_kind = str(_infer_session_kind(session_id) or "")
+    session_tracked = (
+        bool(session_id)
+        and session_kind in AGENT_RELIABILITY_TRACKED_SESSION_KINDS
+        and (not isinstance(session, dict) or bool(session.get("resume_supported")))
+    )
+    retried_operations = _normalize_counter(recovery.get("retried_operations"))
+    recovered_operations = _normalize_counter(recovery.get("recovered_operations"))
+    return {
+        "observed_at": _utc_timestamp(),
+        "command": command,
+        "subcommand": normalized_subcommand,
+        "status": status,
+        "successful_task": _agent_reliability_counts_as_successful_task(command, normalized_subcommand, status),
+        "schema_valid_output": bool(schema_valid_output),
+        "retryable_operations": retried_operations,
+        "retry_auto_recoveries": min(recovered_operations, retried_operations),
+        "session_kind": session_kind or None,
+        "session_id": session_id if isinstance(session_id, str) and session_id.strip() else None,
+        "session_tracked": session_tracked,
+    }
+
+
+def _apply_agent_reliability_observation(
+    state: dict[str, object],
+    observation: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    next_state = _normalize_agent_reliability_state(state)
+    totals = cast(dict[str, object], next_state["totals"])
+    current = cast(dict[str, object], next_state["current"])
+    last_session_ids = cast(dict[str, str], next_state["last_session_ids"])
+    applied = dict(observation)
+
+    totals["commands"] = _normalize_counter(totals.get("commands")) + 1
+    current_commands = _normalize_counter(current.get("commands_since_successful_task")) + 1
+    if bool(applied.get("successful_task")):
+        totals["successful_tasks"] = _normalize_counter(totals.get("successful_tasks")) + 1
+        current_commands = 0
+    current["commands_since_successful_task"] = current_commands
+
+    if bool(applied.get("schema_valid_output")):
+        totals["schema_valid_outputs"] = _normalize_counter(totals.get("schema_valid_outputs")) + 1
+
+    totals["retryable_operations"] = _normalize_counter(totals.get("retryable_operations")) + _normalize_counter(
+        applied.get("retryable_operations")
+    )
+    totals["retry_auto_recoveries"] = _normalize_counter(totals.get("retry_auto_recoveries")) + _normalize_counter(
+        applied.get("retry_auto_recoveries")
+    )
+
+    session_transition = "none"
+    session_kind = str(applied.get("session_kind") or "").strip()
+    session_id = str(applied.get("session_id") or "").strip()
+    if bool(applied.get("session_tracked")) and session_kind and session_id:
+        previous_session_id = last_session_ids.get(session_kind)
+        if isinstance(previous_session_id, str) and previous_session_id:
+            if previous_session_id == session_id:
+                totals["resumable_session_reuses"] = _normalize_counter(totals.get("resumable_session_reuses")) + 1
+                session_transition = "reuse"
+            else:
+                totals["resumable_session_rotations"] = _normalize_counter(
+                    totals.get("resumable_session_rotations")
+                ) + 1
+                session_transition = "rotation"
+        else:
+            totals["resumable_session_starts"] = _normalize_counter(totals.get("resumable_session_starts")) + 1
+            session_transition = "start"
+        last_session_ids[session_kind] = session_id
+    elif session_kind and session_id:
+        session_transition = "ignored"
+
+    observed_at = str(applied.get("observed_at") or _utc_timestamp())
+    applied["observed_at"] = observed_at
+    applied["session_transition"] = session_transition
+    applied["commands_since_successful_task"] = current_commands
+    next_state["updated_at"] = observed_at
+    next_state["last_command"] = {
+        "command": applied.get("command"),
+        "subcommand": applied.get("subcommand"),
+        "status": applied.get("status"),
+        "observed_at": observed_at,
+        "successful_task": bool(applied.get("successful_task")),
+        "schema_valid_output": bool(applied.get("schema_valid_output")),
+        "retryable_operations": _normalize_counter(applied.get("retryable_operations")),
+        "retry_auto_recoveries": _normalize_counter(applied.get("retry_auto_recoveries")),
+        "session_kind": applied.get("session_kind"),
+        "session_id": applied.get("session_id"),
+        "session_transition": session_transition,
+        "commands_since_successful_task": current_commands,
+    }
+    return next_state, applied
+
+
+def _rounded_metric_value(value: float | None, *, digits: int = 4) -> float | None:
+    if value is None:
+        return None
+    return round(value, digits)
+
+
+def _build_agent_reliability_snapshot(state: dict[str, object]) -> dict[str, object]:
+    normalized_state = _normalize_agent_reliability_state(state)
+    totals = cast(dict[str, object], normalized_state["totals"])
+    current = cast(dict[str, object], normalized_state["current"])
+    total_commands = _normalize_counter(totals.get("commands"))
+    successful_tasks = _normalize_counter(totals.get("successful_tasks"))
+    schema_valid_outputs = _normalize_counter(totals.get("schema_valid_outputs"))
+    retryable_operations = _normalize_counter(totals.get("retryable_operations"))
+    retry_auto_recoveries = _normalize_counter(totals.get("retry_auto_recoveries"))
+    session_starts = _normalize_counter(totals.get("resumable_session_starts"))
+    session_reuses = _normalize_counter(totals.get("resumable_session_reuses"))
+    session_rotations = _normalize_counter(totals.get("resumable_session_rotations"))
+    session_repeat_observations = session_reuses + session_rotations
+
+    commands_per_successful_task_value = (
+        _rounded_metric_value(total_commands / successful_tasks, digits=3) if successful_tasks else None
+    )
+    schema_valid_output_rate_value = (
+        _rounded_metric_value(schema_valid_outputs / total_commands) if total_commands else None
+    )
+    retry_auto_recovery_rate_value = (
+        _rounded_metric_value(retry_auto_recoveries / retryable_operations) if retryable_operations else None
+    )
+    session_churn_value = (
+        _rounded_metric_value(session_rotations / session_repeat_observations) if session_repeat_observations else None
+    )
+
+    commands_per_successful_task_status = "unknown"
+    if commands_per_successful_task_value is not None:
+        commands_per_successful_task_status = (
+            "warn"
+            if commands_per_successful_task_value > AGENT_RELIABILITY_COMMANDS_PER_SUCCESSFUL_TASK_WARN
+            else "ok"
+        )
+
+    schema_valid_output_rate_status = "unknown"
+    if schema_valid_output_rate_value is not None:
+        schema_valid_output_rate_status = "ok" if schema_valid_outputs == total_commands else "warn"
+
+    retry_auto_recovery_rate_status = "unknown"
+    if retry_auto_recovery_rate_value is not None:
+        retry_auto_recovery_rate_status = "ok" if retry_auto_recoveries == retryable_operations else "warn"
+
+    session_churn_status = "unknown"
+    if session_churn_value is not None:
+        session_churn_status = "warn" if session_churn_value > AGENT_RELIABILITY_SESSION_CHURN_WARN else "ok"
+
+    metric_statuses = {
+        "commands_per_successful_task": commands_per_successful_task_status,
+        "schema_valid_output_rate": schema_valid_output_rate_status,
+        "retry_auto_recovery_rate": retry_auto_recovery_rate_status,
+        "session_churn": session_churn_status,
+    }
+    warn_metrics = [name for name, status in metric_statuses.items() if status == "warn"]
+    unknown_metrics = [name for name, status in metric_statuses.items() if status == "unknown"]
+    snapshot_status = "warn" if warn_metrics else "ok"
+    snapshot_message = "agent reliability metrics are within configured thresholds"
+    if warn_metrics:
+        snapshot_message = f"agent reliability metrics need attention: {', '.join(sorted(warn_metrics))}"
+    elif unknown_metrics:
+        snapshot_message = f"collecting more observations for: {', '.join(sorted(unknown_metrics))}"
+
+    return {
+        "schema_version": AGENT_RELIABILITY_SCHEMA_VERSION,
+        "tracked_at": normalized_state["updated_at"],
+        "status": snapshot_status,
+        "message": snapshot_message,
+        "warn_metrics": sorted(warn_metrics),
+        "unknown_metrics": sorted(unknown_metrics),
+        "totals": {
+            "commands": total_commands,
+            "successful_tasks": successful_tasks,
+            "schema_valid_outputs": schema_valid_outputs,
+            "retryable_operations": retryable_operations,
+            "retry_auto_recoveries": retry_auto_recoveries,
+            "resumable_session_starts": session_starts,
+            "resumable_session_reuses": session_reuses,
+            "resumable_session_rotations": session_rotations,
+        },
+        "current": {
+            "commands_since_successful_task": _normalize_counter(current.get("commands_since_successful_task")),
+        },
+        "latest_command": normalized_state.get("last_command"),
+        "commands_per_successful_task": {
+            "value": commands_per_successful_task_value,
+            "units": "commands/task",
+            "direction": "lower_is_better",
+            "status": commands_per_successful_task_status,
+            "total_commands": total_commands,
+            "successful_tasks": successful_tasks,
+        },
+        "schema_valid_output_rate": {
+            "value": schema_valid_output_rate_value,
+            "units": "ratio",
+            "direction": "higher_is_better",
+            "status": schema_valid_output_rate_status,
+            "valid_outputs": schema_valid_outputs,
+            "total_outputs": total_commands,
+        },
+        "retry_auto_recovery_rate": {
+            "value": retry_auto_recovery_rate_value,
+            "units": "ratio",
+            "direction": "higher_is_better",
+            "status": retry_auto_recovery_rate_status,
+            "retryable_operations": retryable_operations,
+            "recovered_operations": retry_auto_recoveries,
+        },
+        "session_churn": {
+            "value": session_churn_value,
+            "units": "ratio",
+            "direction": "lower_is_better",
+            "status": session_churn_status,
+            "tracked_session_kinds": sorted(AGENT_RELIABILITY_TRACKED_SESSION_KINDS),
+            "session_starts": session_starts,
+            "reused_sessions": session_reuses,
+            "rotated_sessions": session_rotations,
+            "repeat_observations": session_repeat_observations,
+        },
+    }
+
+
+def _project_agent_reliability_metrics(
+    repo_root: str,
+    command: str,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    envelope, schema_valid_output = _build_command_result_envelope_with_meta(command, payload)
+    observation = _build_agent_reliability_observation(envelope, schema_valid_output=schema_valid_output)
+    projected_state, projected_observation = _apply_agent_reliability_observation(
+        _read_agent_reliability_state(repo_root),
+        observation,
+    )
+    return {
+        "observation": projected_observation,
+        "snapshot": _build_agent_reliability_snapshot(projected_state),
+    }
+
+
+def _record_agent_reliability_metrics(
+    repo_root: str,
+    envelope: dict[str, object],
+    *,
+    schema_valid_output: bool,
+) -> dict[str, object]:
+    observation = _build_agent_reliability_observation(envelope, schema_valid_output=schema_valid_output)
+    next_state, applied_observation = _apply_agent_reliability_observation(_read_agent_reliability_state(repo_root), observation)
+    _write_agent_reliability_state(repo_root, next_state)
+    return {
+        "observation": applied_observation,
+        "snapshot": _build_agent_reliability_snapshot(next_state),
+    }
 
 
 def _error_code_for_exit_code(exit_code: int) -> str:
@@ -2698,8 +3110,32 @@ def emit_jsonl_line(payload: dict) -> None:
     print(json.dumps(payload, ensure_ascii=True))
 
 
+def _prepare_command_result_envelope(
+    payload: dict,
+    command: str | None,
+) -> dict[str, object]:
+    envelope, schema_valid_output = _build_command_result_envelope_with_meta(command or "og", payload)
+    repo_root = _maybe_git_root()
+    if repo_root is None:
+        return envelope
+
+    agent_reliability = _record_agent_reliability_metrics(
+        repo_root,
+        envelope,
+        schema_valid_output=schema_valid_output,
+    )
+    metrics = envelope.get("metrics") if isinstance(envelope.get("metrics"), dict) else {}
+    merged_metrics = dict(metrics)
+    merged_metrics["agent_reliability"] = agent_reliability
+    envelope["metrics"] = merged_metrics
+    data = envelope.get("data")
+    if isinstance(data, dict) and str(envelope.get("command") or "") in {"status", "doctor"}:
+        data["agent_reliability"] = agent_reliability.get("snapshot")
+    return envelope
+
+
 def emit_command_result_jsonl(payload: dict, command: str | None) -> None:
-    payload = _build_command_result_envelope(command or "og", payload)
+    payload = _prepare_command_result_envelope(payload, command)
     list_fields = {
         str(key): value
         for key, value in payload.get("data", {}).items()
@@ -2756,8 +3192,9 @@ def emit_command_result_jsonl(payload: dict, command: str | None) -> None:
 
 def emit_command_result(payload: dict, output_json: bool, command: str | None = None) -> None:
     if output_json:
-        emit_json(_build_command_result_envelope(command or "og", payload))
+        emit_json(_prepare_command_result_envelope(payload, command))
         return
+    _prepare_command_result_envelope(payload, command)
     message = payload.get("message")
     if isinstance(message, str):
         print(message)
@@ -4456,7 +4893,12 @@ def _collect_export_drift_check(repo_root: str) -> dict[str, object] | None:
     }
 
 
-def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+def _build_status_payload(
+    repo_root: str,
+    options: dict[str, object],
+    *,
+    project_agent_reliability: bool = True,
+) -> dict[str, object]:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     state = _read_work_state(repo_root)
     lock = _read_lock_status(repo_root, now)
@@ -4578,6 +5020,8 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
             "message": runtime_message,
         },
     }
+    if project_agent_reliability:
+        payload["agent_reliability"] = _project_agent_reliability_metrics(repo_root, "status", payload)["snapshot"]
     if overall_status == "warn":
         payload["message"] = "status dashboard indicates warnings"
     if overall_status == "error":
@@ -5084,7 +5528,7 @@ def _run_sync_preflight(repo_root: str, options: dict[str, object]) -> dict[str,
 
 
 def _build_doctor_payload(repo_root: str, options: dict[str, object]) -> dict[str, object]:
-    status_payload = _build_status_payload(repo_root, options)
+    status_payload = _build_status_payload(repo_root, options, project_agent_reliability=False)
     drift = status_payload.get("drift") if isinstance(status_payload.get("drift"), dict) else {}
     integrity = status_payload.get("integrity") if isinstance(status_payload.get("integrity"), dict) else {}
     runtime = status_payload.get("runtime") if isinstance(status_payload.get("runtime"), dict) else {}
@@ -5176,6 +5620,17 @@ def _build_doctor_payload(repo_root: str, options: dict[str, object]) -> dict[st
         "runtime_snapshot": status_payload,
         "message": "doctor diagnostics completed",
     }
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "doctor", payload)["snapshot"]
+    payload["agent_reliability"] = agent_reliability
+    checks.append(
+        {
+            "name": "agent_reliability",
+            "status": agent_reliability.get("status", "ok"),
+            "message": agent_reliability.get("message", "agent reliability metrics unavailable"),
+            "details": {"agent_reliability": agent_reliability},
+        }
+    )
+    payload["status"] = _preflight_status_for_checks(checks)
     if payload["status"] == "ok":
         payload["message"] = "doctor found no blocking diagnostics"
     elif payload["status"] == "warn":
@@ -5183,6 +5638,15 @@ def _build_doctor_payload(repo_root: str, options: dict[str, object]) -> dict[st
     else:
         payload["message"] = "doctor found blocking diagnostics"
     return payload
+
+
+def _format_metric_value(metric_payload: object, *, digits: int = 2) -> str:
+    if not isinstance(metric_payload, dict):
+        return "n/a"
+    value = metric_payload.get("value")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "n/a"
+    return f"{float(value):.{digits}f}"
 
 
 def _render_doctor(payload: dict[str, object]) -> str:
@@ -5206,6 +5670,7 @@ def _render_status(payload: dict[str, object]) -> str:
     verification = payload.get("verification", {})
     integrity = payload.get("integrity", {})
     runtime = payload.get("runtime", {})
+    agent_reliability = payload.get("agent_reliability", {})
     issues = payload.get("issues", [])
     status = payload.get("status", "unknown")
     lock = runtime.get("lock", {})
@@ -5223,6 +5688,19 @@ def _render_status(payload: dict[str, object]) -> str:
     )
     lines.append(f"drift: {drift.get('state')}")
     lines.append(f"integrity: {integrity.get('state')}")
+    if isinstance(agent_reliability, dict) and agent_reliability:
+        commands_per_task = agent_reliability.get("commands_per_successful_task")
+        schema_valid_rate = agent_reliability.get("schema_valid_output_rate")
+        retry_recovery_rate = agent_reliability.get("retry_auto_recovery_rate")
+        session_churn = agent_reliability.get("session_churn")
+        lines.append(
+            "agent reliability: "
+            f"{agent_reliability.get('status', 'unknown')} "
+            f"(commands/task={_format_metric_value(commands_per_task)}, "
+            f"schema-valid={_format_metric_value(schema_valid_rate)}, "
+            f"retry-recovery={_format_metric_value(retry_recovery_rate)}, "
+            f"session-churn={_format_metric_value(session_churn)})"
+        )
     for check in drift.get("checks", []):
         check_state = check.get("status")
         if str(check_state) == "ok":
@@ -8521,6 +8999,13 @@ def _init_outcomegraph() -> dict[str, object]:
         f"{OG_ROOT}/constitution/default.yaml": _build_constitution_payload(created_at),
         f"{WORK_STATE_FILE}": _build_state_payload(created_at),
         f"{WORK_LOCK_FILE}": _build_lock_payload(created_at),
+        f"{AGENT_RELIABILITY_STATE_FILE}": json.dumps(
+            _agent_reliability_state_record(created_at),
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        + "\n",
         f"{OG_ROOT}/policy.yaml": _build_policy_payload(created_at),
         f"{OG_ROOT}/config.yaml": _build_config_payload(created_at),
         OUTCOME_GITIGNORE: _build_outcome_gitignore_payload(),
@@ -15787,6 +16272,7 @@ def _build_prompt_pack_payload(
 
 
 def _record_optimize_prompts_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "optimize", payload)
     event_payload = {
         "schema_version": 2,
         "artifact_type": "optimize_prompt_eval",
@@ -15803,6 +16289,7 @@ def _record_optimize_prompts_event(repo_root: str, payload: dict[str, object], t
         "promotion": payload.get("promotion"),
         "errors": payload.get("errors", []),
         "steps": [payload.get("result")],
+        "agent_reliability": agent_reliability,
     }
     path, _ = _append_ledger_event(repo_root, event_payload)
     return path
@@ -16386,6 +16873,7 @@ def _run_export_stage(
 def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     session_id = payload.get("session_id")
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "sync", payload)
     event_payload = {
         "schema_version": 2,
         "artifact_type": "sync_summary",
@@ -16399,6 +16887,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
         "snapshot": payload["snapshot"],
         "steps": payload["steps"],
         "recovery": payload.get("recovery", {}),
+        "agent_reliability": agent_reliability,
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
         **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
@@ -16409,6 +16898,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
 def _record_replay_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     session_id = payload.get("session_id")
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "replay", payload)
     event_payload = {
         "schema_version": 2,
         "artifact_type": "replay_summary",
@@ -16421,6 +16911,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
+        "agent_reliability": agent_reliability,
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
         **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
@@ -16431,6 +16922,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
 def _record_verify_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     session_id = payload.get("session_id")
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "verify", payload)
     event_payload = {
         "schema_version": 2,
         "artifact_type": "verify_summary",
@@ -16443,6 +16935,7 @@ def _record_verify_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
+        "agent_reliability": agent_reliability,
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
         **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
@@ -16470,6 +16963,7 @@ def _build_drift_payload(repo_root: str, options: dict[str, object]) -> dict[str
 def _record_drift_report_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
     run_id = _build_run_id("drift", _short_hash(f"drift:{total_ms}:{len(payload.get('checks', []))}", 10))
     session_id = payload.get("session_id")
+    agent_reliability = _project_agent_reliability_metrics(repo_root, "drift", payload)
     event_payload = {
         "schema_version": 2,
         "artifact_type": "drift_report",
@@ -16481,6 +16975,7 @@ def _record_drift_report_event(repo_root: str, payload: dict[str, object], total
         "checks": payload.get("checks", []),
         "drift": payload.get("drift", {}),
         "remediation": payload.get("drift", {}).get("remediation", []),
+        "agent_reliability": agent_reliability,
         **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)

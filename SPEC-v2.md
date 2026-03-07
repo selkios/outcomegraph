@@ -255,6 +255,10 @@ Structured output:
   - `metrics`
 - `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
 - `data.options.configuration` records resolved config/policy paths plus the source for `output_mode`, `profile`, and `mode`.
+- `metrics.agent_reliability` carries:
+  - `observation`: the current command's command/task, schema-valid output, retry recovery, and session reuse/rotation contribution
+  - `snapshot`: rolling ratios for `commands_per_successful_task`, `schema_valid_output_rate`, `retry_auto_recovery_rate`, and `session_churn`
+- `status` and `doctor` also surface the rolling snapshot under `data.agent_reliability`.
 - `data.session` is present for lock, daemon, and autopilot lifecycles and includes `session_id`, `lifecycle`, `state`, `expires_at`, and resume metadata.
 - Session lifecycle failures are mirrored into top-level `errors` even when the full session payload remains under `data`.
 - Command IDs are stable across help/usage, success, and failure envelopes.
@@ -278,7 +282,20 @@ Example:
   "errors": [],
   "warnings": [],
   "metrics": {
-    "duration_ms": 1234
+    "duration_ms": 1234,
+    "agent_reliability": {
+      "observation": {
+        "command": "sync",
+        "successful_task": true,
+        "schema_valid_output": true
+      },
+      "snapshot": {
+        "commands_per_successful_task": { "value": 1.0 },
+        "schema_valid_output_rate": { "value": 1.0 },
+        "retry_auto_recovery_rate": { "value": null },
+        "session_churn": { "value": null }
+      }
+    }
   }
 }
 ```
@@ -287,6 +304,7 @@ Migration note:
 
 - Old command payloads that previously emitted command-specific JSON shapes now always appear under `data`.
 - Clients should treat top-level fields as the stable contract and preserve `data` as the legacy payload body.
+- Sync, verify, replay, drift, and optimize summary events now also embed the same `agent_reliability` observation + snapshot payload for machine-readable regressions.
 
 ## 6) Repository layout and tracking policy
 
