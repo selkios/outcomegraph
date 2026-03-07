@@ -1415,7 +1415,9 @@
         "OG-AGENT-003"
       ],
       "files": [
+        ".outcomegraph/export/AGENTS.md",
         "AGENT_FIRST_CLI_REVIEW.md",
+        "CONTEXT.md",
         "README.md",
         "RUNBOOKS.md",
         "SPEC-v2.md",
@@ -1425,7 +1427,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T10:38:33Z"
+      "updated_at": "2026-03-07T10:42:44Z"
     },
     {
       "id": "OG-AGENT-011",
@@ -1450,16 +1452,16 @@
         "OG-AGENT-002"
       ],
       "files": [
-        "CONTEXT.md",
         ".outcomegraph/export/AGENTS.md",
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "CONTEXT.md",
         "README.md",
         "SPEC-v2.md",
-        "AGENT_FIRST_CLI_REVIEW.md",
         "og.py",
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T10:40:18Z"
+      "updated_at": "2026-03-07T10:44:17Z"
     },
     {
       "id": "OG-AGENT-012",
@@ -1798,13 +1800,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py",
         "tasks/og-prompt-002/TASK.md",
         "tasks/og-prompt-002/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T10:05:53Z"
+      "updated_at": "2026-03-07T10:07:38Z"
     },
     {
       "id": "OG-CAPSULE-001",
@@ -1935,7 +1937,7 @@
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T10:53:52Z"
+      "updated_at": "2026-03-07T10:57:30Z"
     },
     {
       "id": "OG-REPLAY-003",
@@ -1974,7 +1976,7 @@
       "id": "OG-EVAL-001",
       "title": "Add an artifact-quality evaluation harness for capsule usefulness",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Phase 7 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: measure graph quality directly so prompt and payload changes are judged by capsule usefulness rather than only by structural success.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 7 and define measurable acceptance metrics for executable oracles, invariant coverage, stale-doc contradictions, and code-capsule evidence quality",
@@ -1996,17 +1998,20 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py",
-        "skills/og-quality-pass/SKILL.md"
+        "tests/test_capsule_quality_eval.py",
+        "skills/og-quality-pass/SKILL.md",
+        "tasks/og-eval-001/TASK.md",
+        "tasks/og-eval-001/task-plan.json",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T11:24:50Z"
     },
     {
       "id": "OG-DOGFOOD-001",
       "title": "Dogfood the refactor with a clean full-repo rebuild and capsule review",
       "priority": 2,
-      "status": "todo",
+      "status": "blocked",
       "details": "Phase 8 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: validate the new prompt system and capsule-quality rules with `og clean`, `og init`, and a full live sync on this repository.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 8 and run a clean bootstrap plus full sync/review loop against this repo after the refactor lands",
@@ -2024,14 +2029,31 @@
         "OG-EVAL-001"
       ],
       "files": [
-        "WORKER_CAPSULE_REFACTOR_PLAN.md",
         ".outcomegraph",
-        "skills/outcome-steward/SKILL.md",
+        ".outcomegraph/events/dogfood-drift.txt",
+        ".outcomegraph/events/dogfood-replay.json",
+        ".outcomegraph/events/dogfood-status-final.json",
+        ".outcomegraph/events/dogfood-status.json",
+        ".outcomegraph/events/dogfood-sync.json",
+        ".outcomegraph/events/dogfood-verify.json",
         "README.md",
-        "RUNBOOKS.md"
+        "RUNBOOKS.md",
+        "WORKER_CAPSULE_REFACTOR_PLAN.md",
+        "skills/outcome-steward/SKILL.md",
+        "tasks/og-dogfood-001/TASK.md",
+        "tasks/og-dogfood-001/task-plan.json",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T11:12:41Z",
+      "blockers": [
+        "`dogfood-replay.json` remains `status: \"error\"`; the first actionable replay traces are `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-config-replay-step-0.json` (`/bin/sh: 1: set: Illegal option -o pipefail`) and `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-og-replay-step-1.json` (`/bin/sh: 1: ./og: not found`).",
+        "`dogfood-status.json` remains `status: \"warn\"` and `dogfood-drift.txt` remains `drift: warn` after the failed replay, while `RUNBOOKS.md` and `QUICKSTART.md` still mention the resolved `materials.lock` migration blocker.",
+        "`dogfood-sync.json` remains `status: \"warn\"` because the reviewed target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`) still resolve to warn-only capsules without executable oracle commands.",
+        "dogfood-replay.json remains status=error; replay traces show `/bin/sh: 1: set: Illegal option -o pipefail` in `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-config-replay-step-0.json` and `/bin/sh: 1: ./og: not found` in `.outcomegraph/traces/replay-20260307t110624z-881e9cc2-og-replay-step-1.json`.",
+        "dogfood-status.json remains status=warn and dogfood-drift.txt remains drift=warn after the failed replay, while RUNBOOKS.md and QUICKSTART.md still mention the resolved materials.lock migration blocker.",
+        "dogfood-sync.json remains status=warn because the reviewed target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`) still resolve to warn-only capsules without executable oracle commands."
+      ]
     },
     {
       "id": "OG-DOC-003",

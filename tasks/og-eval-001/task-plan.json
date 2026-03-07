@@ -1,0 +1,50 @@
+{
+  "task_id": "OG-EVAL-001",
+  "title": "Add an artifact-quality evaluation harness for capsule usefulness",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "skills/og-quality-pass/SKILL.md",
+    "skills/og-quality-pass/scripts/run_quality_pass.sh",
+    "tasks/og-apply-001/TASK.md",
+    "tasks/og-apply-001/task-plan.json",
+    "tasks/og-distill-002/TASK.md",
+    "tasks/og-distill-002/task-plan.json",
+    "tasks/og-dogfood-001/TASK.md",
+    "tasks/og-dogfood-001/task-plan.json"
+  ],
+  "write_files": [
+    "og.py",
+    "tests/test_capsule_quality_eval.py",
+    "tasks/og-eval-001/TASK.md",
+    "tasks/og-eval-001/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Define measurable Phase 7 capsule-quality metrics for executable oracles, invariants, evidence-backed claims, advisory-only success capsules, and stale-doc contradiction capture",
+      "status": "done"
+    },
+    {
+      "step": "Implement an artifact-quality evaluator in og.py for graph snapshots",
+      "status": "done"
+    },
+    {
+      "step": "Add focused pytest regressions so the harness runs inside the bundled quality pass",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "./.venv/bin/pytest -q tests/test_capsule_quality_eval.py",
+    "bash skills/og-quality-pass/scripts/run_quality_pass.sh /home/agent/outcomegraph"
+  ]
+}

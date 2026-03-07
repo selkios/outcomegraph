@@ -323,6 +323,13 @@ CAPSULE_KIND_TEST_FILENAME_SUFFIXES = (
     ".test.tsx",
     "_test.py",
 )
+ARTIFACT_QUALITY_SCHEMA_VERSION = 1
+ARTIFACT_QUALITY_ACCEPTED_DECISION_STATUSES = frozenset({"accepted", "success", "updated"})
+ARTIFACT_QUALITY_MIN_EXECUTABLE_ORACLE_COVERAGE = 1.0
+ARTIFACT_QUALITY_MIN_CODE_INVARIANT_COVERAGE = 1.0
+ARTIFACT_QUALITY_MIN_CODE_EVIDENCE_COVERAGE = 1.0
+ARTIFACT_QUALITY_MAX_SUCCESS_CODE_ADVISORY_ONLY_RATE = 0.0
+ARTIFACT_QUALITY_MIN_STALE_DOC_CAPTURE_RATE = 1.0
 SYNC_GENERATED_IGNORE_PREFIXES = (
     f"{OG_ROOT}/capsules/",
     f"{OG_ROOT}/refs/",
@@ -400,6 +407,7 @@ WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
 WORKER_PROMPT_ASSET_SCHEMA_VERSION = 1
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
+WORKER_MODEL_OVERRIDE_ENV = "OG_WORKER_MODEL"
 WORKER_ADAPTER_COMPLEX_TIMEOUT_FILE_COUNT = 6
 WORKER_ADAPTER_COMPLEX_TIMEOUT_BYTES = 12_000
 WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS = frozenset(
@@ -411,7 +419,7 @@ WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "workers")
 WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
 WORKER_PROMPT_BINDINGS: dict[str, dict[str, str]] = {
-    "distill": {"id": "worker-distill", "version": "1.0.0"},
+    "distill": {"id": "worker-distill", "version": "1.0.1"},
     "replay": {"id": "worker-replay", "version": "1.0.0"},
 }
 WORKER_PROMPT_VARIABLE_PATTERN = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
@@ -5930,7 +5938,7 @@ def _worker_oracle_schema() -> dict[str, object]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["name", "command", "scope"],
+        "required": ["name", "command", "reason", "scope"],
         "properties": {
             "name": {"type": "string", "minLength": 1},
             "command": {"type": ["string", "null"]},
@@ -6105,7 +6113,24 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                 "message": {"type": "string"},
                 "failures": {"type": "array", "items": {"type": "string", "minLength": 1}},
                 "parity_results": {
-                    "type": ["object", "array", "string", "number", "boolean", "null"],
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "match",
+                        "details",
+                        "baseline_hash",
+                        "observed_hash",
+                        "oracle_digest",
+                        "trace_count",
+                    ],
+                    "properties": {
+                        "match": {"type": ["boolean", "null"]},
+                        "details": {"type": ["string", "null"]},
+                        "baseline_hash": {"type": ["string", "null"]},
+                        "observed_hash": {"type": ["string", "null"]},
+                        "oracle_digest": {"type": ["string", "null"]},
+                        "trace_count": {"type": ["integer", "null"], "minimum": 0},
+                    },
                 },
             },
         }
@@ -6435,13 +6460,19 @@ def _build_worker_command_variants(entrypoint: str, schema_path: str, last_messa
     normalized = [part for part in command_root if part]
     if not normalized:
         normalized = ["codex"]
+    command_prefix = [
+        *normalized,
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+    ]
+    override_model = os.environ.get(WORKER_MODEL_OVERRIDE_ENV, "").strip()
+    if override_model:
+        command_prefix.extend(["--model", override_model])
     return [
         [
-            *normalized,
-            "exec",
-            "--json",
-            "--sandbox",
-            "read-only",
+            *command_prefix,
             "--output-schema",
             schema_path,
             "--output-last-message",
@@ -10908,8 +10939,7 @@ def _run_replay_step(
             attempts += 1
             try:
                 executed = subprocess.run(
-                    command,
-                    shell=True,
+                    ["bash", "-lc", command],
                     cwd=step_cwd,
                     capture_output=True,
                     text=True,
@@ -11496,6 +11526,413 @@ def _collect_ref_records(repo_root: str) -> list[dict[str, object]]:
     return refs
 
 
+def _collect_capsule_quality_records(repo_root: str) -> list[dict[str, object]]:
+    capsules: list[dict[str, object]] = []
+    for path, payload in _collect_artifact_payloads(
+        repo_root,
+        f"{OG_ROOT}/capsules",
+        strict=True,
+    ):
+        capsule_id = _normalize_artifact_id(payload, path, "id")
+        scope = _safe_string_list(payload.get("scope"))
+        capsules.append(
+            {
+                "path": path,
+                "id": capsule_id,
+                "kind": _classify_capsule_kind(capsule_id, [], scope, payload),
+                "status": _normalize_distill_status(payload.get("status")),
+                "scope": scope,
+                "invariants": _safe_string_list(payload.get("invariants")),
+                "behavior_claims": _safe_string_list(payload.get("behavior_claims")),
+                "oracles": _safe_object_list(payload.get("oracles")),
+                "decision_refs": _normalize_artifact_path_refs(payload.get("decision_refs"), "decisions"),
+                "raw": payload,
+            }
+        )
+    return capsules
+
+
+def _index_artifact_records_by_reference(
+    records: list[dict[str, object]],
+    scope: str,
+) -> dict[str, dict[str, object]]:
+    index: dict[str, dict[str, object]] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        candidates = [
+            _normalize_canonical_artifact_reference(str(record.get("path") or ""), scope),
+            _normalize_canonical_artifact_reference(str(record.get("id") or ""), scope),
+        ]
+        for candidate in candidates:
+            if candidate and candidate not in index:
+                index[candidate] = record
+    return index
+
+
+def _capsule_has_executable_oracle(capsule_record: dict[str, object]) -> bool:
+    for oracle in _safe_object_list(capsule_record.get("oracles")):
+        if str(oracle.get("command") or "").strip():
+            return True
+    return False
+
+
+def _capsule_is_advisory_only(capsule_record: dict[str, object]) -> bool:
+    oracles = _safe_object_list(capsule_record.get("oracles"))
+    if not oracles:
+        return False
+    if _capsule_has_executable_oracle(capsule_record):
+        return False
+    for oracle in oracles:
+        if str(oracle.get("reason") or "").strip() or str(oracle.get("name") or "").strip():
+            return True
+    return False
+
+
+def _collect_capsule_linked_claims(
+    capsule_record: dict[str, object],
+    decisions_by_capsule: dict[str, list[dict[str, object]]],
+    decision_index: dict[str, dict[str, object]],
+    claim_index: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    capsule_id = _safe_slug(str(capsule_record.get("id") or "default")) or "default"
+    decision_refs = _safe_string_list(capsule_record.get("decision_refs"))
+    if not decision_refs:
+        decision_refs = [
+            str(record.get("path") or "")
+            for record in decisions_by_capsule.get(capsule_id, [])
+            if isinstance(record, dict)
+        ]
+
+    claims: list[dict[str, object]] = []
+    seen_claims: set[str] = set()
+    for raw_ref in decision_refs:
+        normalized_decision_ref = _normalize_canonical_artifact_reference(raw_ref, "decisions")
+        if not normalized_decision_ref:
+            continue
+        decision = decision_index.get(normalized_decision_ref)
+        if not isinstance(decision, dict):
+            continue
+        for claim_ref in _safe_string_list(decision.get("claim_refs")):
+            normalized_claim_ref = _normalize_canonical_artifact_reference(claim_ref, "claims")
+            if not normalized_claim_ref or normalized_claim_ref in seen_claims:
+                continue
+            claim = claim_index.get(normalized_claim_ref)
+            if not isinstance(claim, dict):
+                continue
+            seen_claims.add(normalized_claim_ref)
+            claims.append(claim)
+    return claims
+
+
+def _capsule_has_receipt_backed_behavior_claim(
+    capsule_record: dict[str, object],
+    decisions_by_capsule: dict[str, list[dict[str, object]]],
+    decision_index: dict[str, dict[str, object]],
+    claim_index: dict[str, dict[str, object]],
+) -> bool:
+    for claim in _collect_capsule_linked_claims(capsule_record, decisions_by_capsule, decision_index, claim_index):
+        if str(claim.get("category") or "").strip().lower() != "behavior":
+            continue
+        if not str(claim.get("text") or "").strip():
+            continue
+        if _safe_object_list(claim.get("receipt_pointers")):
+            return True
+    return False
+
+
+def _normalize_artifact_quality_case(raw_case: object) -> dict[str, object] | None:
+    if not isinstance(raw_case, dict):
+        return None
+    case_id = _safe_slug(str(raw_case.get("id") or ""))
+    if not case_id:
+        return None
+    capsule_ids = sorted(
+        {
+            capsule_id
+            for capsule_id in (
+                _safe_slug(str(item))
+                for item in raw_case.get("capsule_ids", [])
+                if isinstance(raw_case.get("capsule_ids"), list)
+            )
+            if capsule_id
+        }
+    )
+    required_terms = [
+        str(item).strip().lower()
+        for item in raw_case.get("required_terms", [])
+        if isinstance(item, str) and str(item).strip()
+    ] if isinstance(raw_case.get("required_terms"), list) else []
+    if not capsule_ids or not required_terms:
+        return None
+    return {
+        "id": case_id,
+        "description": str(raw_case.get("description") or "").strip(),
+        "capsule_ids": capsule_ids,
+        "required_terms": required_terms,
+    }
+
+
+def _evaluate_stale_doc_truth_case(
+    case: dict[str, object],
+    decisions_by_capsule: dict[str, list[dict[str, object]]],
+    claim_index: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    capsule_ids = _safe_string_list(case.get("capsule_ids"))
+    required_terms = [term.lower() for term in _safe_string_list(case.get("required_terms"))]
+    decision_ids: list[str] = []
+    claim_ids: list[str] = []
+    accepted_text_parts: list[str] = []
+
+    for capsule_id in capsule_ids:
+        for decision in decisions_by_capsule.get(capsule_id, []):
+            if not isinstance(decision, dict):
+                continue
+            decision_status = str(decision.get("status") or "").strip().lower()
+            if decision_status not in ARTIFACT_QUALITY_ACCEPTED_DECISION_STATUSES:
+                continue
+            decision_id = str(decision.get("id") or "").strip()
+            if decision_id and decision_id not in decision_ids:
+                decision_ids.append(decision_id)
+            statement = str(decision.get("statement") or "").strip()
+            rationale = str(decision.get("rationale") or "").strip()
+            if statement:
+                accepted_text_parts.append(statement)
+            if rationale:
+                accepted_text_parts.append(rationale)
+            for claim_ref in _safe_string_list(decision.get("claim_refs")):
+                normalized_claim_ref = _normalize_canonical_artifact_reference(claim_ref, "claims")
+                if not normalized_claim_ref:
+                    continue
+                claim = claim_index.get(normalized_claim_ref)
+                if not isinstance(claim, dict):
+                    continue
+                claim_id = str(claim.get("id") or "").strip()
+                if claim_id and claim_id not in claim_ids:
+                    claim_ids.append(claim_id)
+                claim_text = str(claim.get("text") or "").strip()
+                if claim_text:
+                    accepted_text_parts.append(claim_text)
+
+    accepted_truth = " ".join(accepted_text_parts).lower()
+    matched_terms = [term for term in required_terms if term in accepted_truth]
+    missing_terms = [term for term in required_terms if term not in accepted_truth]
+    status = "pass" if not missing_terms else "fail"
+    return {
+        "id": str(case.get("id") or ""),
+        "description": str(case.get("description") or ""),
+        "capsule_ids": capsule_ids,
+        "status": status,
+        "required_terms": required_terms,
+        "matched_terms": matched_terms,
+        "missing_terms": missing_terms,
+        "decision_ids": decision_ids,
+        "claim_ids": claim_ids,
+    }
+
+
+def _build_artifact_quality_metric(
+    metric_id: str,
+    *,
+    numerator: int,
+    denominator: int,
+    min_ratio: float | None = None,
+    max_ratio: float | None = None,
+    passing_items: list[str] | None = None,
+    failing_items: list[str] | None = None,
+) -> dict[str, object]:
+    ratio = 1.0 if denominator <= 0 else numerator / denominator
+    status = "pass"
+    threshold: dict[str, float] = {}
+    if min_ratio is not None:
+        threshold["min_ratio"] = float(min_ratio)
+        if denominator > 0 and ratio + 1e-9 < float(min_ratio):
+            status = "fail"
+    if max_ratio is not None:
+        threshold["max_ratio"] = float(max_ratio)
+        if denominator > 0 and ratio - 1e-9 > float(max_ratio):
+            status = "fail"
+    return {
+        "id": metric_id,
+        "status": status,
+        "numerator": numerator,
+        "denominator": denominator,
+        "ratio": ratio,
+        "threshold": threshold,
+        "passing_items": sorted(set(passing_items or [])),
+        "failing_items": sorted(set(failing_items or [])),
+    }
+
+
+def _evaluate_artifact_quality(
+    repo_root: str,
+    *,
+    contradiction_cases: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    capsule_records = _collect_capsule_quality_records(repo_root)
+    decision_records = _collect_decision_records(repo_root)
+    claim_records = _collect_claim_records(repo_root)
+
+    decisions_by_capsule: dict[str, list[dict[str, object]]] = {}
+    for decision in decision_records:
+        capsule_id = _safe_slug(str(decision.get("capsule_id") or "default")) or "default"
+        decisions_by_capsule.setdefault(capsule_id, []).append(decision)
+
+    decision_index = _index_artifact_records_by_reference(decision_records, "decisions")
+    claim_index = _index_artifact_records_by_reference(claim_records, "claims")
+
+    code_or_test_capsules = [
+        record
+        for record in capsule_records
+        if str(record.get("kind") or "") in {CAPSULE_KIND_CODE, CAPSULE_KIND_TEST}
+    ]
+    code_capsules = [
+        record
+        for record in capsule_records
+        if str(record.get("kind") or "") == CAPSULE_KIND_CODE
+    ]
+    success_code_capsules = [
+        record
+        for record in code_capsules
+        if str(record.get("status") or "").strip().lower() == "success"
+    ]
+
+    executable_oracle_capsules = [
+        str(record.get("id") or "")
+        for record in code_or_test_capsules
+        if _capsule_has_executable_oracle(record)
+    ]
+    missing_executable_oracle_capsules = [
+        str(record.get("id") or "")
+        for record in code_or_test_capsules
+        if not _capsule_has_executable_oracle(record)
+    ]
+    invariant_covered_capsules = [
+        str(record.get("id") or "")
+        for record in code_capsules
+        if _safe_string_list(record.get("invariants"))
+    ]
+    missing_invariant_capsules = [
+        str(record.get("id") or "")
+        for record in code_capsules
+        if not _safe_string_list(record.get("invariants"))
+    ]
+    evidence_backed_capsules = [
+        str(record.get("id") or "")
+        for record in code_capsules
+        if _capsule_has_receipt_backed_behavior_claim(record, decisions_by_capsule, decision_index, claim_index)
+    ]
+    weak_evidence_capsules = [
+        str(record.get("id") or "")
+        for record in code_capsules
+        if not _capsule_has_receipt_backed_behavior_claim(record, decisions_by_capsule, decision_index, claim_index)
+    ]
+    advisory_only_success_capsules = [
+        str(record.get("id") or "")
+        for record in success_code_capsules
+        if _capsule_is_advisory_only(record)
+    ]
+    executable_success_code_capsules = [
+        str(record.get("id") or "")
+        for record in success_code_capsules
+        if not _capsule_is_advisory_only(record)
+    ]
+
+    normalized_cases = [
+        normalized
+        for normalized in (_normalize_artifact_quality_case(raw_case) for raw_case in contradiction_cases or [])
+        if normalized is not None
+    ]
+    stale_doc_results = [
+        _evaluate_stale_doc_truth_case(case, decisions_by_capsule, claim_index)
+        for case in normalized_cases
+    ]
+    resolved_contradiction_ids = [
+        str(result.get("id") or "")
+        for result in stale_doc_results
+        if str(result.get("status") or "") == "pass"
+    ]
+    unresolved_contradiction_ids = [
+        str(result.get("id") or "")
+        for result in stale_doc_results
+        if str(result.get("status") or "") != "pass"
+    ]
+
+    metrics = {
+        "code_test_executable_oracle_coverage": _build_artifact_quality_metric(
+            "code_test_executable_oracle_coverage",
+            numerator=len(executable_oracle_capsules),
+            denominator=len(code_or_test_capsules),
+            min_ratio=ARTIFACT_QUALITY_MIN_EXECUTABLE_ORACLE_COVERAGE,
+            passing_items=executable_oracle_capsules,
+            failing_items=missing_executable_oracle_capsules,
+        ),
+        "code_invariant_coverage": _build_artifact_quality_metric(
+            "code_invariant_coverage",
+            numerator=len(invariant_covered_capsules),
+            denominator=len(code_capsules),
+            min_ratio=ARTIFACT_QUALITY_MIN_CODE_INVARIANT_COVERAGE,
+            passing_items=invariant_covered_capsules,
+            failing_items=missing_invariant_capsules,
+        ),
+        "code_receipt_backed_behavior_claim_coverage": _build_artifact_quality_metric(
+            "code_receipt_backed_behavior_claim_coverage",
+            numerator=len(evidence_backed_capsules),
+            denominator=len(code_capsules),
+            min_ratio=ARTIFACT_QUALITY_MIN_CODE_EVIDENCE_COVERAGE,
+            passing_items=evidence_backed_capsules,
+            failing_items=weak_evidence_capsules,
+        ),
+        "success_code_advisory_only_rate": _build_artifact_quality_metric(
+            "success_code_advisory_only_rate",
+            numerator=len(advisory_only_success_capsules),
+            denominator=len(success_code_capsules),
+            max_ratio=ARTIFACT_QUALITY_MAX_SUCCESS_CODE_ADVISORY_ONLY_RATE,
+            passing_items=executable_success_code_capsules,
+            failing_items=advisory_only_success_capsules,
+        ),
+        "stale_doc_accepted_truth_capture": _build_artifact_quality_metric(
+            "stale_doc_accepted_truth_capture",
+            numerator=len(resolved_contradiction_ids),
+            denominator=len(stale_doc_results),
+            min_ratio=ARTIFACT_QUALITY_MIN_STALE_DOC_CAPTURE_RATE,
+            passing_items=resolved_contradiction_ids,
+            failing_items=unresolved_contradiction_ids,
+        ),
+    }
+
+    failed_metrics = [
+        metric_id
+        for metric_id, metric in metrics.items()
+        if isinstance(metric, dict) and str(metric.get("status") or "") == "fail"
+    ]
+    capsule_kind_counts: dict[str, int] = {}
+    for record in capsule_records:
+        kind = str(record.get("kind") or "").strip() or "unknown"
+        capsule_kind_counts[kind] = capsule_kind_counts.get(kind, 0) + 1
+
+    return {
+        "schema_version": ARTIFACT_QUALITY_SCHEMA_VERSION,
+        "artifact_type": "artifact_quality_evaluation",
+        "status": "pass" if not failed_metrics else "fail",
+        "capsule_counts": {
+            "total": len(capsule_records),
+            "by_kind": capsule_kind_counts,
+            "code_or_test": len(code_or_test_capsules),
+            "code": len(code_capsules),
+            "success_code": len(success_code_capsules),
+        },
+        "metrics": metrics,
+        "failures": failed_metrics,
+        "capsules": {
+            "code_or_test": sorted(str(record.get("id") or "") for record in code_or_test_capsules),
+            "code": sorted(str(record.get("id") or "") for record in code_capsules),
+            "success_code": sorted(str(record.get("id") or "") for record in success_code_capsules),
+        },
+        "stale_doc_contradictions": stale_doc_results,
+    }
+
+
 def _list_known_capsules(repo_root: str) -> list[str]:
     capsules_dir = os.path.join(repo_root, OG_ROOT, "capsules")
     if not os.path.isdir(capsules_dir):
@@ -11544,7 +11981,9 @@ def _distill_feature_tokens(paths: list[str]) -> list[str]:
 
 def _should_skip_related_context_dir(relative_dir: str) -> bool:
     normalized = _normalize_repo_relative_path(relative_dir)
-    if normalized in {
+    if not normalized:
+        return False
+    ignored_segments = {
         ".git",
         ".mypy_cache",
         ".pytest_cache",
@@ -11553,7 +11992,9 @@ def _should_skip_related_context_dir(relative_dir: str) -> bool:
         "__pycache__",
         "node_modules",
         OG_ROOT,
-    }:
+    }
+    segments = {segment for segment in normalized.split("/") if segment}
+    if normalized in ignored_segments or segments.intersection(ignored_segments):
         return True
     if normalized.startswith(f"{OG_ROOT}/"):
         return True
@@ -15426,8 +15867,14 @@ def _run_sync_job(repo_root: str, options: dict[str, object], session: dict[str,
     run_status = "ok"
     if step_statuses.intersection({"error", "pending", "failed", "fail"}):
         run_status = "error"
-    elif "warn" in step_statuses:
-        run_status = "warn"
+    else:
+        blocking_warn_steps = {
+            str(item.get("name") or "").lower()
+            for item in steps
+            if isinstance(item, dict) and str(item.get("status") or "").lower() == "warn"
+        } - {"apply"}
+        if blocking_warn_steps:
+            run_status = "warn"
     sync_message = "sync workflow completed"
     if run_status == "warn":
         sync_message = "sync workflow completed with warnings"
