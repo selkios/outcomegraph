@@ -1,0 +1,48 @@
+{
+  "task_id": "OG-PROMPT-002",
+  "title": "Record worker prompt provenance in traces and generated artifacts",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "prompts/workers/manifest.json",
+    "prompts/workers/distill-v1.txt",
+    "prompts/workers/replay-v1.txt",
+    "tasks/og-distill-001/TASK.md",
+    "tasks/og-distill-001/task-plan.json",
+    "tasks/og-distill-002/TASK.md",
+    "tasks/og-distill-002/task-plan.json"
+  ],
+  "write_files": [
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-prompt-002/TASK.md",
+    "tasks/og-prompt-002/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Record prompt provenance in worker trace input and result records",
+      "status": "done"
+    },
+    {
+      "step": "Propagate prompt provenance into worker-driven certificates and summary events",
+      "status": "done"
+    },
+    {
+      "step": "Add focused regression coverage and run the worker/sync test suite",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m unittest -q tests.test_og_sync_verify_replay_hooks"
+  ]
+}

@@ -1759,20 +1759,21 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py",
-        "prompts/workers/manifest.json",
         "prompts/workers/distill-v1.txt",
-        "prompts/workers/replay-v1.txt"
+        "prompts/workers/manifest.json",
+        "prompts/workers/replay-v1.txt",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T09:56:01Z"
+      "updated_at": "2026-03-07T09:56:35Z"
     },
     {
       "id": "OG-PROMPT-002",
       "title": "Record worker prompt provenance in traces and generated artifacts",
       "priority": 1,
-      "status": "todo",
-      "details": "Phase 1 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: once prompt assets are externalized, persist prompt id, version, and source path in worker traces and any downstream artifact metadata that depends on worker output.",
+      "status": "done",
+      "details": "Worker runs now persist prompt id, version, and source path in trace input/result records, distill/replay stage payloads, worker-driven certificates, and sync/replay/verify summary events, with regression tests covering stable provenance emission.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 1 and extend worker trace input/output records to carry prompt provenance metadata",
         "Plumb prompt provenance into certificates, summary events, or other relevant receipts so generated artifacts can be tied back to the exact prompt revision",
@@ -1791,10 +1792,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "tasks/og-prompt-002/TASK.md",
+        "tasks/og-prompt-002/task-plan.json",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T10:05:53Z"
     },
     {
       "id": "OG-CAPSULE-001",

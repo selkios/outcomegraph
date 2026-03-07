@@ -5914,6 +5914,71 @@ def _validate_worker_prompt_template(entry: dict[str, object]) -> str:
     return template
 
 
+def _normalize_prompt_provenance(raw: object) -> dict[str, str] | None:
+    if not isinstance(raw, dict):
+        return None
+    prompt_id = str(raw.get("id") or "").strip()
+    version = str(raw.get("version") or "").strip()
+    source_path = _normalize_repo_relative_path(str(raw.get("source_path") or "").strip())
+    if not prompt_id or not version or not source_path:
+        return None
+    return {
+        "id": prompt_id,
+        "version": version,
+        "source_path": source_path,
+    }
+
+
+def _build_worker_prompt_provenance(entry: dict[str, object]) -> dict[str, str]:
+    source_path = str(entry.get("source_path") or "").strip()
+    if source_path:
+        try:
+            source_path = os.path.relpath(source_path, os.path.dirname(__file__))
+        except ValueError:
+            source_path = str(entry.get("path") or source_path)
+    else:
+        source_path = str(entry.get("path") or "")
+    normalized = _normalize_prompt_provenance(
+        {
+            "id": entry.get("id"),
+            "version": entry.get("version"),
+            "source_path": source_path,
+        }
+    )
+    if normalized is None:
+        raise WorkerAdapterError("worker prompt provenance is incomplete")
+    return normalized
+
+
+def _collect_prompt_provenance_records(raw: object) -> list[dict[str, str]]:
+    discovered: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            prompt_provenance = _normalize_prompt_provenance(value.get("prompt_provenance"))
+            if prompt_provenance is not None:
+                key = (
+                    prompt_provenance["id"],
+                    prompt_provenance["version"],
+                    prompt_provenance["source_path"],
+                )
+                if key not in seen:
+                    seen.add(key)
+                    discovered.append(prompt_provenance)
+            for nested in value.values():
+                if isinstance(nested, (dict, list)):
+                    visit(nested)
+            return
+        if isinstance(value, list):
+            for nested in value:
+                if isinstance(nested, (dict, list)):
+                    visit(nested)
+
+    visit(raw)
+    return discovered
+
+
 def _load_worker_prompt_manifest() -> dict[str, dict[str, object]]:
     try:
         with open(WORKER_PROMPT_MANIFEST_PATH, "r", encoding="utf-8") as handle:
@@ -5991,12 +6056,20 @@ def _render_worker_prompt_template(entry: dict[str, object], variables: dict[str
     return WORKER_PROMPT_VARIABLE_PATTERN.sub(replace_variable, template)
 
 
-def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
+def _resolve_worker_prompt(role: str, payload: dict[str, object]) -> tuple[str, dict[str, str]]:
     if role not in WORKER_PROMPT_BINDINGS:
         raise WorkerAdapterError(f"unsupported worker role '{role}'")
     payload_json = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True)
     prompt_entry = _load_worker_prompt_manifest()[role]
-    return _render_worker_prompt_template(prompt_entry, {"payload_json": payload_json})
+    return (
+        _render_worker_prompt_template(prompt_entry, {"payload_json": payload_json}),
+        _build_worker_prompt_provenance(prompt_entry),
+    )
+
+
+def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
+    prompt, _ = _resolve_worker_prompt(role, payload)
+    return prompt
 
 
 def _extract_json_object(raw: str) -> dict[str, object] | None:
@@ -6137,7 +6210,7 @@ def _run_codex_worker(
     if not isinstance(entrypoint, str) or not entrypoint.strip():
         raise WorkerAdapterError("worker manifest entrypoint missing")
 
-    worker_prompt = _build_worker_prompt(role, payload)
+    worker_prompt, prompt_provenance = _resolve_worker_prompt(role, payload)
     worker_schema = _build_worker_output_schema(role)
     last_error = "codex executable was not found"
     output = ""
@@ -6191,7 +6264,20 @@ def _run_codex_worker(
                 candidate_output = ""
         if not candidate_output.strip():
             candidate_output = output
-        parsed = _parse_worker_output(role, candidate_output)
+        parsed_output = _parse_worker_output(role, candidate_output)
+        result_payload = {
+            "schema_version": WORKER_SCHEMA_VERSION,
+            "role": role,
+            "adapter": manifest.get("name"),
+            "command": command,
+            "duration_ms": duration_ms,
+            "prompt_provenance": prompt_provenance,
+            "output": parsed_output,
+        }
+        parsed = {
+            **parsed_output,
+            "prompt_provenance": prompt_provenance,
+        }
         selected_command = command
 
     trace_base = trace_path.rsplit(".", 1)[0] if "." in trace_path else trace_path
@@ -6205,14 +6291,16 @@ def _run_codex_worker(
         "duration_ms": duration_ms,
         "input": payload,
         "prompt": worker_prompt,
+        "prompt_provenance": prompt_provenance,
     }
     request_text = json.dumps(request_payload, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
     request_bytes = request_text.encode("utf-8")
     output_bytes = output.encode("utf-8")
-    result_bytes = candidate_output.encode("utf-8")
+    result_text = json.dumps(result_payload, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
+    result_bytes = result_text.encode("utf-8")
     _write_text_payload(os.path.join(repo_root, trace_input_path), request_text)
     _write_text_payload(os.path.join(repo_root, trace_path), output)
-    _write_text_payload(os.path.join(repo_root, trace_result_path), candidate_output)
+    _write_text_payload(os.path.join(repo_root, trace_result_path), result_text)
     return parsed, [
         _build_file_pointer(trace_input_path, request_bytes, "application/json"),
         _store_put(repo_root, request_bytes, "application/json"),
@@ -6711,13 +6799,14 @@ def _build_certificate_payload(
     source: str = "distill",
     adapter_name: str = "filesystem-store",
     adapter_version: str = "1.0.0",
+    prompt_provenance: dict[str, object] | None = None,
 ) -> dict[str, object]:
     now = _utc_timestamp()
     normalized_refs: list[str] = []
     for raw_ref in claim_refs:
         if isinstance(raw_ref, str) and raw_ref:
             normalized_refs.append(raw_ref)
-    return {
+    payload = {
         "schema_version": 2,
         "artifact_type": "certificate",
         "id": certificate_id,
@@ -6739,6 +6828,10 @@ def _build_certificate_payload(
         "created_at": now,
         "updated_at": now,
     }
+    normalized_prompt_provenance = _normalize_prompt_provenance(prompt_provenance)
+    if normalized_prompt_provenance is not None:
+        payload["prompt_provenance"] = normalized_prompt_provenance
+    return payload
 
 
 def _extract_artifact_field(line: str, field_name: str) -> str | None:
@@ -12196,6 +12289,7 @@ def _run_distill_stage(
     )
     try:
         deltas = []
+        distill_prompt_provenance: dict[str, str] | None = None
         batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
         for batch_index in range(0, len(target_capsules), WORKER_ADAPTER_DISTILL_BATCH_SIZE):
             batch_capsules = target_capsules[batch_index : batch_index + WORKER_ADAPTER_DISTILL_BATCH_SIZE]
@@ -12242,6 +12336,9 @@ def _run_distill_stage(
         for batch_index, batch_capsules, _, _ in batch_specs:
             output, receipts, recovery = completed_batches[batch_index]
             recovery_records.append(recovery)
+            batch_prompt_provenance = _normalize_prompt_provenance(output.get("prompt_provenance"))
+            if batch_prompt_provenance is not None and distill_prompt_provenance is None:
+                distill_prompt_provenance = batch_prompt_provenance
             delta_payload = _normalize_distill_delta(output)
             for update in delta_payload["capsule_updates"]:
                 raw_delta = update if isinstance(update, dict) else {}
@@ -12270,6 +12367,7 @@ def _run_distill_stage(
                         "receipts": raw_delta.get("receipts") if isinstance(raw_delta.get("receipts"), list) else [],
                         "changed_files": delta_changed_files,
                         "adapter_receipts": receipts,
+                        **({"prompt_provenance": batch_prompt_provenance} if batch_prompt_provenance is not None else {}),
                     }
                 )
         adapter_name = str(worker_adapter.get("name", WORKER_ADAPTER_NAME))
@@ -12317,6 +12415,7 @@ def _run_distill_stage(
         "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         "generated_deltas": deltas,
         "recovery": _summarize_recovery_records(recovery_records),
+        **({"prompt_provenance": distill_prompt_provenance} if distill_prompt_provenance is not None else {}),
     }
 
 
@@ -12512,6 +12611,7 @@ def _run_apply_stage(
         return refs
 
     normalized_discovered_capsules = sorted({_normalize_capsule_id(capsule_id) for capsule_id in affected_capsules})
+    distill_prompt_provenance = _normalize_prompt_provenance(distill_result.get("prompt_provenance"))
 
     for delta in deltas:
         if not isinstance(delta, dict):
@@ -12543,6 +12643,7 @@ def _run_apply_stage(
         if not isinstance(changed_files, list):
             changed_files = []
         normalized_changed_files = [str(path) for path in changed_files]
+        delta_prompt_provenance = _normalize_prompt_provenance(delta.get("prompt_provenance")) or distill_prompt_provenance
         claims = delta.get("claims")
         if isinstance(claims, list):
             raw_claims = claims
@@ -12752,6 +12853,7 @@ def _run_apply_stage(
                 mode,
                 cert_receipts,
                 adapter_name=str(distill_result.get("adapter_name") or WORKER_ADAPTER_NAME),
+                prompt_provenance=delta_prompt_provenance,
             )
             if not claim_refs:
                 raise RuntimeError("no claim refs produced")
@@ -13061,6 +13163,7 @@ def _run_replay_stage(
     overall_failed = False
     replay_error_code: str | None = None
     recovery_records: list[dict[str, object]] = []
+    replay_prompt_provenance: dict[str, str] | None = None
 
     for capsule in targets:
         trace_path = _build_trace_path(capsule, run_id, "replay")
@@ -13089,6 +13192,11 @@ def _run_replay_stage(
             )
             recovery_records.append(worker_recovery)
             plan = _normalize_replay_plan(output)
+            plan_prompt_provenance = _normalize_prompt_provenance(output.get("prompt_provenance"))
+            if plan_prompt_provenance is not None:
+                plan["prompt_provenance"] = plan_prompt_provenance
+                if replay_prompt_provenance is None:
+                    replay_prompt_provenance = plan_prompt_provenance
             plan["adapter_receipts"] = receipts
             plans.append(plan)
         except WorkerAdapterError as exc:
@@ -13140,6 +13248,7 @@ def _run_replay_stage(
             "equivalence": None,
             "materialized_paths": materialized_paths,
             "oracle_results": [],
+            **({"prompt_provenance": plan_prompt_provenance} if plan_prompt_provenance is not None else {}),
         }
 
         if lower_status in {"error", "failed", "fail", "warn"}:
@@ -13291,6 +13400,7 @@ def _run_replay_stage(
                 status="success",
                 source="replay",
                 adapter_name=str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
+                prompt_provenance=plan_prompt_provenance,
             )
             cert_payload["replay_context"] = {
                 "run_id": run_id,
@@ -13357,6 +13467,7 @@ def _run_replay_stage(
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": errors,
         "recovery": _summarize_recovery_records(recovery_records),
+        **({"prompt_provenance": replay_prompt_provenance} if replay_prompt_provenance is not None else {}),
     }
 
 
@@ -14456,6 +14567,7 @@ def _run_export_stage(
 
 
 def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
+    prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     event_payload = {
         "schema_version": 2,
         "artifact_type": "sync_summary",
@@ -14469,12 +14581,14 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
         "snapshot": payload["snapshot"],
         "steps": payload["steps"],
         "recovery": payload.get("recovery", {}),
+        **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
 def _record_replay_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
+    prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     event_payload = {
         "schema_version": 2,
         "artifact_type": "replay_summary",
@@ -14487,12 +14601,14 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
+        **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
 def _record_verify_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
+    prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
     event_payload = {
         "schema_version": 2,
         "artifact_type": "verify_summary",
@@ -14505,6 +14621,7 @@ def _record_verify_summary_event(repo_root: str, payload: dict[str, object], tot
         "snapshot": snapshot,
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
+        **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path

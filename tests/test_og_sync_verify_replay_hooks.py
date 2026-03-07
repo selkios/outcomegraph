@@ -1189,6 +1189,11 @@ class TestSyncWorkflows(_RepoTestCase):
         )
 
     def test_run_distill_stage_backfills_changed_files_per_capsule(self) -> None:
+        prompt_provenance = {
+            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+            "source_path": "prompts/workers/distill-v1.txt",
+        }
         snapshot = {
             "changed_files": [
                 "README.md",
@@ -1207,6 +1212,7 @@ class TestSyncWorkflows(_RepoTestCase):
                 _distill_update("tests", []),
                 _distill_update("materials", []),
             ],
+            "prompt_provenance": prompt_provenance,
         }
 
         with self.git_root_patch(), patch.object(
@@ -1231,6 +1237,44 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(changed_by_capsule["og"], ["og.py"])
         self.assertEqual(changed_by_capsule["tests"], ["tests/test_og_sync_verify_replay_hooks.py"])
         self.assertEqual(changed_by_capsule["materials"], [".outcomegraph/materials.lock"])
+        self.assertEqual(result["prompt_provenance"], prompt_provenance)
+        self.assertTrue(all(item["prompt_provenance"] == prompt_provenance for item in result["generated_deltas"]))
+
+    def test_record_sync_summary_event_collects_worker_prompt_provenance(self) -> None:
+        prompt_provenance = {
+            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+            "source_path": "prompts/workers/distill-v1.txt",
+        }
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            event_path = og._record_sync_summary_event(
+                str(self.repo),
+                {
+                    "run_id": "sync-1",
+                    "status": "ok",
+                    "idempotency_key": "sync-key",
+                    "snapshot": {"changed_files": ["og.py"]},
+                    "steps": [
+                        {
+                            "name": "distill",
+                            "status": "ok",
+                            "prompt_provenance": prompt_provenance,
+                            "generated_deltas": [
+                                {
+                                    "capsule_id": "og",
+                                    "prompt_provenance": prompt_provenance,
+                                }
+                            ],
+                        }
+                    ],
+                },
+                42,
+            )
+
+        event_payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
+        self.assertEqual(event_payload["worker_prompt_provenance"], [prompt_provenance])
 
     def test_run_distill_stage_uses_bootstrap_timeout_for_full_snapshot(self) -> None:
         snapshot = {
@@ -2862,12 +2906,23 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         with self.git_root_patch(), patch.object(og.subprocess, "run", side_effect=fake_subprocess_run):
             parsed, receipts = og._run_codex_worker("distill", input_payload, str(self.repo), "trace.json")
 
+        expected_prompt = og._build_worker_prompt("distill", input_payload)
+        expected_prompt_provenance = {
+            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+            "source_path": "prompts/workers/distill-v1.txt",
+        }
         self.assertEqual(parsed["run_id"], "run-2")
         self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
+        self.assertEqual(parsed["prompt_provenance"], expected_prompt_provenance)
         self.assertEqual(len(receipts), 6)
         self.assertTrue((self.repo / "trace.json").exists())
         trace_input = json.loads((self.repo / "trace-input.json").read_text(encoding="utf-8"))
-        self.assertEqual(trace_input["prompt"], og._build_worker_prompt("distill", input_payload))
+        self.assertEqual(trace_input["prompt"], expected_prompt)
+        self.assertEqual(trace_input["prompt_provenance"], expected_prompt_provenance)
+        trace_result = json.loads((self.repo / "trace-result.json").read_text(encoding="utf-8"))
+        self.assertEqual(trace_result["prompt_provenance"], expected_prompt_provenance)
+        self.assertEqual(trace_result["output"]["run_id"], "run-2")
 
     def test_collect_policy_checks_flags_schema_errors(self) -> None:
         (self.repo / ".outcomegraph").mkdir()
@@ -3153,6 +3208,33 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(capsule_payload["dependencies"], delta["dependencies"])
         self.assertEqual(capsule_payload["unknowns"], delta["unknowns"])
         self.assertEqual(capsule_payload["oracles"][0]["command"], "pytest -q")
+
+    def test_run_apply_stage_records_prompt_provenance_in_certificate(self) -> None:
+        prompt_provenance = {
+            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+            "source_path": "prompts/workers/distill-v1.txt",
+        }
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("default", ["README.md"], status="success")
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["default"],
+                    "adapter_name": "codex",
+                    "prompt_provenance": prompt_provenance,
+                },
+                "run-1",
+                "observe",
+            )
+
+        certificate_payload = json.loads((self.repo / payload["applied_certificates"][0]).read_text(encoding="utf-8"))
+        self.assertEqual(certificate_payload["prompt_provenance"], prompt_provenance)
 
     def test_run_apply_stage_persists_recreation_brief_for_tests_capsule(self) -> None:
         with self.git_root_patch():
@@ -3485,6 +3567,11 @@ class TestSpecComplianceGates(_RepoTestCase):
         self.assertEqual(payload["code"], og.POLICY_CONFIG_ERROR_CODE)
 
     def test_run_replay_stage_persists_equivalence_and_receipts(self) -> None:
+        prompt_provenance = {
+            "id": og.WORKER_PROMPT_BINDINGS["replay"]["id"],
+            "version": og.WORKER_PROMPT_BINDINGS["replay"]["version"],
+            "source_path": "prompts/workers/replay-v1.txt",
+        }
         with self.git_root_patch():
             snapshot = {"changed_files": ["capsules/default.yaml"]}
             receipts = [
@@ -3498,6 +3585,7 @@ class TestSpecComplianceGates(_RepoTestCase):
                 "steps": [{"command": "echo ok"}],
                 "status": "ok",
                 "parity_results": {"match": True, "details": "equivalence output checksum identical"},
+                "prompt_provenance": prompt_provenance,
             }
 
             with patch.object(
@@ -3530,6 +3618,9 @@ class TestSpecComplianceGates(_RepoTestCase):
         replay_result = payload["replay_results"][0]
         result_equivalence = replay_result.get("equivalence")
         self.assertIsInstance(result_equivalence, dict)
+        self.assertEqual(replay_result["prompt_provenance"], prompt_provenance)
+        self.assertEqual(payload["prompt_provenance"], prompt_provenance)
+        self.assertEqual(certificate_payload["prompt_provenance"], prompt_provenance)
         self.assertIn("equivalence", certificate_payload["replay_context"])
         self.assertEqual(
             certificate_payload["replay_context"]["equivalence"],
