@@ -1206,6 +1206,7 @@ If storage/index is corrupted:
 `og mcp-server`:
 
 - tools: `sync`, `verify`, `replay`, `explain`, `status`
+- each tool entry embeds the same command signature object returned by `og schema` / `og describe <command>`
 - resources: capsules, refs, constitutions, certificates
 - prompts: bootstrap, replay, repair
 

@@ -1521,13 +1521,14 @@
       ],
       "files": [
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py",
-        "README.md",
+        "tests/test_cli_mcp_contracts.py",
         "SPEC-v2.md",
         "AGENT_FIRST_CLI_REVIEW.md",
+        ".outcomegraph/export/mcp-resources.json",
         "to-do.json"
       ],
-      "updated_at": "2026-03-07T12:25:48Z"
+      "updated_at": "2026-03-07T13:07:00Z",
+      "blockers": []
     },
     {
       "id": "OG-AGENT-014",

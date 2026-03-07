@@ -359,9 +359,38 @@ SYNC_GENERATED_IGNORE_PATHS = (
     f"{OG_ROOT}/materials.lock",
     OUTCOME_GITIGNORE,
 )
-MCP_CONTROL_RESOURCES = ("capsules", "refs", "constitution", "certificates")
 MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
-MCP_CONTROL_RESOURCE_NAMES = tuple(MCP_CONTROL_RESOURCES)
+MCP_CONTROL_RESOURCE_DEFS = (
+    {
+        "uri": "outcomegraph://capsules",
+        "name": "capsules",
+        "description": "Canonical artifact projection for capsules scope.",
+        "category": "artifact",
+        "scope": "capsules",
+    },
+    {
+        "uri": "outcomegraph://refs",
+        "name": "refs",
+        "description": "Canonical artifact projection for refs scope.",
+        "category": "artifact",
+        "scope": "refs",
+    },
+    {
+        "uri": "outcomegraph://constitution",
+        "name": "constitution",
+        "description": "Canonical artifact projection for constitution scope.",
+        "category": "artifact",
+        "scope": "constitution",
+    },
+    {
+        "uri": "outcomegraph://certificates",
+        "name": "certificates",
+        "description": "Canonical artifact projection for certificates scope.",
+        "category": "artifact",
+        "scope": "certificates",
+    },
+)
+MCP_CONTROL_RESOURCE_NAMES = tuple(str(item["name"]) for item in MCP_CONTROL_RESOURCE_DEFS)
 MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
 CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
 WORK_LOCK_STALE_SECONDS = 300
@@ -1269,6 +1298,7 @@ _COMMAND_FIELD_PLACEHOLDERS: dict[str, str] = {
     "--session-id": "<id>",
     "--timeout": "<seconds>",
 }
+_COMMAND_USAGE_OMIT_FIELDS = frozenset({"--json", "--strict", "--non-interactive"})
 
 
 def _command_overview_usage(signature: dict[str, object]) -> str:
@@ -1319,6 +1349,39 @@ def _command_field_syntax(field: dict[str, object]) -> str:
     if field_type == "string":
         return f"{name} <value>"
     return name
+
+
+def _command_usage_contract(
+    usage: str,
+    request_fields: list[dict[str, object]],
+    *,
+    subcommands: list[str] | None = None,
+) -> str:
+    normalized_usage = " ".join(str(usage).split()).strip()
+    if not normalized_usage:
+        normalized_usage = "og"
+    if subcommands:
+        return normalized_usage
+
+    segments: list[str] = [normalized_usage]
+    for raw_field in request_fields:
+        if not isinstance(raw_field, dict):
+            continue
+        field = cast(dict[str, object], raw_field)
+        name = str(field.get("name") or "").strip()
+        if not name or name in _COMMAND_USAGE_OMIT_FIELDS:
+            continue
+        placeholder = f"<{name}>"
+        if (name.startswith("--") and name in normalized_usage) or (not name.startswith("--") and placeholder in normalized_usage):
+            continue
+        syntax = _command_field_syntax(field)
+        if not syntax:
+            continue
+        if field.get("required") is True:
+            segments.append(syntax)
+        else:
+            segments.append(f"[{syntax}]")
+    return " ".join(segments)
 
 
 def _command_help_from_signature(signature: dict[str, object]) -> str:
@@ -1487,6 +1550,7 @@ def _command_signature_entry(
     mcp_tool: bool = False,
     mcp_uri: str | None = None,
 ) -> dict[str, object]:
+    usage_contract = _command_usage_contract(usage, request_fields, subcommands=subcommands)
     response_schema = {
         "envelope_schema_version": COMMAND_RESULT_SCHEMA_VERSION,
         "data_fields": response_fields,
@@ -1514,7 +1578,7 @@ def _command_signature_entry(
     required_request = [entry["name"] for entry in request_fields_with_strict if entry.get("required")]
     signature: dict[str, object] = {
         "command": command,
-        "usage": usage,
+        "usage": usage_contract,
         "summary": summary,
         "request": {
             "fields": request_fields_with_strict,
@@ -1556,7 +1620,6 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "Collect changes, distill/categorize them, apply artifacts, verify, and export outputs.",
             [
                 _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
-                _command_schema_field("--changed", "boolean", "Limit processing to changed scope.", default=False),
                 _command_schema_field(
                     "--profile",
                     "string",
@@ -2081,6 +2144,36 @@ def _command_subcommands_text(command: str) -> str:
     return ", ".join(subcommands)
 
 
+def _command_request_fields(command: str) -> list[dict[str, object]]:
+    signature = _CLI_COMMAND_SIGNATURE_BY_NAME.get(_normalize_command_signature_target(command))
+    if not isinstance(signature, dict):
+        return []
+    request = signature.get("request") if isinstance(signature.get("request"), dict) else {}
+    fields = request.get("fields") if isinstance(request.get("fields"), list) else []
+    return [cast(dict[str, object], field) for field in fields if isinstance(field, dict)]
+
+
+def _command_request_field(command: str, field_name: str) -> dict[str, object] | None:
+    for field in _command_request_fields(command):
+        if str(field.get("name") or "").strip() == field_name:
+            return field
+    return None
+
+
+def _command_accepts_field(command: str, field_name: str) -> bool:
+    return _command_request_field(command, field_name) is not None
+
+
+def _command_field_enum_values(command: str, field_name: str) -> list[str]:
+    field = _command_request_field(command, field_name)
+    if not isinstance(field, dict):
+        return []
+    enum_values = field.get("enum")
+    if not isinstance(enum_values, list):
+        return []
+    return [str(item) for item in enum_values if isinstance(item, str) and item.strip()]
+
+
 def _mcp_command_signatures() -> list[dict[str, object]]:
     return [entry for entry in _CLI_COMMAND_SIGNATURES if entry.get("mcp_tool") is True]
 
@@ -2098,6 +2191,37 @@ def _build_mcp_tool_definition(signature: dict[str, object]) -> dict[str, object
 
 def _mcp_tool_definitions() -> list[dict[str, object]]:
     return sorted((_build_mcp_tool_definition(signature) for signature in _mcp_command_signatures()), key=lambda item: str(item["name"]))
+
+
+def _mcp_resource_definitions(snapshot: dict[str, object]) -> list[dict[str, object]]:
+    artifacts = snapshot.get("artifacts") if isinstance(snapshot.get("artifacts"), list) else []
+    definitions: list[dict[str, object]] = []
+    for raw_definition in MCP_CONTROL_RESOURCE_DEFS:
+        scope = str(raw_definition.get("scope") or "").strip()
+        path_prefix = f"{OG_ROOT}/{scope}/"
+        paths = sorted(
+            str(record.get("path") or "")
+            for record in artifacts
+            if isinstance(record, dict) and str(record.get("path") or "").startswith(path_prefix)
+        )
+        definitions.append(
+            {
+                "uri": str(raw_definition["uri"]),
+                "name": str(raw_definition["name"]),
+                "description": str(raw_definition["description"]),
+                "category": str(raw_definition["category"]),
+                "paths": paths,
+            }
+        )
+    return sorted(definitions, key=lambda item: str(item["name"]))
+
+
+def _mcp_resource_counts(resources: list[dict[str, object]]) -> dict[str, int]:
+    return {
+        str(item.get("name") or ""): len(item.get("paths") if isinstance(item.get("paths"), list) else [])
+        for item in resources
+        if str(item.get("name") or "").strip()
+    }
 
 
 
@@ -4308,7 +4432,7 @@ def _collect_export_drift_check(repo_root: str) -> dict[str, object] | None:
 
     try:
         payload = _build_mcp_server_payload(snapshot, {})
-        mcp_surface_issues = _validate_mcp_control_surface_payload(payload)
+        mcp_surface_issues = _validate_mcp_control_surface_payload(payload, snapshot)
         for item in mcp_surface_issues:
             mismatches.append({"type": "control_surface", "message": item})
     except Exception as exc:
@@ -7899,55 +8023,22 @@ def _render_skill_export(snapshot: dict[str, object]) -> str:
 
 def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
     tools = _mcp_tool_definitions()
-    resources = [
-        *tools,
-        *(
-        {
-            "uri": f"outcomegraph://{scope}",
-            "name": scope,
-            "description": f"Canonical artifact projection for {scope} scope.",
-            "category": "artifact",
-            "paths": [record["path"] for record in snapshot["artifacts"] if record["path"].startswith(f"{OG_ROOT}/{scope}")],
-        }
-        for scope in sorted(snapshot["counts"]["by_scope"])
-        ),
-    ]
+    resources = _mcp_resource_definitions(snapshot)
     payload = {
         "schema_version": 2,
         "artifact_type": "mcp_resource_export",
         "id": "mcp-export",
         "tools": tools,
-        "resources": sorted(resources[len(tools) :], key=lambda item: item["uri"]),
-        "prompts": [
-            "bootstrap",
-            "replay",
-            "repair",
-        ],
-        "artifact_counts": {scope: snapshot["counts"]["by_scope"][scope] for scope in sorted(snapshot["counts"]["by_scope"])},
+        "resources": resources,
+        "prompts": list(MCP_CONTROL_PROMPTS),
+        "artifact_counts": _mcp_resource_counts(resources),
         "status": "ok",
     }
     return json.dumps(payload, sort_keys=True, indent=2) + "\n"
 
 
 def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, object]) -> dict[str, object]:
-    artifact_counts = snapshot.get("counts", {}).get("by_scope", {}) if isinstance(snapshot.get("counts"), dict) else {}
-    resources = [
-        {
-            "uri": f"outcomegraph://{scope}",
-            "name": scope,
-            "description": f"Canonical artifact projection for {scope} scope.",
-            "category": "artifact",
-            "paths": sorted(
-                [
-                    record["path"]
-                    for record in snapshot.get("artifacts", [])
-                    if isinstance(record, dict)
-                    and str(record.get("path", "")).startswith(f"{OG_ROOT}/{scope}")
-                ]
-            ),
-        }
-        for scope in MCP_CONTROL_RESOURCES
-    ]
+    resources = _mcp_resource_definitions(snapshot)
     controls = {
         "tools": _mcp_tool_definitions(),
         "resources": resources,
@@ -7960,14 +8051,14 @@ def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, ob
         "tools": controls["tools"],
         "resources": controls["resources"],
         "prompts": controls["prompts"],
-        "artifact_counts": {scope: artifact_counts.get(scope, 0) for scope in MCP_CONTROL_RESOURCES},
+        "artifact_counts": _mcp_resource_counts(resources),
         "status": "ok",
         "generated_at": snapshot.get("generated_at"),
         "message": "MCP control surface available from canonical artifact projections.",
     }
 
 
-def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[str]:
+def _validate_mcp_control_surface_payload(payload: dict[str, object], snapshot: dict[str, object]) -> list[str]:
     issues: list[str] = []
     tools = payload.get("tools")
     if not isinstance(tools, list):
@@ -7983,12 +8074,14 @@ def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[st
         prompts = []
 
     expected_tools = {str(item["name"]): item for item in _mcp_tool_definitions()}
+    expected_resources = {str(item["name"]): item for item in _mcp_resource_definitions(snapshot)}
+    expected_artifact_counts = _mcp_resource_counts(list(expected_resources.values()))
     tool_names = sorted({str(item.get("name")) for item in tools if isinstance(item, dict) and str(item.get("name"))})
     resource_names = sorted({str(item.get("name")) for item in resources if isinstance(item, dict) and str(item.get("name"))})
     prompt_values = sorted(str(value) for value in prompts if str(value))
 
     expected_tool_names = sorted(expected_tools)
-    expected_resource_names = sorted(MCP_CONTROL_RESOURCE_NAMES)
+    expected_resource_names = sorted(expected_resources)
     expected_prompt_names = sorted(MCP_CONTROL_PROMPT_NAMES)
     if tool_names != expected_tool_names:
         issues.append(f"`tools` does not match contract: expected {expected_tool_names}, observed {tool_names}")
@@ -8002,12 +8095,37 @@ def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[st
         for item in tools
         if isinstance(item, dict) and str(item.get("name"))
     }
+    observed_resources = {
+        str(item.get("name")): item
+        for item in resources
+        if isinstance(item, dict) and str(item.get("name"))
+    }
     for name, expected in expected_tools.items():
         observed = observed_tools.get(name)
         if observed is None:
             continue
         if observed != expected:
             issues.append(f"`tools[{name}]` does not match the shared CLI contract signature")
+    for name, expected in expected_resources.items():
+        observed = observed_resources.get(name)
+        if observed is None:
+            continue
+        if observed != expected:
+            issues.append(f"`resources[{name}]` does not match the shared resource contract")
+
+    artifact_counts = payload.get("artifact_counts")
+    if not isinstance(artifact_counts, dict):
+        issues.append("`artifact_counts` must be an object")
+    else:
+        normalized_artifact_counts = {
+            str(key): int(value)
+            for key, value in artifact_counts.items()
+            if isinstance(key, str) and isinstance(value, int)
+        }
+        if normalized_artifact_counts != expected_artifact_counts:
+            issues.append(
+                f"`artifact_counts` does not match contract: expected {expected_artifact_counts}, observed {normalized_artifact_counts}"
+            )
 
     if str(payload.get("command")) != "mcp-server":
         issues.append("command field must be 'mcp-server'")
@@ -8021,7 +8139,7 @@ def _run_mcp_server_stage(repo_root: str, options: dict[str, object]) -> dict[st
     try:
         snapshot = _canonical_export_snapshot(repo_root)
         payload = _build_mcp_server_payload(snapshot, options)
-        issues = _validate_mcp_control_surface_payload(payload)
+        issues = _validate_mcp_control_surface_payload(payload, snapshot)
         if issues:
             return {
                 "schema_version": 2,
@@ -9472,9 +9590,34 @@ def parse_command_flags(
     runtime_defaults: dict[str, object] | None = None,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
+    if _command_request_fields(command):
+        allow_changed = _command_accepts_field(command, "--changed")
+        allow_profile = _command_accepts_field(command, "--profile")
+        allow_mode = _command_accepts_field(command, "--mode")
+        allow_force_hooks_path = _command_accepts_field(command, "--force-hooks-path")
+        allow_force_full_sync = _command_accepts_field(command, "--force-full-sync")
+        allow_capsule_filter = _command_accepts_field(command, "--capsule")
+        allow_ref_filter = _command_accepts_field(command, "--ref")
+        allow_certificate_filter = _command_accepts_field(command, "--certificate")
+        allow_output_controls = any(
+            _command_accepts_field(command, field_name)
+            for field_name in ("--output", "--fields", "--limit", "--offset")
+        )
+        allow_yes = _command_accepts_field(command, "--yes")
+        allow_session_id = _command_accepts_field(command, "--session-id")
+        allow_validate = _command_accepts_field(command, "--validate")
+        allow_dry_run = _command_accepts_field(command, "--dry-run")
+        allow_recovery_controls = any(
+            _command_accepts_field(command, field_name)
+            for field_name in ("--max-retries", "--timeout")
+        )
+
     changed = False
     resolved_defaults = runtime_defaults or {}
     resolved_sources = dict(cast(dict[str, str], resolved_defaults.get("resolved_from") or {}))
+    allowed_output_modes = _command_field_enum_values(command, "--output") or [OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL]
+    allowed_profile_values = _command_field_enum_values(command, "--profile") or sorted(PROFILE_VALUES)
+    allowed_mode_values = _command_field_enum_values(command, "--mode") or sorted(MODE_VALUES)
     profile = str(resolved_defaults.get("profile")).strip() if allow_profile and resolved_defaults.get("profile") else None
     profile_source = resolved_sources.get("profile", "built-in") if allow_profile else None
     mode = str(resolved_defaults.get("mode")).strip() if allow_mode and resolved_defaults.get("mode") else None
@@ -9492,6 +9635,7 @@ def parse_command_flags(
     limit: int | None = None
     confirmed = False
     session_id: str | None = None
+    command_non_interactive = False
     offset = 0
     validate_only = False
     dry_run = False
@@ -9514,9 +9658,9 @@ def parse_command_flags(
 
     def parse_output_mode(raw_value: str) -> str:
         value = raw_value.lower().strip()
-        if value not in {OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL}:
+        if value not in allowed_output_modes:
             emit_error(
-                f"invalid --output value '{raw_value}', expected one of: {OUTPUT_MODE_HUMAN}, {OUTPUT_MODE_JSON}, {OUTPUT_MODE_JSONL}",
+                f"invalid --output value '{raw_value}', expected one of: {', '.join(allowed_output_modes)}",
                 command,
                 EXIT_USAGE,
                 output_json,
@@ -9667,6 +9811,17 @@ def parse_command_flags(
                 emit_error(f"invalid --strict value: {exc}", command, EXIT_USAGE, output_json)
             i += 1
             continue
+        if arg == "--non-interactive":
+            command_non_interactive = True
+            i += 1
+            continue
+        if arg.startswith("--non-interactive="):
+            try:
+                command_non_interactive = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --non-interactive value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg == "--changed":
             if not allow_changed:
                 emit_error(f"{command} does not accept --changed", command, EXIT_USAGE, output_json)
@@ -9781,9 +9936,9 @@ def parse_command_flags(
             if i + 1 >= len(args):
                 emit_error(f"{command} requires a value for --profile", command, EXIT_USAGE, output_json)
             value = args[i + 1]
-            if value not in PROFILE_VALUES:
+            if value not in allowed_profile_values:
                 emit_error(
-                    f"invalid --profile '{value}', expected one of: {', '.join(sorted(PROFILE_VALUES))}",
+                    f"invalid --profile '{value}', expected one of: {', '.join(sorted(allowed_profile_values))}",
                     command,
                     EXIT_USAGE,
                     output_json,
@@ -9796,9 +9951,9 @@ def parse_command_flags(
             if not allow_profile:
                 emit_error(f"{command} does not accept --profile", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
-            if value not in PROFILE_VALUES:
+            if value not in allowed_profile_values:
                 emit_error(
-                    f"invalid --profile '{value}', expected one of: {', '.join(sorted(PROFILE_VALUES))}",
+                    f"invalid --profile '{value}', expected one of: {', '.join(sorted(allowed_profile_values))}",
                     command,
                     EXIT_USAGE,
                     output_json,
@@ -9813,9 +9968,9 @@ def parse_command_flags(
             if i + 1 >= len(args):
                 emit_error(f"{command} requires a value for --mode", command, EXIT_USAGE, output_json)
             value = args[i + 1]
-            if value not in MODE_VALUES:
+            if value not in allowed_mode_values:
                 emit_error(
-                    f"invalid --mode '{value}', expected one of: {', '.join(sorted(MODE_VALUES))}",
+                    f"invalid --mode '{value}', expected one of: {', '.join(sorted(allowed_mode_values))}",
                     command,
                     EXIT_USAGE,
                     output_json,
@@ -9828,9 +9983,9 @@ def parse_command_flags(
             if not allow_mode:
                 emit_error(f"{command} does not accept --mode", command, EXIT_USAGE, output_json)
             value = arg.split("=", 1)[1]
-            if value not in MODE_VALUES:
+            if value not in allowed_mode_values:
                 emit_error(
-                    f"invalid --mode '{value}', expected one of: {', '.join(sorted(MODE_VALUES))}",
+                    f"invalid --mode '{value}', expected one of: {', '.join(sorted(allowed_mode_values))}",
                     command,
                     EXIT_USAGE,
                     output_json,
@@ -9933,6 +10088,7 @@ def parse_command_flags(
         "output_mode": output_mode,
         "output_json": output_json,
         "strict": strict,
+        "non_interactive": command_non_interactive,
         "validate": validate_only,
         "dry_run": dry_run,
         "max_retries": max_retries,
@@ -9980,6 +10136,8 @@ def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
     scope = "runtime"
     dry_run = False
     confirmed = False
+    strict = False
+    non_interactive = False
     i = 0
     while i < len(args):
         arg = args[i]
@@ -10003,6 +10161,28 @@ def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
                 output_json = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --json value: {exc}", "clean", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--strict":
+            strict = True
+            i += 1
+            continue
+        if arg.startswith("--strict="):
+            try:
+                strict = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --strict value: {exc}", "clean", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--non-interactive":
+            non_interactive = True
+            i += 1
+            continue
+        if arg.startswith("--non-interactive="):
+            try:
+                non_interactive = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --non-interactive value: {exc}", "clean", EXIT_USAGE, output_json)
             i += 1
             continue
         if arg == "--scope":
@@ -10052,6 +10232,8 @@ def _parse_clean_flags(args: list[str], output_json: bool) -> dict[str, object]:
         "scope": scope,
         "dry_run": dry_run,
         "yes": confirmed,
+        "strict": strict,
+        "non_interactive": non_interactive,
         "output_json": output_json,
     }
 
@@ -10160,6 +10342,7 @@ def _parse_optimize_prompts_flags(
     default_strict: bool = False,
 ) -> dict[str, object]:
     strict = bool(default_strict)
+    non_interactive = False
     has_payload = False
     payload: dict[str, object] = {}
     flag_values: dict[str, object] = {}
@@ -10192,6 +10375,13 @@ def _parse_optimize_prompts_flags(
             output_json = True
             i += 1
             continue
+        if arg.startswith("--json="):
+            try:
+                output_json = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --json value: {exc}", "optimize", EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg == "--strict":
             strict = True
             i += 1
@@ -10201,6 +10391,17 @@ def _parse_optimize_prompts_flags(
                 strict = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --strict value: {exc}", "optimize", EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--non-interactive":
+            non_interactive = True
+            i += 1
+            continue
+        if arg.startswith("--non-interactive="):
+            try:
+                non_interactive = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --non-interactive value: {exc}", "optimize", EXIT_USAGE, output_json)
             i += 1
             continue
         if arg == "--params":
@@ -10460,6 +10661,7 @@ def _parse_optimize_prompts_flags(
         "min_improvement": min_improvement,
         "approve": bool(approve),
         "strict": strict,
+        "non_interactive": non_interactive,
         "output_json": output_json,
     }
 
@@ -17177,7 +17379,7 @@ def run_command(
             state = _init_autopilot(
                 bool(options.get("force_hooks_path", False)),
                 bool(options.get("yes", False)),
-                non_interactive=non_interactive,
+                non_interactive=non_interactive or bool(options.get("non_interactive")),
                 output_json=output_json,
             )
             state["message"] = "autopilot init command executed."
@@ -17340,6 +17542,14 @@ def run_command(
                     _ = parse_bool_option(arg.split("=", 1)[1])
                 except ValueError as exc:
                     emit_error(f"invalid --strict value for describe: {exc}", "describe", EXIT_USAGE, output_json)
+                continue
+            if arg == "--non-interactive":
+                continue
+            if arg.startswith("--non-interactive="):
+                try:
+                    _ = parse_bool_option(arg.split("=", 1)[1])
+                except ValueError as exc:
+                    emit_error(f"invalid --non-interactive value for describe: {exc}", "describe", EXIT_USAGE, output_json)
                 continue
             if arg.startswith("-"):
                 emit_error(
