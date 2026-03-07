@@ -1860,7 +1860,7 @@
       "id": "OG-DISTILL-002",
       "title": "Rewrite the distill contract around recreation briefs instead of summaries",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Phase 4 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: change the distill prompt and output expectations so capsules describe recreatable behavior, invariants, dependencies, acceptance oracles, and explicit unknowns.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 4 and rewrite the distill worker prompt to request compact feature recreation briefs rather than broad summaries",
@@ -1882,10 +1882,14 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "tasks/og-distill-002/TASK.md",
+        "tasks/og-distill-002/task-plan.json",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T09:44:50Z",
+      "blockers": []
     },
     {
       "id": "OG-APPLY-001",

@@ -1,0 +1,43 @@
+{
+  "task_id": "OG-DISTILL-002",
+  "title": "Rewrite the distill contract around recreation briefs instead of summaries",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-distill-001/TASK.md",
+    "tasks/og-distill-001/task-plan.json"
+  ],
+  "write_files": [
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-distill-002/TASK.md",
+    "tasks/og-distill-002/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Rewrite the distill prompt and worker output contract around recreation briefs",
+      "status": "done"
+    },
+    {
+      "step": "Require behavior claims, invariants, dependencies, unknowns, and oracle-gap reasons in distill normalization and apply-stage success policy",
+      "status": "done"
+    },
+    {
+      "step": "Add regression coverage for stronger `og` and `tests` capsule outputs and run the focused unittest suite",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m unittest -q tests.test_og_sync_verify_replay_hooks"
+  ]
+}

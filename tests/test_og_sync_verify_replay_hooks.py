@@ -51,14 +51,29 @@ class _RepoTestCase(TestCase):
 
 
 def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = "success") -> dict[str, object]:
+    scope = changed_files or [capsule_id]
     return {
         "id": capsule_id,
         "capsule_id": capsule_id,
         "status": status,
         "goal": f"Preserve and replay the {capsule_id} capability.",
-        "scope": changed_files or [capsule_id],
+        "scope": scope,
+        "behavior_claims": [
+            f"{capsule_id} preserves the observed behavior within the recorded capsule boundary.",
+        ],
         "constraints": [],
-        "oracles": [{"name": f"{capsule_id}-verify", "command": None, "scope": changed_files or [capsule_id]}],
+        "invariants": [
+            f"{capsule_id} must keep its current contract stable for the recorded scope.",
+        ],
+        "dependencies": scope,
+        "oracles": [
+            {
+                "name": f"{capsule_id}-verify",
+                "command": None,
+                "reason": "This fixture does not provide an executable oracle command.",
+                "scope": scope,
+            }
+        ],
         "claims": [
             {
                 "id": None,
@@ -66,7 +81,7 @@ def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = 
                 "category": "behavior",
                 "text": f"{capsule_id} remains consistent with the observed repository state.",
                 "receipt_pointers": [],
-                "source_paths": changed_files or [capsule_id],
+                "source_paths": scope,
             }
         ],
         "decision": {
@@ -75,6 +90,9 @@ def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = 
             "status": "accepted",
         },
         "lineage": {"parent_capsule_ids": []},
+        "unknowns": [
+            "Bounded fixture input may omit additional unchanged collaborators outside the recorded scope.",
+        ],
         "errors": [],
         "receipts": [],
         "changed_files": changed_files,
@@ -2684,6 +2702,41 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
 
         parsed = og._normalize_distill_delta(payload)
         self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
+        self.assertEqual(parsed["capsule_updates"][0]["behavior_claims"][0], payload["capsule_updates"][0]["behavior_claims"][0])
+
+    def test_build_worker_prompt_distill_requests_recreation_briefs(self) -> None:
+        prompt = og._build_worker_prompt(
+            "distill",
+            {
+                "schema_version": 2,
+                "interface_version": 1,
+                "run_id": "run-1",
+                "target_capsules": [{"id": "og", "kind": "code"}],
+            },
+        )
+
+        self.assertIn("compact recreation brief", prompt)
+        self.assertIn("behavior_claims", prompt)
+        self.assertIn("invariants", prompt)
+        self.assertIn("dependencies", prompt)
+        self.assertIn("unknowns", prompt)
+        self.assertIn("do not write a file-by-file summary", prompt.lower())
+        self.assertIn("command=null and provide a non-empty reason", prompt)
+
+    def test_normalize_distill_delta_requires_oracle_reason_when_command_missing(self) -> None:
+        update = _distill_update("default", ["capsules/default.yaml"])
+        update["oracles"] = [{"name": "default-verify", "command": None, "scope": ["capsules/default.yaml"]}]
+        payload = {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "run-1",
+            "capsule_updates": [update],
+        }
+
+        with self.assertRaises(og.WorkerAdapterError) as context:
+            og._normalize_distill_delta(payload)
+
+        self.assertIn("reason is required when command is null", str(context.exception))
 
     def test_run_codex_worker_prefers_output_last_message_contract(self) -> None:
         input_payload = {
@@ -2922,6 +2975,156 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(capsule_payload["kind"], "test")
         self.assertEqual(capsule_payload["status"], "success")
+
+    def test_run_apply_stage_downgrades_success_without_recreation_brief_fields(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("default", ["README.md"], status="success")
+            delta["behavior_claims"] = []
+            delta["dependencies"] = []
+            delta["unknowns"] = []
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["default"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "default.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(capsule_payload["status"], "warn")
+        self.assertEqual(capsule_payload["behavior_claims"], [])
+        self.assertTrue(any("behavior_claims" in warning for warning in payload["warnings"]))
+        self.assertTrue(any("dependencies" in warning for warning in payload["warnings"]))
+        self.assertTrue(any("unknowns" in warning for warning in payload["warnings"]))
+
+    def test_run_apply_stage_persists_recreation_brief_for_og_capsule(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("og", ["og.py"], status="success")
+            delta["goal"] = "Provide the stable OutcomeGraph CLI and sync orchestration contract."
+            delta["scope"] = ["og.py", "tests/test_og_sync_verify_replay_hooks.py", "README.md"]
+            delta["behavior_claims"] = [
+                "The `og` command keeps a stable CLI surface for sync, verify, replay, and status workflows.",
+                "Structured command envelopes remain available for automation and agent callers.",
+            ]
+            delta["invariants"] = [
+                "CLI command parsing must keep stable top-level commands and usage contracts.",
+                "Sync continues to orchestrate distill, apply, verify, and export in order.",
+            ]
+            delta["dependencies"] = [
+                "og.py",
+                "tests/test_og_sync_verify_replay_hooks.py",
+                "README.md",
+            ]
+            delta["unknowns"] = [
+                "A full repo-wide sync run is still needed to confirm no hidden command-surface regressions outside the focused tests.",
+            ]
+            delta["oracles"] = [
+                {
+                    "name": "pytest regression suite",
+                    "command": "pytest -q",
+                    "scope": ["og.py", "tests/test_og_sync_verify_replay_hooks.py"],
+                }
+            ]
+            delta["claims"] = [
+                {
+                    "id": None,
+                    "capsule_id": "og",
+                    "category": "behavior",
+                    "text": "`og` exposes a stable command contract with structured sync and verification workflows.",
+                    "receipt_pointers": [],
+                    "source_paths": ["og.py", "tests/test_og_sync_verify_replay_hooks.py"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["og"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "og.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["status"], "success")
+        self.assertEqual(capsule_payload["kind"], "code")
+        self.assertEqual(capsule_payload["behavior_claims"], delta["behavior_claims"])
+        self.assertEqual(capsule_payload["invariants"], delta["invariants"])
+        self.assertEqual(capsule_payload["dependencies"], delta["dependencies"])
+        self.assertEqual(capsule_payload["unknowns"], delta["unknowns"])
+        self.assertEqual(capsule_payload["oracles"][0]["command"], "pytest -q")
+
+    def test_run_apply_stage_persists_recreation_brief_for_tests_capsule(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("tests", ["tests/test_og_sync_verify_replay_hooks.py"], status="success")
+            delta["goal"] = "Protect the OutcomeGraph regression contract with focused repository tests."
+            delta["scope"] = ["tests/test_og_sync_verify_replay_hooks.py", "og.py"]
+            delta["behavior_claims"] = [
+                "The test suite exercises sync, distill, apply, verify, replay, and CLI contract regressions.",
+            ]
+            delta["invariants"] = [
+                "Regression tests must stay deterministic and runnable from a clean temporary repository.",
+            ]
+            delta["dependencies"] = [
+                "tests/test_og_sync_verify_replay_hooks.py",
+                "og.py",
+                "tests/conftest.py",
+            ]
+            delta["unknowns"] = [
+                "Broader cross-platform behavior still depends on environments outside this focused fixture set.",
+            ]
+            delta["oracles"] = [
+                {
+                    "name": "pytest regression suite",
+                    "command": "pytest -q",
+                    "scope": ["tests/test_og_sync_verify_replay_hooks.py", "og.py"],
+                }
+            ]
+            delta["claims"] = [
+                {
+                    "id": None,
+                    "capsule_id": "tests",
+                    "category": "behavior",
+                    "text": "The focused regression suite validates the repository's distill/apply/verify/replay contract.",
+                    "receipt_pointers": [],
+                    "source_paths": ["tests/test_og_sync_verify_replay_hooks.py", "og.py"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["tests"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["status"], "success")
+        self.assertEqual(capsule_payload["kind"], "test")
+        self.assertEqual(capsule_payload["behavior_claims"], delta["behavior_claims"])
+        self.assertEqual(capsule_payload["invariants"], delta["invariants"])
+        self.assertEqual(capsule_payload["dependencies"], delta["dependencies"])
+        self.assertEqual(capsule_payload["unknowns"], delta["unknowns"])
+        self.assertEqual(capsule_payload["oracles"][0]["command"], "pytest -q")
 
     def test_run_apply_stage_downgrades_policy_blocked_oracle_to_advisory_only(self) -> None:
         with self.git_root_patch():

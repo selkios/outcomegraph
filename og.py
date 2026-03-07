@@ -5666,6 +5666,7 @@ def _worker_oracle_schema() -> dict[str, object]:
         "properties": {
             "name": {"type": "string", "minLength": 1},
             "command": {"type": ["string", "null"]},
+            "reason": {"type": ["string", "null"]},
             "scope": {"type": "array", "items": {"type": "string", "minLength": 1}},
         },
     }
@@ -5736,11 +5737,15 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                             "status",
                             "goal",
                             "scope",
+                            "behavior_claims",
                             "constraints",
+                            "invariants",
+                            "dependencies",
                             "oracles",
                             "claims",
                             "decision",
                             "lineage",
+                            "unknowns",
                             "errors",
                             "receipts",
                             "changed_files",
@@ -5757,7 +5762,14 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                                 "minItems": 1,
                                 "items": {"type": "string", "minLength": 1},
                             },
+                            "behavior_claims": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {"type": "string", "minLength": 1},
+                            },
                             "constraints": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                            "invariants": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                            "dependencies": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                             "oracles": {
                                 "type": "array",
                                 "minItems": 1,
@@ -5770,6 +5782,7 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                             },
                             "decision": _worker_decision_schema(),
                             "lineage": _worker_lineage_schema(),
+                            "unknowns": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                             "errors": {"type": "array", "items": {"type": "string", "minLength": 1}},
                             "receipts": {
                                 "type": "array",
@@ -5838,7 +5851,7 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "You are the OutcomeGraph distill worker adapter.\n"
             "Do not run shell commands.\n"
             "Return exactly one JSON object and nothing else.\n"
-            "Produce a reusable capsule record that would help another agent understand and regenerate the same capability.\n"
+            "Produce a compact recreation brief that would let another agent recreate the same capability without reading the full repository.\n"
             "Rules:\n"
             "- schema_version must be 2\n"
             "- interface_version must be 1\n"
@@ -5854,16 +5867,24 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- input.target_capsules[].kind tells you whether the capsule is code, test, doc, config, or runtime; use it when choosing oracle strength and status\n"
             "- A snapshot with selection='diff_hunks' is an intentional changed-region view, not a simple file-prefix truncation\n"
             "- Use only the input payload below\n"
-            "- Fill goal, scope, constraints, oracles, claims, decision, receipts, and changed_files from actual repository evidence\n"
+            "- Treat goal as the feature/capability statement and scope as the capsule boundary; do not write a file-by-file summary\n"
+            "- behavior_claims must be a short list of recreatable behaviors another agent must preserve\n"
+            "- claims must be evidence-backed records; include at least one claim with category='behavior' for every capsule update\n"
+            "- invariants must capture behaviors or contracts that must remain true after recreation\n"
+            "- dependencies must name the files, modules, tests, configs, or runtime contracts that materially support the capsule\n"
+            "- unknowns must explicitly call out evidence gaps, bounded-input limits, or follow-up questions; never imply certainty you do not have\n"
+            "- constraints are hard limits or policy restrictions, not a substitute for invariants or unknowns\n"
+            "- oracles are the acceptance contract; when no honest executable oracle exists, set command=null and provide a non-empty reason explaining the gap\n"
+            "- Fill goal, scope, behavior_claims, constraints, invariants, dependencies, oracles, claims, decision, unknowns, receipts, and changed_files from actual repository evidence\n"
             "- Set lineage.parent_capsule_ids to an array, using [] when there is no parent lineage\n"
             "- Each claim must include id, capsule_id, category, text, receipt_pointers, and source_paths; use null for id/capsule_id only when unknown, and [] for empty lists\n"
             "- Each receipt pointer must include schema_version, type, target, hash, media_type, and size; use null for hash/media_type/size when unknown\n"
-            "- Every successful update must include at least one claim and at least one oracle\n"
+            "- Every successful update must be materially reusable: specific goal/boundary, explicit behavior_claims, invariants, dependencies, unknowns, and an acceptance oracle or explicit oracle gap reason\n"
             "- Prefer concrete validation commands already used in this repository when they fit the capsule, including repo-native wrappers such as `uv run ...` when the repository uses them\n"
             "- Do not turn documentation examples, allowlists, or generic command catalogs into live oracle commands unless repository evidence shows they are the capsule's actual verification contract\n"
             "- When a command is only mentioned as an example or policy allowance, emit command=null and explain the gap instead of inventing an executable oracle\n"
             "- For code or test capsules, use status='success' only when repository evidence supports at least one executable oracle command for the capsule; snapshot-only or doc-like evidence should stay at warn\n"
-            "- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable when they are the strongest honest evidence\n"
+            "- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable only when they are the strongest honest evidence and the oracle reason is explicit\n"
             "- Use status='warn' when the capsule is materially useful but still missing important supporting context\n"
             "- Use status='pending' only when repository evidence is too thin to produce a reusable capsule record\n"
             "\n"
@@ -6286,10 +6307,18 @@ def _normalize_distill_oracles(raw: object, *, field: str) -> list[dict[str, obj
             command_value = None
         else:
             command_value = _required_str(raw_command, f"{field}[{index}].command")
+        raw_reason = raw_oracle.get("reason")
+        if raw_reason is None:
+            reason_value = None
+        else:
+            reason_value = _required_str(raw_reason, f"{field}[{index}].reason")
+        if command_value is None and reason_value is None:
+            raise WorkerAdapterError(f"{field}[{index}].reason is required when command is null")
         normalized.append(
             {
                 "name": name,
                 "command": command_value,
+                **({"reason": reason_value} if reason_value is not None else {}),
                 "scope": _safe_string_list(raw_oracle.get("scope")),
             }
         )
@@ -6335,6 +6364,17 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
         raw_id = raw_update.get("id")
         if not isinstance(raw_id, str) or not raw_id.strip():
             raw_id = raw_update.get("capsule_id")
+        normalized_claims = _normalize_claim_payloads(
+            raw_update.get("claims"),
+            field=f"capsule_updates[{index}].claims",
+            default_capsule_id=_required_str(raw_id, f"capsule_updates[{index}].id"),
+            require_receipts=False,
+        )
+        if not any(
+            str(claim.get("category") or "").strip().lower() == "behavior" and str(claim.get("text") or "").strip()
+            for claim in normalized_claims
+        ):
+            raise WorkerAdapterError(f"capsule_updates[{index}].claims must include at least one behavior claim")
         updates.append(
             {
                 "id": _required_str(raw_id, f"capsule_updates[{index}].id"),
@@ -6343,18 +6383,29 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
                 "scope": _string_list(
                     raw_update.get("scope"),
                     f"capsule_updates[{index}].scope",
+                    required=True,
+                ),
+                "behavior_claims": _string_list(
+                    raw_update.get("behavior_claims"),
+                    f"capsule_updates[{index}].behavior_claims",
+                    required=True,
                 ),
                 "constraints": _safe_string_list(raw_update.get("constraints")),
+                "invariants": _string_list(
+                    raw_update.get("invariants"),
+                    f"capsule_updates[{index}].invariants",
+                    required=True,
+                ),
+                "dependencies": _string_list(
+                    raw_update.get("dependencies"),
+                    f"capsule_updates[{index}].dependencies",
+                    required=True,
+                ),
                 "oracles": _normalize_distill_oracles(
                     raw_update.get("oracles"),
                     field=f"capsule_updates[{index}].oracles",
                 ),
-                "claims": _normalize_claim_payloads(
-                    raw_update.get("claims"),
-                    field=f"capsule_updates[{index}].claims",
-                    default_capsule_id=_required_str(raw_id, f"capsule_updates[{index}].id"),
-                    require_receipts=False,
-                ),
+                "claims": normalized_claims,
                 "decision": _normalize_distill_decision(
                     raw_update.get("decision"),
                     field=f"capsule_updates[{index}].decision",
@@ -6362,6 +6413,11 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
                 "lineage": _normalize_distill_lineage(
                     raw_update.get("lineage"),
                     field=f"capsule_updates[{index}].lineage",
+                ),
+                "unknowns": _string_list(
+                    raw_update.get("unknowns"),
+                    f"capsule_updates[{index}].unknowns",
+                    required=True,
                 ),
                 "errors": _string_list(
                     raw_update.get("errors"),
@@ -9608,6 +9664,8 @@ def _normalize_oracle_entry(raw_oracle: object) -> dict[str, object] | None:
 
     command = raw_oracle.get("command")
     command_value = command.strip() if isinstance(command, str) and command.strip() else None
+    reason = raw_oracle.get("reason")
+    reason_value = reason.strip() if isinstance(reason, str) and reason.strip() else None
 
     scope_raw = raw_oracle.get("scope")
     scope: list[str] = []
@@ -9621,7 +9679,10 @@ def _normalize_oracle_entry(raw_oracle: object) -> dict[str, object] | None:
                 if cleaned:
                     scope.append(cleaned)
 
-    return {"name": name.strip(), "command": command_value, "scope": scope}
+    normalized = {"name": name.strip(), "command": command_value, "scope": scope}
+    if reason_value is not None:
+        normalized["reason"] = reason_value
+    return normalized
 
 
 def _load_capsule_oracles(repo_root: str, capsule_id: str) -> list[dict[str, object]]:
@@ -10461,6 +10522,57 @@ def _apply_kind_specific_success_policy(
     return "warn", [warning]
 
 
+def _apply_recreation_brief_success_policy(
+    capsule_id: str,
+    status: str,
+    claims: list[dict[str, object]],
+    behavior_claims: list[str],
+    invariants: list[str],
+    dependencies: list[str],
+    unknowns: list[str],
+    oracles: list[dict[str, object]],
+) -> tuple[str, list[str]]:
+    normalized_status = _normalize_distill_status(status)
+    if normalized_status != "success":
+        return normalized_status, []
+
+    warnings: list[str] = []
+    if not behavior_claims:
+        warnings.append(f"capsule {capsule_id} requires explicit behavior_claims for success")
+    if not any(
+        isinstance(claim, dict)
+        and str(claim.get("category") or "").strip().lower() == "behavior"
+        and str(claim.get("text") or "").strip()
+        for claim in claims
+    ):
+        warnings.append(f"capsule {capsule_id} requires at least one evidence-backed behavior claim for success")
+    if not invariants:
+        warnings.append(f"capsule {capsule_id} requires explicit invariants for success")
+    if not dependencies:
+        warnings.append(f"capsule {capsule_id} requires explicit dependencies for success")
+    if not unknowns:
+        warnings.append(f"capsule {capsule_id} requires explicit unknowns for success")
+
+    executable_oracles = [
+        oracle
+        for oracle in oracles
+        if isinstance(oracle, dict) and str(oracle.get("command") or "").strip()
+    ]
+    advisory_reasons = [
+        str(oracle.get("reason") or "").strip()
+        for oracle in oracles
+        if isinstance(oracle, dict)
+        and not str(oracle.get("command") or "").strip()
+        and str(oracle.get("reason") or "").strip()
+    ]
+    if not executable_oracles and not advisory_reasons:
+        warnings.append(f"capsule {capsule_id} requires an acceptance oracle or explicit oracle gap reason for success")
+
+    if warnings:
+        return "warn", warnings
+    return normalized_status, []
+
+
 def _safe_string_list(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -10852,6 +10964,7 @@ def _summarize_oracle_payloads(raw_oracles: list[dict[str, object]], *, limit: i
             {
                 "name": str(normalized_oracle.get("name") or ""),
                 "command": normalized_oracle.get("command"),
+                **({"reason": str(normalized_oracle.get("reason") or "")} if normalized_oracle.get("reason") else {}),
                 "scope": _safe_string_list(normalized_oracle.get("scope")),
             }
         )
@@ -10970,8 +11083,12 @@ def _build_existing_capsule_summary(
         "status": str(existing_capsule.get("status") or ""),
         "goal": str(existing_capsule.get("goal") or ""),
         "scope": scope,
+        "behavior_claims": _safe_string_list(existing_capsule.get("behavior_claims")),
         "constraints": _safe_string_list(existing_capsule.get("constraints")),
+        "invariants": _safe_string_list(existing_capsule.get("invariants")),
+        "dependencies": _safe_string_list(existing_capsule.get("dependencies")),
         "oracles": _summarize_oracle_payloads(_safe_object_list(existing_capsule.get("oracles"))),
+        "unknowns": _safe_string_list(existing_capsule.get("unknowns")),
         "lineage": existing_capsule.get("lineage") if isinstance(existing_capsule.get("lineage"), dict) else {},
         "claim_highlights": [
             {
@@ -11185,8 +11302,12 @@ def _build_distill_target_capsules(
                         "kind": capsule_kind,
                         "goal": str(existing_capsule.get("goal") or ""),
                         "scope": existing_scope,
+                        "behavior_claims": _safe_string_list(existing_capsule.get("behavior_claims")),
                         "constraints": _safe_string_list(existing_capsule.get("constraints")),
+                        "invariants": _safe_string_list(existing_capsule.get("invariants")),
+                        "dependencies": _safe_string_list(existing_capsule.get("dependencies")),
                         "oracles": _safe_object_list(existing_capsule.get("oracles")),
+                        "unknowns": _safe_string_list(existing_capsule.get("unknowns")),
                         "lineage": existing_capsule.get("lineage") if isinstance(existing_capsule.get("lineage"), dict) else {},
                     }
                     if existing_capsule
@@ -11642,9 +11763,13 @@ def _build_capsule_payload(
     goal: str | None = None,
     scope: list[str] | None = None,
     kind: str | None = None,
+    behavior_claims: list[str] | None = None,
     constraints: list[str] | None = None,
+    invariants: list[str] | None = None,
+    dependencies: list[str] | None = None,
     oracles: list[dict[str, object]] | None = None,
     lineage: dict[str, object] | None = None,
+    unknowns: list[str] | None = None,
     status: str = "active",
 ) -> dict[str, object]:
     now = _utc_timestamp()
@@ -11674,17 +11799,43 @@ def _build_capsule_payload(
     existing_oracles = _safe_object_list(existing.get("oracles"))
     resolved_oracles = [oracle for oracle in (oracles or []) if isinstance(oracle, dict)]
     if not resolved_oracles:
-        resolved_oracles = existing_oracles if existing_oracles else [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+        resolved_oracles = existing_oracles if existing_oracles else [
+            {
+                "name": f"{_safe_slug(capsule_id)}-verify",
+                "command": None,
+                "reason": "No explicit executable oracle was recorded for this capsule.",
+                "scope": [],
+            }
+        ]
     if not isinstance(existing_oracles, list) or (not existing_oracles and not resolved_oracles):
-        resolved_oracles = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": []}]
+        resolved_oracles = [
+            {
+                "name": f"{_safe_slug(capsule_id)}-verify",
+                "command": None,
+                "reason": "No explicit executable oracle was recorded for this capsule.",
+                "scope": [],
+            }
+        ]
 
     merged_decision_refs = _normalize_artifact_path_refs(existing.get("decision_refs"), "decisions") if isinstance(existing, dict) else []
     merged_decision_refs.extend(_safe_string_list(decision_refs))
     merged_decision_refs = sorted({item for item in merged_decision_refs if isinstance(item, str)})
     created_at = str(existing.get("created_at") or created_at_default)
+    resolved_behavior_claims = [item for item in _safe_string_list(behavior_claims) if item]
+    if not resolved_behavior_claims:
+        resolved_behavior_claims = _safe_string_list(existing.get("behavior_claims"))
     resolved_constraints = [item for item in _safe_string_list(constraints) if item]
     if not resolved_constraints:
         resolved_constraints = _safe_string_list(existing.get("constraints"))
+    resolved_invariants = [item for item in _safe_string_list(invariants) if item]
+    if not resolved_invariants:
+        resolved_invariants = _safe_string_list(existing.get("invariants"))
+    resolved_dependencies = [item for item in _safe_string_list(dependencies) if item]
+    if not resolved_dependencies:
+        resolved_dependencies = _safe_string_list(existing.get("dependencies"))
+    resolved_unknowns = [item for item in _safe_string_list(unknowns) if item]
+    if not resolved_unknowns:
+        resolved_unknowns = _safe_string_list(existing.get("unknowns"))
     resolved_status = str(status).strip() if str(status).strip() else str(existing.get("status") or "active")
     return {
         "schema_version": 2,
@@ -11693,8 +11844,12 @@ def _build_capsule_payload(
         "kind": resolved_kind,
         "goal": str(goal or existing.get("goal") or f"OutcomeGraph capsule for {capsule_id}"),
         "scope": resolved_scope,
+        "behavior_claims": resolved_behavior_claims,
         "constraints": resolved_constraints,
+        "invariants": resolved_invariants,
+        "dependencies": resolved_dependencies,
         "oracles": resolved_oracles,
+        "unknowns": resolved_unknowns,
         "materials_lock_ref": f"{OG_ROOT}/materials.lock",
         "decision_refs": merged_decision_refs,
         "lineage": lineage if isinstance(lineage, dict) and lineage else existing.get("lineage") or {},
@@ -11748,6 +11903,9 @@ def _normalize_capsule_oracles_for_apply(
         if command_value and not _policy_allows_verify_command(policy, mode, command_value):
             normalized_oracle["command"] = None
             normalized_oracle["name"] = f"{normalized_oracle['name']} (advisory only in {mode} mode)"
+            policy_reason = f"Command '{command_value}' is not allowed by policy in {mode} mode."
+            existing_reason = str(normalized_oracle.get("reason") or "").strip()
+            normalized_oracle["reason"] = f"{existing_reason} {policy_reason}".strip() if existing_reason else policy_reason
             policy_blocked_commands.add(command_value)
         command_after = str(normalized_oracle.get("command") or "").strip()
         if command_after:
@@ -11774,7 +11932,14 @@ def _normalize_capsule_oracles_for_apply(
         inferred_executable_commands.add("pytest -q")
 
     if not normalized:
-        normalized = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": oracle_scope}]
+        normalized = [
+            {
+                "name": f"{_safe_slug(capsule_id)}-verify",
+                "command": None,
+                "reason": "No explicit executable oracle was available from distill evidence.",
+                "scope": oracle_scope,
+            }
+        ]
     return (
         normalized,
         _normalize_distill_status(status),
@@ -12008,11 +12173,15 @@ def _run_distill_stage(
                         "status": str(raw_delta.get("status") or "success"),
                         "goal": raw_delta.get("goal"),
                         "scope": raw_delta.get("scope"),
+                        "behavior_claims": raw_delta.get("behavior_claims"),
                         "constraints": raw_delta.get("constraints"),
+                        "invariants": raw_delta.get("invariants"),
+                        "dependencies": raw_delta.get("dependencies"),
                         "oracles": raw_delta.get("oracles"),
                         "claims": raw_delta.get("claims"),
                         "decision": raw_delta.get("decision"),
                         "lineage": raw_delta.get("lineage"),
+                        "unknowns": raw_delta.get("unknowns"),
                         "errors": raw_delta.get("errors"),
                         "receipts": raw_delta.get("receipts") if isinstance(raw_delta.get("receipts"), list) else [],
                         "changed_files": delta_changed_files,
@@ -12298,10 +12467,14 @@ def _run_apply_stage(
 
         delta_goal = str(delta.get("goal") or "").strip()
         delta_scope = _safe_string_list(delta.get("scope"))
+        delta_behavior_claims = _safe_string_list(delta.get("behavior_claims"))
         delta_constraints = _safe_string_list(delta.get("constraints"))
+        delta_invariants = _safe_string_list(delta.get("invariants"))
+        delta_dependencies = _safe_string_list(delta.get("dependencies"))
         delta_oracles = _safe_object_list(delta.get("oracles"))
         delta_decision = delta.get("decision") if isinstance(delta.get("decision"), dict) else {}
         delta_lineage = delta.get("lineage") if isinstance(delta.get("lineage"), dict) else {}
+        delta_unknowns = _safe_string_list(delta.get("unknowns"))
         existing_payload = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{capsule_id}.json"))
         capsule_kind = _classify_capsule_kind(
             capsule_id,
@@ -12318,6 +12491,17 @@ def _run_apply_stage(
             policy_payload,
             mode,
         )
+        delta_status, recreation_warnings = _apply_recreation_brief_success_policy(
+            capsule_id,
+            delta_status,
+            raw_claims,
+            delta_behavior_claims,
+            delta_invariants,
+            delta_dependencies,
+            delta_unknowns,
+            delta_oracles,
+        )
+        warnings.extend(recreation_warnings)
         delta_status, kind_warnings = _apply_kind_specific_success_policy(
             capsule_id,
             capsule_kind,
@@ -12439,9 +12623,13 @@ def _run_apply_stage(
                 goal=delta_goal,
                 scope=delta_scope,
                 kind=capsule_kind,
+                behavior_claims=delta_behavior_claims,
                 constraints=delta_constraints,
+                invariants=delta_invariants,
+                dependencies=delta_dependencies,
                 oracles=delta_oracles,
                 lineage=delta_lineage,
+                unknowns=delta_unknowns,
                 status=delta_status,
             )
             _write_canonical_artifact(
