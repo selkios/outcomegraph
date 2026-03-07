@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "agents",
+  "claim_refs": [
+    ".outcomegraph/claims/agents-claim-01.json",
+    ".outcomegraph/claims/agents-claim-02.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".agents/skills/og-quality-pass",
+    ".agents/skills/og-quality-pass/SKILL.md",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1.json",
+    "sha256:327dec33e30a241bab51303de55536a778a0c8dbcdc14bc7693e54391da9e1aa",
+    "sha256:43bf10edbb9bfc3e9ea6d0a1e857bd0f4fdfd43c5857f7b3c552eaa238f11dcd",
+    "sha256:e886b526e0b6683a3e1cf7f79dd1266e0c2533db92ed44b8b1b4064521360ef3"
+  ],
+  "id": "dec-agents-fa3d042530",
+  "rationale": "The snapshot uniquely defines the capsule shape and target mapping, which is sufficient to rehydrate the same adapter path and structure.",
+  "schema_version": 2,
+  "statement": "Represent `agents` as a symlink capsule at `.agents/skills/og-quality-pass` pointing to the shared `og-quality-pass` skill implementation and keep the same top-level contents.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

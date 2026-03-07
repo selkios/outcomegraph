@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "migration_guide",
+  "category": "validation",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "migration_guide_post_migration_expectations",
+  "origin": {
+    "changed_files": [
+      "MIGRATION_GUIDE.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:7ad4a3e5db2a92b915ed6f5482954007a37f5a020656f466143a9612f2f86c24",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "MIGRATION_GUIDE.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Post-migration success is documented as a healthy `og status`, no `POLICY_DENIED` for canonical safe writes, no adapter mismatch errors, successful `og sync`, successful scoped `og verify --changed` and `og replay --changed`, and dogfood runbook JSON artifacts in `RUNBOOKS` showing status `ok`."
+}

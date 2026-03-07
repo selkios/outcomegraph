@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-tests-814042905e.json"
+  ],
+  "created_at": "2026-03-06T21:23:45Z",
+  "id": "cert-tests-814042905e",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:1737038381249d1b696c27b4639fe44223525e1144fc283fce747eb04b5b4655",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 452,
+      "target": ".outcomegraph/traces/tests-sync-20260306t212059z-bfdeaf732b-visible-test-file-contract-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1737038381249d1b696c27b4639fe44223525e1144fc283fce747eb04b5b4655",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 452,
+      "target": "sha256:1737038381249d1b696c27b4639fe44223525e1144fc283fce747eb04b5b4655",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:0137e1ab2335901b00e65b82eb06bdda49975b5e64998ff6d29926a767a12cff",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 612,
+      "target": ".outcomegraph/traces/tests-sync-20260306t212059z-bfdeaf732b-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0137e1ab2335901b00e65b82eb06bdda49975b5e64998ff6d29926a767a12cff",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 612,
+      "target": "sha256:0137e1ab2335901b00e65b82eb06bdda49975b5e64998ff6d29926a767a12cff",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T212059Z-bfdeaf732b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T212059Z-bfdeaf732b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T21:23:45Z"
+}

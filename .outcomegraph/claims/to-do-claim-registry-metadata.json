@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "to-do",
+  "category": "registry_metadata",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "to-do-claim-registry-metadata",
+  "origin": {
+    "changed_files": [
+      "to-do.json"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "target": "to-do.json",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The changed file `to-do.json` is a task-registry document with `schema_version` 1 and project metadata `{name: \"OutcomeGraph\", root: \".\"}`. Its visible header declares `source_files` including `AGENT_FIRST_CLI_REVIEW.md`, `ARCHITECTURE.md`, `QUICKSTART.md`, `README.md`, and `SPEC-v2.md`."
+}

@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "og",
+  "claim_refs": [
+    ".outcomegraph/claims/og-error-contract-surface.json",
+    ".outcomegraph/claims/og-runtime-version-order.json",
+    ".outcomegraph/claims/og-version-binding.json"
+  ],
+  "created_at": "2026-03-06T22:06:44Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-2-input.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-2-result.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-2.json",
+    "og.py",
+    "sha256:68678217fa60f1591bef10b22b840f043e75018ba61a4669cfdd8f73d1e8f7f3",
+    "sha256:7667c6cc897db7636d374fa9aa2895107fb0e952bcdc7d63529e352bc9855e91",
+    "sha256:daaf2817ffa9fd9341deba05d9af366ca76ef78d8cedc2b10271ab3215b17fc7"
+  ],
+  "id": "dec-og-11fc939cbb",
+  "rationale": "The provided `og.py` snapshot directly supports the recorded version-loader flow, module-level version binding, and exported constant surface. The carried-forward `pytest -q` oracle comes from the prior capsule evidence and fits this contract-focused capsule.",
+  "schema_version": 2,
+  "statement": "Record the observable `og.py` scaffold as the reusable OutcomeGraph CLI contract capsule.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:06:44Z"
+}

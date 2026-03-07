@@ -1,0 +1,80 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "ogd",
+  "claim_refs": [
+    ".outcomegraph/claims/ogd-claim-1.json",
+    ".outcomegraph/claims/ogd-claim-2.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-ogd-d386186452",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:18038c33fb496278bb072d643b19c5319dd0bd47fcb76c2c9ebbf3757480b9eb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4417,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-8-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:18038c33fb496278bb072d643b19c5319dd0bd47fcb76c2c9ebbf3757480b9eb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4417,
+      "target": "sha256:18038c33fb496278bb072d643b19c5319dd0bd47fcb76c2c9ebbf3757480b9eb",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:32186409a8984d7f1cf174656256f4ec93eae41c5eec5206d96cedb02b3cc71c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2365,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-8-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:32186409a8984d7f1cf174656256f4ec93eae41c5eec5206d96cedb02b3cc71c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2365,
+      "target": "sha256:32186409a8984d7f1cf174656256f4ec93eae41c5eec5206d96cedb02b3cc71c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:3a8664de750dae9eca68bf0ae0a34253556422db4ac6f4c6ee3f1562b6226bf0",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2859,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-8.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:3a8664de750dae9eca68bf0ae0a34253556422db4ac6f4c6ee3f1562b6226bf0",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2859,
+      "target": "sha256:3a8664de750dae9eca68bf0ae0a34253556422db4ac6f4c6ee3f1562b6226bf0",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:5bfd50e1b1428f5d295ae6f4bc049c8c18bab863a962fd87e387c34d9d44b0ea",
+      "schema_version": 2,
+      "target": "ogd",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

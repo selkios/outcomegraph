@@ -1,0 +1,37 @@
+schema_version: 2
+created_at: "2026-03-06T19:58:02Z"
+name: observe-policy
+mode: observe
+allow:
+  file_writes:
+    - ".outcomegraph/**"
+    - "export/**"
+    - "skills/outcome-steward/**"
+    - "AGENTS.md"
+  verify_commands:
+    - "npm test --listTests"
+    - "npm test"
+    - "go test ./..."
+    - "pytest -q"
+  sandbox_operations:
+    - create_isolated_worktree
+    - read_repo_state
+    - read_artifacts
+deny:
+  file_writes:
+    - "src/**"
+    - "lib/**"
+    - "app/**"
+    - "packages/**"
+  network:
+    - unrestricted
+  dependencies:
+    - "npm install"
+    - "pip install"
+    - "cargo add"
+    - "go mod tidy"
+  deployment:
+    - push
+    - git commit --amend
+    - github pr create
+    - gha workflow_dispatch

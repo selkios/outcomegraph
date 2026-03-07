@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "skill-og",
+  "category": "command_policy",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "claim-skill-og-command-policy",
+  "origin": {
+    "changed_files": [
+      "skills/og/SKILL.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:86ce614bbd4719a2553240a88ed161f0cc86aa3edcce95c03f5e12958bc70961",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "skills/og/SKILL.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The skill's documented command policy is to prefer `--json` for scripts and CI, treat `status: error` as a non-zero automation failure path, and persist status and run summaries through `.outcomegraph/work/`, `.outcomegraph/events/`, `.outcomegraph/claims/`, and `.outcomegraph/certificates/` artifacts."
+}

@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "policy",
+  "claim_refs": [
+    ".outcomegraph/claims/policy-allowlist.json",
+    ".outcomegraph/claims/policy-denylist.json",
+    ".outcomegraph/claims/policy-metadata.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/policy.yaml",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-9-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-9-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-9.json",
+    "sha256:1a538a59771f0099f2f5290a057d38f344b188c1937eea3c3585977862c7c07f",
+    "sha256:3f974e539d26a44c9bb7d468ee1eb3979831b5a2c44445a066c3d3b851deceee",
+    "sha256:4745d1b80bdbfcc8294d13b2df1c366b472ef88f25f0a050f11851bf2a48a2e5"
+  ],
+  "id": "dec-policy-6b900e386c",
+  "rationale": "The input includes a full, untruncated snapshot of `.outcomegraph/policy.yaml` with a content digest, which is sufficient to reconstruct the observable policy state. No repository evidence shows executed verification commands, so the oracle set remains descriptive rather than executable.",
+  "schema_version": 2,
+  "statement": "Capture the observe-mode policy directly from `.outcomegraph/policy.yaml` and preserve its allow/deny semantics without inferring extra capabilities or executed checks.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

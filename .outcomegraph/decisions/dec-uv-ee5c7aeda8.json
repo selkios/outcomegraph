@@ -1,0 +1,29 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "uv",
+  "claim_refs": [
+    ".outcomegraph/claims/uv-claim-artifact-pinning.json",
+    ".outcomegraph/claims/uv-claim-lockfile-header.json",
+    ".outcomegraph/claims/uv-claim-root-package.json",
+    ".outcomegraph/claims/uv-claim-snapshot-limit.json",
+    ".outcomegraph/claims/uv-claim-validation-gap.json",
+    ".outcomegraph/claims/uv-claim-visible-edges.json",
+    ".outcomegraph/claims/uv-claim-visible-pins.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-24-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-24-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-24.json",
+    "sha256:a6200f66c138c9b48b3f0ea24991699d26c80f1134f2f2af317f02a41ea2ff5a",
+    "sha256:b4873e4ff92df9a331813834be293a5cab174f9aa4f81d3cb2f1d4cbea6d4fc8",
+    "sha256:c5a3c3c62cd00504779dfe36fb96ab16fe4d1f8f4bf84d3166a4f428a300d167",
+    "uv.lock"
+  ],
+  "id": "dec-uv-ee5c7aeda8",
+  "rationale": "The supplied snapshot provides concrete lockfile header data, root package requirements, visible dependency pins, and artifact metadata, but it is truncated before the file ends and does not include a repository-evidenced regeneration command.",
+  "schema_version": 2,
+  "statement": "Record the observable uv.lock state as a partial dependency-lock capsule that preserves visible package metadata and explicitly marks the missing tail as unknown.",
+  "status": "warn",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

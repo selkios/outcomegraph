@@ -1,0 +1,1606 @@
+{
+  "artifact_type": "materials_lock",
+  "captured_at": "2026-03-06T22:21:21Z",
+  "created_at": "2026-03-06T19:58:02Z",
+  "entries": [
+    {
+      "digest": "sha256:cd99fb1a2a820b208495d96dd98bda65b4b5cad4fa5c2e7d3c211bb56085be11",
+      "kind": "file",
+      "path": ".gitignore",
+      "size": 51
+    },
+    {
+      "digest": "sha256:dd63671a161cc1dd487ed2caa34403e05c785f7f0aa4a77327372deaabb48a90",
+      "kind": "file",
+      "path": ".outcomegraph/.gitignore",
+      "size": 79
+    },
+    {
+      "digest": "sha256:ceb8f31f091ab2d001affa69eb0d4ced134b079a803e69a8ff314dde61fc55da",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/agent_first_cli_review.json",
+      "size": 2130
+    },
+    {
+      "digest": "sha256:d36df05694aaedf57309c9d1252bb0a1572ce174468161a1abdd6858293320f2",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/agents.json",
+      "size": 1007
+    },
+    {
+      "digest": "sha256:c257026d5cb1cd20ac5ebbf16b0ff743c619010ac94a64c43eec63db4608cc1e",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/architecture.json",
+      "size": 1836
+    },
+    {
+      "digest": "sha256:1209c7e698dcf0eed5193c46f7823ce8f05882809af013cd2b2f96f7083a3da0",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/config.json",
+      "size": 1049
+    },
+    {
+      "digest": "sha256:91718259b03c49a220f5c1b7e9c7ecabdd890df93f2f5a879f0f05b1fd73e09c",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/constitution.json",
+      "size": 1095
+    },
+    {
+      "digest": "sha256:5ac0bcd9b5039edeaa9344c11ed6d3c80df20c8aff6a2ffb240650d63597d3aa",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/materials.json",
+      "size": 1303
+    },
+    {
+      "digest": "sha256:42d664b445a6eeea27f820f63c74c60e7b7a180616e2c7849e610ce07839e9c9",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/migration_guide.json",
+      "size": 1580
+    },
+    {
+      "digest": "sha256:6a98378db2daa481d4064da46cd982bf1ff2b40610f9c26c988b2f689f30db30",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/og.json",
+      "size": 1156
+    },
+    {
+      "digest": "sha256:92f2b183a0bd1fd5ba1f246319474144f53fb8f8605989abe5f63c0936ac4e1f",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/ogd.json",
+      "size": 1159
+    },
+    {
+      "digest": "sha256:81742cabe064ec2abe6a0dd5cd30a8a8aa6b6611bdf6d1d1170ff9a41888c539",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/plugin_api.json",
+      "size": 1376
+    },
+    {
+      "digest": "sha256:7989cf436e181e08f128d4bec42104949ba3cbf3ef930dae02ea9f3debd3fb21",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/policy.json",
+      "size": 1209
+    },
+    {
+      "digest": "sha256:296ec1569df5fba4bfb45fad99da35317894200aafdb6abac6b617340dae89b8",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/pyproject.json",
+      "size": 1292
+    },
+    {
+      "digest": "sha256:153d88014c32940420c7fc2531e2bf1f3182cbe6d5582f22a98f678a87279b71",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/quickstart.json",
+      "size": 2621
+    },
+    {
+      "digest": "sha256:765dbfbe20b2d1f81ade8886149209369e9142d413a96249f8da9187c6531326",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/readme.json",
+      "size": 1069
+    },
+    {
+      "digest": "sha256:715026571d27abbfe799b31c88721ce19e4f1947e002cd71e356b59da216fd10",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/runbooks.json",
+      "size": 2441
+    },
+    {
+      "digest": "sha256:5b2fdcea8f3b78108f943c96066c340200ccc3dadb551e974c8781673dc72fc1",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/runtime.json",
+      "size": 1126
+    },
+    {
+      "digest": "sha256:9e8b51f9c85d2021d0b73d28a61f6159debeafce457f20bb3af5c90a11a73585",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/security_policy.json",
+      "size": 1537
+    },
+    {
+      "digest": "sha256:b93ee8ed6895ce524c35e7ead7d1622a57729f25627668c4664233b1b15f0ffa",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/skill-og-dogfood.json",
+      "size": 2012
+    },
+    {
+      "digest": "sha256:75ba95820eec87c559b9a109718cda77b062909b36ebf600a16f60cb015cb989",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/skill-og-quality-pass.json",
+      "size": 1706
+    },
+    {
+      "digest": "sha256:097e6fd599dff56e392cc99388a3384fe1bd549fee87d2e8211348c79294bb46",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/skill-og.json",
+      "size": 1722
+    },
+    {
+      "digest": "sha256:f3703b7591ee00dbee7dbd6ab6e15021b5a74f62d112aed727bc5a84efc3c805",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/spec-v2.json",
+      "size": 1246
+    },
+    {
+      "digest": "sha256:158d94c7aa0f652a8eeb3936ea84d4fb48f967263d0ba543fc08aa559e4d5cf2",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/spec_implementation_matrix.json",
+      "size": 1985
+    },
+    {
+      "digest": "sha256:3fbec3e7ca182ad1e8552946a2bf7a58ee59d0dfbf85af957986259a20dc6c2a",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/tests.json",
+      "size": 987
+    },
+    {
+      "digest": "sha256:ee72f684d2b37391888827a36dacad5a9c446d867f4d6ba9b56ebfa2648dd6bb",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/to-do-schema.json",
+      "size": 1196
+    },
+    {
+      "digest": "sha256:7a0a3138593700ff0c48ed67421111d5f488a166a522f9da187f95c1ec1e6bd5",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/to-do.json",
+      "size": 1149
+    },
+    {
+      "digest": "sha256:f0bc52f4377b6ba405d9397516286ae243e7aee6ab7ea4badb6b151d46bcca65",
+      "kind": "file",
+      "path": ".outcomegraph/capsules/uv.json",
+      "size": 1075
+    },
+    {
+      "digest": "sha256:08671e7a58e3e1592e306541fe3a4ea76e57612ce89794bb1b1aa0f65ebc790e",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-agent_first_cli_review-7325f76973.json",
+      "size": 3642
+    },
+    {
+      "digest": "sha256:019543962fc709ace870ac5bae2075dcb0e370e3180a3f4c792b63a1b339b327",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-agent_first_cli_review-e15054b730.json",
+      "size": 1302
+    },
+    {
+      "digest": "sha256:b3f67233c1a93b35fc4fb0dbe557bdae8fe9175e4bfce58a5cfd27923e6f2097",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-agents-4f2d4780ac.json",
+      "size": 1247
+    },
+    {
+      "digest": "sha256:ed5e81dfd5abdac80a786f383b3fd1bd4fa8eeed67288e57a48695bf5e0c763a",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-agents-e9d7a96ba5.json",
+      "size": 2705
+    },
+    {
+      "digest": "sha256:0eee852532aa9212f9d594bafe7a82fa82ce45f7608aeabc45053a9bfcac02d4",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-architecture-c18b8ec535.json",
+      "size": 2012
+    },
+    {
+      "digest": "sha256:d3435dcd90b1b31b9f0349f7bd06f52db054f58fb6bfb408fa6ec4962e1ea17d",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-architecture-defb919e38.json",
+      "size": 2936
+    },
+    {
+      "digest": "sha256:7671571bed8b528bf8b5ea340be3162f1e31c70eda4b1828f35956a5834a7c66",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-config-e5cd27e67a.json",
+      "size": 2712
+    },
+    {
+      "digest": "sha256:33093bdf9b3eb2a70037cf2ea559f26c06f09c974e4fb7eb722411ced709a677",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-config-f4ce50d97c.json",
+      "size": 1407
+    },
+    {
+      "digest": "sha256:fbd5ba7d77440643cb81c8d25f43c73fdcb972c14c7774263c9ec1a0a38ad32d",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-constitution-23cd9f2940.json",
+      "size": 1273
+    },
+    {
+      "digest": "sha256:d9a1b567d3b46ff5e037bc896ab92b07a2bc2ed9afa1d714f3a1857bffc0c76c",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-constitution-acd719f194.json",
+      "size": 2724
+    },
+    {
+      "digest": "sha256:6c6f8ec939b94c1f663ea372247f50dcbf551de1162ee80068adef40f1de2444",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-materials-43fc58b3d9.json",
+      "size": 2974
+    },
+    {
+      "digest": "sha256:e4f04517294cb5293f1e32a01ae8cd83b1895167b81025b83a6c691bf7aa05b9",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-materials-5bbafc537b.json",
+      "size": 1256
+    },
+    {
+      "digest": "sha256:393088f34195d3c0ac9d38aef5586a1a5cb3bf0dd952377d766b2c1caaf3531c",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-migration_guide-3e1e09eb53.json",
+      "size": 1932
+    },
+    {
+      "digest": "sha256:e985fb9873ea75c931a5cdcffda66f119cbf549f010aed276c425c5dc87345db",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-migration_guide-8b64bf7544.json",
+      "size": 2805
+    },
+    {
+      "digest": "sha256:aa4c8d5fc0bc824eaa8264d1dd9b68c8b3a0c79cda37c2c3ad7a381c8bdb5b01",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-og-0b1095eef7.json",
+      "size": 2893
+    },
+    {
+      "digest": "sha256:c2b2f44e5ec1b201b5027528b07df13caa7340f78329c94c4a1813575f14a239",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-og-26e000b279.json",
+      "size": 1250
+    },
+    {
+      "digest": "sha256:af7b326f45a3bf49b456ec6cbe512778f284c910145775c5f33a75a4cfdd9386",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-ogd-55eadb0694.json",
+      "size": 1239
+    },
+    {
+      "digest": "sha256:61c7353da0566ad8f23a5dc68ed1c856710e82ecb74172f2e3ba986fdea44252",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-ogd-d386186452.json",
+      "size": 2633
+    },
+    {
+      "digest": "sha256:7000784f1790d659698350cbb4fb1f898dabbb0b9b1fd2d34df560e54687b862",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-plugin_api-426e6e59e5.json",
+      "size": 2834
+    },
+    {
+      "digest": "sha256:0e2f680ecb8722272182c8d5968d19d68e886d836165e7c55d8a644a2b411a5e",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-plugin_api-90657a7b18.json",
+      "size": 1266
+    },
+    {
+      "digest": "sha256:34277f99cbdf13603717e83116947367b4e742d9816779dd88cf98c78eabd0df",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-policy-12362d570a.json",
+      "size": 2842
+    },
+    {
+      "digest": "sha256:d3e946f44db9c371d11d02a1e172ab5ed3b348e349f0d9aa13dac3ae1ffd0b96",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-policy-3d20fc2039.json",
+      "size": 1884
+    },
+    {
+      "digest": "sha256:b7f6968b0c5a09c25fe8884a53407d3958d73b6f9fd81de0e6332eaacf18b667",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-pyproject-495d17b874.json",
+      "size": 2790
+    },
+    {
+      "digest": "sha256:b0ffdbf56454cc270a1baf08fe5a775a855c7c73e54d9a0216ff0674768ffe99",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-pyproject-be6a30a6de.json",
+      "size": 1249
+    },
+    {
+      "digest": "sha256:d7cd25c41ba1cbcdc8a031bc3e4c7c97882607338b95d9f95efdfc5b8299757d",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-quickstart-834cc48bb5.json",
+      "size": 1350
+    },
+    {
+      "digest": "sha256:37f8104eaed1ecff2bb46b887fe6b10bac1f828402bd2de6b5bc47b0d9aff34b",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-quickstart-c03056c165.json",
+      "size": 3416
+    },
+    {
+      "digest": "sha256:287a586e1da2674446ff6d83956a63bf21198180cf95342f52f07310ea28a7a6",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-readme-ef448a832f.json",
+      "size": 2728
+    },
+    {
+      "digest": "sha256:5ae600b19959f40d7c1d9470c56da75c1fc2adc779b011240d005de8a2fe87a2",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-readme-f35ca11fd4.json",
+      "size": 1243
+    },
+    {
+      "digest": "sha256:16ed545333230f02eae527e27e009d61fc636b7aecd0dd8e1f3a49e90262bc83",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-runbooks-8966bd918f.json",
+      "size": 5050
+    },
+    {
+      "digest": "sha256:970e524d08dc39c7e9ce043a0a99d980a0ffe2958cd566235639d0355465e547",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-runbooks-90f1fefc70.json",
+      "size": 2853
+    },
+    {
+      "digest": "sha256:9dc29a86f9473973318505271c21450aaa9a57d68df2987a9aca550f2f19c65a",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-runtime-5f0904d546.json",
+      "size": 1337
+    },
+    {
+      "digest": "sha256:353b91b3ce3fe32ad89cf9be5dbdb5014b8908f8060bb3ea073211f5ee85a08e",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-runtime-de7b7389a3.json",
+      "size": 2923
+    },
+    {
+      "digest": "sha256:4928b8c2db375b5ef1da2828b07c4e9f969260e0cf167f338332ea8347e63a27",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-security_policy-1e39ba1434.json",
+      "size": 1939
+    },
+    {
+      "digest": "sha256:e1b92e587b1e2e646c8db6bb96e04e0efd46c3efd565467eea88dca4ca0d4736",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-security_policy-9943b9b4dd.json",
+      "size": 2909
+    },
+    {
+      "digest": "sha256:c1c74ad8cc76190baa6c86a153b929d1ae03bd0abedc35ca0790507853da9787",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-af106bbddf.json",
+      "size": 1951
+    },
+    {
+      "digest": "sha256:6d605ddcc80a666affcb3775417a4c0b78dbaed7e318dfaa698dbed1e1e16632",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-d72995823c.json",
+      "size": 2845
+    },
+    {
+      "digest": "sha256:6f77f0e9ed8bd9cd6e6748832413e13d0165fe5df14f4d748282b6a115f9a2b0",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-dogfood-104d0924fd.json",
+      "size": 3201
+    },
+    {
+      "digest": "sha256:972c8560364427dda2140296a7546579da2e40164248e55939fd993198ee4a39",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-dogfood-3f5c37b9f4.json",
+      "size": 3257
+    },
+    {
+      "digest": "sha256:fe75f1938437592e297a3e421c75a53ad7699711e168192a79fea8d0c3c4d63f",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-quality-pass-43bd13df1c.json",
+      "size": 3248
+    },
+    {
+      "digest": "sha256:225d493e0e088c89e219c50acf10cf7591139ca59c17be055b0c6bade2de998c",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-skill-og-quality-pass-7550f8840f.json",
+      "size": 1946
+    },
+    {
+      "digest": "sha256:f524cd595cd671ee623e92b32e68ef88d6a092a9d7373790208c0ca403901372",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-spec-v2-5cc5846f56.json",
+      "size": 2855
+    },
+    {
+      "digest": "sha256:68c280b08db818b9404316d946411348f2d341d5ff3e1408c3b703f84c4cc430",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-spec-v2-9075d584fb.json",
+      "size": 1875
+    },
+    {
+      "digest": "sha256:b546a11cfd203f49c8135b92cecda2b9156f1bbfffe5b813af3160d828e38994",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-spec_implementation_matrix-d4daf5ba11.json",
+      "size": 3238
+    },
+    {
+      "digest": "sha256:f1540c31a32536f898cbf90e2c76e42862c253dc91bb7fee57397e1ffda74ac5",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-spec_implementation_matrix-fed7a82b46.json",
+      "size": 2909
+    },
+    {
+      "digest": "sha256:927d28908fd8b2efaf30f3ec7582191dd08917ae37d80b1e7f31bfea5568f320",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-tests-1ae79b0a56.json",
+      "size": 2945
+    },
+    {
+      "digest": "sha256:d44ff77fd89711c0b5f3a542b8879e454b57eb694eb06dba529458170c66817a",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-tests-5c9cfe36a4.json",
+      "size": 1236
+    },
+    {
+      "digest": "sha256:ea6600484031b6fb8b75dcfc1dcc6d2813f101480ea897a756222e0f7426b1d5",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-to-do-8fe1c83ef0.json",
+      "size": 2700
+    },
+    {
+      "digest": "sha256:5b13c5bc9c86e121c2a578bd3576f6e015ba01e4886084e1f1638cc21f4d0b84",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-to-do-dd7c426c0a.json",
+      "size": 1244
+    },
+    {
+      "digest": "sha256:b8a6746b99673b837c3fa75173cd62f9345c61a99a245d414e8954371bc91860",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-to-do-schema-468f48cd53.json",
+      "size": 2786
+    },
+    {
+      "digest": "sha256:ea4db26b87d7f6d314a6a3f75670c9d0419116a67234ea5eb6a3d130e3063253",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-to-do-schema-6a6cda5dfd.json",
+      "size": 1283
+    },
+    {
+      "digest": "sha256:32ddfdaf6424e9e96a316ad18a59ebcfcd1cce3e8494abb91d6706cf90729815",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-uv-04f5395bdb.json",
+      "size": 2740
+    },
+    {
+      "digest": "sha256:1694a43c88dd9a3b72d09f1133c9ff5f64b2b7007141baecb18042d25616d99e",
+      "kind": "file",
+      "path": ".outcomegraph/certificates/cert-uv-5463666b8d.json",
+      "size": 1227
+    },
+    {
+      "digest": "sha256:6570ad0b52c944ff7a2defdf01e49dfa1111fab3f5f63e2f1d20b4c97cb21a40",
+      "kind": "file",
+      "path": ".outcomegraph/claims/agents-claim-01.json",
+      "size": 684
+    },
+    {
+      "digest": "sha256:18b858aef918c7c75371b386cd4ce4d5037e9a59d602350179fbf4e8ef78db45",
+      "kind": "file",
+      "path": ".outcomegraph/claims/agents-claim-02.json",
+      "size": 668
+    },
+    {
+      "digest": "sha256:60710ad7bb7b57c181ef09d9838cf9d45161de1ec6f6cc9b45901ac88315e7e1",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-1.json",
+      "size": 815
+    },
+    {
+      "digest": "sha256:2b1444cad317f7d40871fe03fc8ed1202ae51153c58344ab147d180a1ba4e088",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-2.json",
+      "size": 886
+    },
+    {
+      "digest": "sha256:4a3b9a0854fae755680fdca9bf099c80b8f22c79df7b4bb11db4f8ec721d655c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-3.json",
+      "size": 926
+    },
+    {
+      "digest": "sha256:c4c19713350d6075e7098a74b98205951b40a8cec88eee5509965045748f1990",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-4.json",
+      "size": 847
+    },
+    {
+      "digest": "sha256:2f824071906992b34945ef3ae23b487c2acd9f587e3dae2135f80b10a34c9346",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-5.json",
+      "size": 882
+    },
+    {
+      "digest": "sha256:4a125f5f927c2b3906fda6c46466db6c0eb3d96c52be183e33183e4042544eec",
+      "kind": "file",
+      "path": ".outcomegraph/claims/architecture-claim-6.json",
+      "size": 891
+    },
+    {
+      "digest": "sha256:7242b765f6dcceeb3fb5ff91b8071a303245b3d05297329e93cfc269dec3363c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-0030f45840.json",
+      "size": 834
+    },
+    {
+      "digest": "sha256:47d8457d122abb21a5e34bc607f613d75c52adcbf07e4a4b277b9fdac3298fd8",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-062a6d997c.json",
+      "size": 910
+    },
+    {
+      "digest": "sha256:2a64b3ce95f6c104054bcd8d01be41f68f84dbb0fefdd3f8c374488353ab3352",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-3c5bda0873.json",
+      "size": 853
+    },
+    {
+      "digest": "sha256:e30719121395cc129436a68814c4dd95430f75a936527d5aac75c9d75c2f5748",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-4736c902d2.json",
+      "size": 849
+    },
+    {
+      "digest": "sha256:26073e63cc6cf18220fff78f3651e77628e3eb287a53ef221a2d33a3797e1e71",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-589ef9cf7b.json",
+      "size": 933
+    },
+    {
+      "digest": "sha256:c8aaec62ce625b51aa7ea22f46ce7f336711abb553c7da2a186150f90d8b6720",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-76c6ee0493.json",
+      "size": 763
+    },
+    {
+      "digest": "sha256:58236a59ec5035191bbdb64eaccfbfaf7d00eda49b1dbd35150540fe6591c6a4",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-7c1c3c267a.json",
+      "size": 779
+    },
+    {
+      "digest": "sha256:cba68e822abc9f49d7bda1d81d12f2a87de3a42d5a9d83d50d388c41c8f55918",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-81f2d6903e.json",
+      "size": 848
+    },
+    {
+      "digest": "sha256:b1b115917ba8ab2824a3c38aca6a046c07bf3e5474c0c4723c78a03a0a2b947c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-9c5669cccf.json",
+      "size": 747
+    },
+    {
+      "digest": "sha256:401bee7737b13a48d2f6ad002e204d691c8e0e154d8b10bbfd81026a6f2d7701",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-agent_first_cli_review-e15054b730.json",
+      "size": 2141
+    },
+    {
+      "digest": "sha256:60554a261d4a8140466c043b551ca37d3915baa623c9b9aa3164385f5c4f4163",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-agents-4f2d4780ac.json",
+      "size": 2086
+    },
+    {
+      "digest": "sha256:e2c03c5c87f1739d345e368ea5e86627dbcf8900d1dfc66c60edd62b95000512",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-architecture-c18b8ec535.json",
+      "size": 2851
+    },
+    {
+      "digest": "sha256:eeb796ef73c75674d9de40e0170a183b5e5be0fa590433995d53f211aa3140eb",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-config-f4ce50d97c.json",
+      "size": 2246
+    },
+    {
+      "digest": "sha256:220714ae61e160376587490e406c28d511e9480fbfeb2e011728c9cbe7696634",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-constitution-23cd9f2940.json",
+      "size": 2112
+    },
+    {
+      "digest": "sha256:452c9dd0cd8183f42d5c703933464fbb3e84cac33b2ef8e16aa87d0d88317e02",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-materials-5bbafc537b.json",
+      "size": 2095
+    },
+    {
+      "digest": "sha256:358b158639b3892a91ec3cc0408fcc9b0f350882344b772a11684829b38fd299",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-migration_guide-3e1e09eb53.json",
+      "size": 2771
+    },
+    {
+      "digest": "sha256:0ed1686ed42dbf84b2fbf19eb203a925b9e304e8b6ef416ba44d5ece2302b228",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-og-26e000b279.json",
+      "size": 2089
+    },
+    {
+      "digest": "sha256:60051026790a48cd208b3f846a645f90cbb4f1d7da1073b88aa8ecf77469f1cb",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-ogd-55eadb0694.json",
+      "size": 2078
+    },
+    {
+      "digest": "sha256:dbf3fc1261ec4fc7932977eb7d63dcfe8d7d4e8d7854f106437ce8dbaac7cfb6",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-plugin_api-90657a7b18.json",
+      "size": 2105
+    },
+    {
+      "digest": "sha256:c894028ad3302143ef01a1568e37d0d1a4021ce973123617cee192414d19b493",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-policy-3d20fc2039.json",
+      "size": 2723
+    },
+    {
+      "digest": "sha256:30331e3b775b9478cce3a6705a88c5985c0d9cd052ace6f60e68ba50e13668ee",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-pyproject-be6a30a6de.json",
+      "size": 2088
+    },
+    {
+      "digest": "sha256:7a8c1ffbdf506326f1f6b4c61f2137385fbc1177e5c8cd913f4d17ae0bf94ee6",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-quickstart-834cc48bb5.json",
+      "size": 2189
+    },
+    {
+      "digest": "sha256:6126eadd723141824f2685c170155736aea07a2ddcbf3e829e195c9b268fdf81",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-readme-f35ca11fd4.json",
+      "size": 2082
+    },
+    {
+      "digest": "sha256:126657abf84f9b299362ca9afb8859cee10456ac7df8a291e53a358efe8a527c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-runbooks-8966bd918f.json",
+      "size": 5889
+    },
+    {
+      "digest": "sha256:1b2e75624a1f5d6074a68a95a25e5d9650d8dd9f00cabe8cee2114ea6a0092e2",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-runtime-5f0904d546.json",
+      "size": 2176
+    },
+    {
+      "digest": "sha256:065cdcc61238110478b99c0bc590875551904754acd94db70309e5d6ae870d7f",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-security_policy-1e39ba1434.json",
+      "size": 2778
+    },
+    {
+      "digest": "sha256:2b383ed45d6254d012e119032e073b1594e41cccc42ae4b111f563bc43a2b596",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-skill-og-af106bbddf.json",
+      "size": 2790
+    },
+    {
+      "digest": "sha256:5435f137f87803a6f388286e8ff5c7e49208ed2a1212c823f22e4e9dc6bcdc6a",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-skill-og-dogfood-104d0924fd.json",
+      "size": 4040
+    },
+    {
+      "digest": "sha256:921ef11742dff0c3d82c588cb31ff99f801ad500558d8e18b094e20b1dd57cb2",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-skill-og-quality-pass-7550f8840f.json",
+      "size": 2785
+    },
+    {
+      "digest": "sha256:e4037d59d6ad372c185f5d072f261f7d777d68f08ae98b7dd48b393caff7f263",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-spec-v2-9075d584fb.json",
+      "size": 2714
+    },
+    {
+      "digest": "sha256:7c1e2f79d87d08eeb3e9ce35e3c18222d6933fcad67f2fa1cdb0094aed8fd232",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-spec_implementation_matrix-d4daf5ba11.json",
+      "size": 4077
+    },
+    {
+      "digest": "sha256:c29f3e1ba2f9ee277889a7d46eefdf1535b038c61e1f08a18e95084ab8ea6746",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-tests-5c9cfe36a4.json",
+      "size": 2075
+    },
+    {
+      "digest": "sha256:4fafc1603ea489aae2c29a752d8a322c51f1e0e8bc52440ac724736f5fe2778e",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-to-do-dd7c426c0a.json",
+      "size": 2083
+    },
+    {
+      "digest": "sha256:8045d2239cfbffdb3457a2b4555a39f08a0beaca6f21c83832ddf67da793de82",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-to-do-schema-6a6cda5dfd.json",
+      "size": 2122
+    },
+    {
+      "digest": "sha256:3929ec81433fcdad46551fa4ae5ce611c9f7cf7934d540dd3c0ad950049592d8",
+      "kind": "file",
+      "path": ".outcomegraph/claims/cl-uv-5463666b8d.json",
+      "size": 2066
+    },
+    {
+      "digest": "sha256:fdcf874e5243de237f636dbfa49793c0e562edc44131acbecd128bc3cf67cfc7",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-1.json",
+      "size": 928
+    },
+    {
+      "digest": "sha256:89a2c6d52aa28d16d8918a43088d17d1150174179d81b951d23b82c1fd04e994",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-2.json",
+      "size": 895
+    },
+    {
+      "digest": "sha256:8f1e926d91a1a17d8c43bce12873cfc151877a6fe0ad92d9be654535b092f51c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-3.json",
+      "size": 1136
+    },
+    {
+      "digest": "sha256:81605f901e03647ab7b46a0e95228acbf47b01be0e5c9d635d8227a1b23aeb43",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-4.json",
+      "size": 1006
+    },
+    {
+      "digest": "sha256:e07cff17a863a0452f8a1d354489d640b214aeb8bab9e586d7c18bd29d0bf26a",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-5.json",
+      "size": 912
+    },
+    {
+      "digest": "sha256:881ee8eaaa21e95e4ba81ca5cada2ee45634f52f2063386b2a9b242fac397f7e",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-materials-lock-blocker.json",
+      "size": 851
+    },
+    {
+      "digest": "sha256:eb0530b392032d5aa8e9f64a63043103d43710da81c9b15196e15b9bfd5a5ea7",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-migration-guidance.json",
+      "size": 996
+    },
+    {
+      "digest": "sha256:8c70a60d2f7c7af20ecbba68a7b39c47276305de12ffc84c051808a199e3ab33",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-migration-guide-identity.json",
+      "size": 830
+    },
+    {
+      "digest": "sha256:4e8c072fedd8f3ee2be4484b3f845bc9c737491be5a6be5452a64f96ba9ba995",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-quickstart-bootstrap-flow.json",
+      "size": 917
+    },
+    {
+      "digest": "sha256:93313f4bd7e1db758ace09c3dc9b09cc19338ae014530c1d487e90fee9e7b461",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-quickstart-dogfood-evidence.json",
+      "size": 1416
+    },
+    {
+      "digest": "sha256:d33ffa4887c3601d8349d5e308546c7c7ce989a69a43c3986fdaecff3ab1f8e8",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-quickstart-prompt-optimization.json",
+      "size": 928
+    },
+    {
+      "digest": "sha256:e6b63d3163879ae8edf90f373672c92a29b63340e2da6fb6b4a053468e29d746",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-quickstart-safety-defaults.json",
+      "size": 803
+    },
+    {
+      "digest": "sha256:3b9114c0b30354336723ac55fa369dd4ac886434d0512679d1c503aafba26dae",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-spec-matrix-acceptance-checks.json",
+      "size": 880
+    },
+    {
+      "digest": "sha256:e4e26cefbc2de2b270468e0708e8bd87c482875b5e228cfce76aa1f1cea3fbf1",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-spec-matrix-header.json",
+      "size": 850
+    },
+    {
+      "digest": "sha256:56e8c2da117953ed8d758a9950d812ef899fe469c11d3184c12c65e2ac5432b8",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-spec-matrix-section-statuses.json",
+      "size": 877
+    },
+    {
+      "digest": "sha256:a8a12d18570b1ef819a2b53f256e4d118cac893db838533e28170152f640bfad",
+      "kind": "file",
+      "path": ".outcomegraph/claims/claim-spec-matrix-tests.json",
+      "size": 924
+    },
+    {
+      "digest": "sha256:227e4499c98887f9fe642971e8043955b70e9dfdad52b5c9a92cc49fab4d8fa8",
+      "kind": "file",
+      "path": ".outcomegraph/claims/materials-claim-001.json",
+      "size": 791
+    },
+    {
+      "digest": "sha256:be720ed2bfa8c35f8ca4b988300c9094e829eefd72eac9266f346e4df0552009",
+      "kind": "file",
+      "path": ".outcomegraph/claims/materials-claim-002.json",
+      "size": 898
+    },
+    {
+      "digest": "sha256:84315602f8385153f900c4c946645213bbb10c1a8c3882b44404c25a8eeccc14",
+      "kind": "file",
+      "path": ".outcomegraph/claims/materials-claim-003.json",
+      "size": 800
+    },
+    {
+      "digest": "sha256:2c1ab1a91a85a5400a7689dad02ba8e3645cd491ad5e645fa1deb941d68f16c9",
+      "kind": "file",
+      "path": ".outcomegraph/claims/og-claim-1.json",
+      "size": 711
+    },
+    {
+      "digest": "sha256:2c298a4cca91dd53d7fe3804b1f7a55dc645f33c76bcb9a84451e12de6568fd7",
+      "kind": "file",
+      "path": ".outcomegraph/claims/og-claim-2.json",
+      "size": 765
+    },
+    {
+      "digest": "sha256:2aa9fb3955c93f5fbe367262ade96812dcf9a1a6f27c139e8c463f4a1817b991",
+      "kind": "file",
+      "path": ".outcomegraph/claims/og-claim-3.json",
+      "size": 784
+    },
+    {
+      "digest": "sha256:46324f14209b4ffc02c2d2dc9addda0b1e07b505fdd2a1faa987008af32dd8a7",
+      "kind": "file",
+      "path": ".outcomegraph/claims/og-claim-4.json",
+      "size": 734
+    },
+    {
+      "digest": "sha256:6d01df045253517c4767d2e06fa0c981789c18dd43d2ddc287b5a8464c9bd499",
+      "kind": "file",
+      "path": ".outcomegraph/claims/ogd-claim-1.json",
+      "size": 725
+    },
+    {
+      "digest": "sha256:642d7da6320d6b02b9294fd254f7ddf90ac5f2ed1ce9b054826700de49b7efd5",
+      "kind": "file",
+      "path": ".outcomegraph/claims/ogd-claim-2.json",
+      "size": 696
+    },
+    {
+      "digest": "sha256:39751dcc25492490bc4ab2c6861b687404ffd389482521fcef95e10f35c64aa4",
+      "kind": "file",
+      "path": ".outcomegraph/claims/plugin_api-claim-01.json",
+      "size": 736
+    },
+    {
+      "digest": "sha256:dba387fe7a4243ebdc31c22cf341f4a49a8535e57e2a2794e745a3065e8c23af",
+      "kind": "file",
+      "path": ".outcomegraph/claims/plugin_api-claim-02.json",
+      "size": 841
+    },
+    {
+      "digest": "sha256:aedf1afb8693c840ba212680998611ef40c0e79924ad37aeb5b32d08ca71ff9a",
+      "kind": "file",
+      "path": ".outcomegraph/claims/plugin_api-claim-03.json",
+      "size": 781
+    },
+    {
+      "digest": "sha256:d7306c8704db40dd5de3d9eba46fc1774a6a3be5eaad335487dbd558f2a46f1d",
+      "kind": "file",
+      "path": ".outcomegraph/claims/plugin_api-claim-04.json",
+      "size": 846
+    },
+    {
+      "digest": "sha256:eddbaa8f28a8f3fd93299757aac090b3539c6755f8d5fcde8891b35be9745e01",
+      "kind": "file",
+      "path": ".outcomegraph/claims/plugin_api-claim-05.json",
+      "size": 772
+    },
+    {
+      "digest": "sha256:30bd10cb817ec6a07b6ce40ea518d18d616a5a6c3b922987a62e31b9408fccb6",
+      "kind": "file",
+      "path": ".outcomegraph/claims/readme-1.json",
+      "size": 794
+    },
+    {
+      "digest": "sha256:715ddafb4f7869524fd69ea55578ae2b71c886b805011941850747134484d342",
+      "kind": "file",
+      "path": ".outcomegraph/claims/readme-2.json",
+      "size": 777
+    },
+    {
+      "digest": "sha256:f5e18943cffab1628e879995f0169f2c8200be1a61d1ca660e0da0996de8d1d3",
+      "kind": "file",
+      "path": ".outcomegraph/claims/readme-3.json",
+      "size": 801
+    },
+    {
+      "digest": "sha256:cdba1ab341f4fd0cc5e3e0028a2b93e837268a787c8ff218fc529f0fdeb753c4",
+      "kind": "file",
+      "path": ".outcomegraph/claims/readme-4.json",
+      "size": 763
+    },
+    {
+      "digest": "sha256:ad921d33d6c7150c508bbbebe8855954d4424cb60be9883caa87d143bc30f151",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runbooks-claim-1.json",
+      "size": 862
+    },
+    {
+      "digest": "sha256:54064fd8f397d1873c63f0ce973ef18912c002aa2cdbc9b2ff6c940a48931326",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runbooks-claim-2.json",
+      "size": 793
+    },
+    {
+      "digest": "sha256:3770c0f8c72535253f37a5bdba06cfc927809640e53f9ef9d7d4b4943117a4d9",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runbooks-claim-3.json",
+      "size": 825
+    },
+    {
+      "digest": "sha256:bc0f089a6ac2a08c285f4afb400de9ae275bbc882e8e399a538bd3511f454867",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runbooks-claim-4.json",
+      "size": 844
+    },
+    {
+      "digest": "sha256:acb47cd287477ad8da46a48e77abb776923a9aacb17b98588f82e9ed610bd504",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runbooks-claim-5.json",
+      "size": 776
+    },
+    {
+      "digest": "sha256:f072ed9fdb6d4c7eeec07cb64268717ed882a3f2ffdacba30ec79fe55c51af2c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runtime.claim.01.json",
+      "size": 783
+    },
+    {
+      "digest": "sha256:1ce320b883dcd8afd9ad9602bae407a65f2454ac0db1bf595fe7543a8cb0035d",
+      "kind": "file",
+      "path": ".outcomegraph/claims/runtime.claim.02.json",
+      "size": 786
+    },
+    {
+      "digest": "sha256:0b357cf69e4e95bdb4f7fce334ea98ad7527f95436df9955803f515da8499d3c",
+      "kind": "file",
+      "path": ".outcomegraph/claims/security_policy_claim_1.json",
+      "size": 800
+    },
+    {
+      "digest": "sha256:47cd8b972e1a94e06f1bfeac4f71304a93812f1877697dbac47b29ed6abcee02",
+      "kind": "file",
+      "path": ".outcomegraph/claims/security_policy_claim_2.json",
+      "size": 804
+    },
+    {
+      "digest": "sha256:338a6a614cd3280f8d0e101d976a0d83ee92e95e5fd45a9053903bcd7b28721f",
+      "kind": "file",
+      "path": ".outcomegraph/claims/security_policy_claim_3.json",
+      "size": 870
+    },
+    {
+      "digest": "sha256:687767d8f7949d6117b3492e0c92cf40e514bb7047e24a1b4a442296c8347b3a",
+      "kind": "file",
+      "path": ".outcomegraph/claims/security_policy_claim_4.json",
+      "size": 791
+    },
+    {
+      "digest": "sha256:b9bee949c15a4d7f3dad9ffb4436d3b6f9f62ca79a75db0f5d570b1b8f661476",
+      "kind": "file",
+      "path": ".outcomegraph/claims/security_policy_claim_5.json",
+      "size": 853
+    },
+    {
+      "digest": "sha256:f1777417d80cdbf6ee901e04828b20dc01c67fccb7d4c844c79ba8ebec4cf20b",
+      "kind": "file",
+      "path": ".outcomegraph/claims/spec-v2-claim-001.json",
+      "size": 743
+    },
+    {
+      "digest": "sha256:442420a5b1806f32e40981e89c82c58aba6abcfb9ec950bde6a24faf4cb18d03",
+      "kind": "file",
+      "path": ".outcomegraph/claims/spec-v2-claim-002.json",
+      "size": 807
+    },
+    {
+      "digest": "sha256:2f39f641b0664d1aab8525642b73d03cb21fd85d51e72e57be3e06180d318b01",
+      "kind": "file",
+      "path": ".outcomegraph/claims/spec-v2-claim-003.json",
+      "size": 803
+    },
+    {
+      "digest": "sha256:b10495b79f296e87e13494669ad6ced51abf92ae8fdad4038c01f6d326831e8d",
+      "kind": "file",
+      "path": ".outcomegraph/claims/spec-v2-claim-004.json",
+      "size": 860
+    },
+    {
+      "digest": "sha256:c09f3e74e8c0c8210c061d0ece812118889b1e61aad13acd57e0c24c76578bb7",
+      "kind": "file",
+      "path": ".outcomegraph/claims/spec-v2-claim-005.json",
+      "size": 828
+    },
+    {
+      "digest": "sha256:1d8e96e95a42a83580781a49a9a88cc10714995670e54b1efec6f3e948bd3055",
+      "kind": "file",
+      "path": ".outcomegraph/claims/to-do-schema-claim-001.json",
+      "size": 773
+    },
+    {
+      "digest": "sha256:e040e2f0f996663d179e6bffba0ace20fe3700f2cea97658eadeac068919b5b3",
+      "kind": "file",
+      "path": ".outcomegraph/claims/to-do-schema-claim-002.json",
+      "size": 816
+    },
+    {
+      "digest": "sha256:0a0321dbb56e794b4da42f78d8389c8de067ec066909179634d3b8038366c97b",
+      "kind": "file",
+      "path": ".outcomegraph/claims/to-do-schema-claim-003.json",
+      "size": 875
+    },
+    {
+      "digest": "sha256:ed9fc50b9d1574da571f5a87477990d620b828a64ddce05d25ff1c75b1000dca",
+      "kind": "file",
+      "path": ".outcomegraph/claims/uv-lock-header.json",
+      "size": 764
+    },
+    {
+      "digest": "sha256:93dc6d2c8444736ac82d7b641f92a14d6fbaafb93f95c322cf9453b80d610eee",
+      "kind": "file",
+      "path": ".outcomegraph/claims/uv-lock-outcomegraph-meta.json",
+      "size": 770
+    },
+    {
+      "digest": "sha256:7ed5cb8a0688f67ae7a3c7a6ba06142585704576981e0d1ba5886cba3c5363ee",
+      "kind": "file",
+      "path": ".outcomegraph/claims/uv-lock-packages.json",
+      "size": 872
+    },
+    {
+      "digest": "sha256:4edbe2e6f4dd89a1b0bf0e70adc7f476e74323ee697ace5e308a821ed9b3363e",
+      "kind": "file",
+      "path": ".outcomegraph/config.yaml",
+      "size": 144
+    },
+    {
+      "digest": "sha256:590f3e935ba126d10f87fb6c0d01ec5578f314ae65df3ff6134e3c175e212519",
+      "kind": "file",
+      "path": ".outcomegraph/constitution/default.yaml",
+      "size": 257
+    },
+    {
+      "digest": "sha256:a11bc7bd36c8c5060625eb142ed89f2729278d60db8c3ea090568a24e0f3236a",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-agent_first_cli_review-ee6ce7def7.json",
+      "size": 1787
+    },
+    {
+      "digest": "sha256:586c6ebe77a3793d04735871da3af01cd570c8c6e5e0f7500709bc96091267f2",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-agents-fa3d042530.json",
+      "size": 1295
+    },
+    {
+      "digest": "sha256:7a8c703942fdcba66f5b00e4de695edbcfa67ffab995e4d9b5e7b932dbfa5c50",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-architecture-8d9f3cd848.json",
+      "size": 1509
+    },
+    {
+      "digest": "sha256:72ba4cbcfc93f5a8c131b0121a07373c0cdee6291255d4603279e495a76981d4",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-config-667b06aaf3.json",
+      "size": 1249
+    },
+    {
+      "digest": "sha256:c66a5600b0d22aaca9dd7a050f61493bf6c9b152131ab37f975c7fc2a1860857",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-constitution-ed81610905.json",
+      "size": 1237
+    },
+    {
+      "digest": "sha256:275312d841412fda88bddcd3c77dcf01d5013170f2a5e106270955a57e978eb0",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-materials-a2a82b1c06.json",
+      "size": 1432
+    },
+    {
+      "digest": "sha256:bdb8ab0f55bd7da694c742716ff037fbcd8dab65aefd90ad4a07e738e3917035",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-migration_guide-fbdd6018b0.json",
+      "size": 1401
+    },
+    {
+      "digest": "sha256:04d9efb96fa72954ceb0f62304e5e8288c5a4b7402a9a1636a480e6ad754e60f",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-og-2d837aebb1.json",
+      "size": 1314
+    },
+    {
+      "digest": "sha256:b2afd7db9175ce570e1aa769743a3cfe994dfc655dddf2a49c98494c430c641b",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-ogd-fca06483c0.json",
+      "size": 1172
+    },
+    {
+      "digest": "sha256:c0193429af1ec72e86283b3a30950cc1cf5119e70db54468b8fce2e402a3f675",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-plugin_api-3e34b608f7.json",
+      "size": 1399
+    },
+    {
+      "digest": "sha256:d5d2dbfed4b1235e072a8a9f3c807610a891576080374d936fb1c19ea447b3c4",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-policy-aeb0d4d42e.json",
+      "size": 1334
+    },
+    {
+      "digest": "sha256:5c049e99df20c2d7ff386360ea7666bc5aae24d6d2fddce104a6ef9e8f8844cd",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-pyproject-18e10014f6.json",
+      "size": 1276
+    },
+    {
+      "digest": "sha256:5308667287a2ab94d5cd7c160db5ef851124c18aca26fdf72778a13e22df32cd",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-quickstart-64500e1176.json",
+      "size": 1633
+    },
+    {
+      "digest": "sha256:756923623febeade98cf29644868687ec2c6042d9e89f38120e5a3e7a9188577",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-readme-978d4917e8.json",
+      "size": 1274
+    },
+    {
+      "digest": "sha256:0dfd13ab4c98a6ae79407bfcab157d44d7e64a5d7cfa3a17736b1a92ce6eae23",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-runbooks-a9e0c96bc9.json",
+      "size": 1379
+    },
+    {
+      "digest": "sha256:0b87854e6c0649d291a84a658718fbdfa4abca813cc85bc3ca884bcc5201c609",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-runtime-cbfd379dc4.json",
+      "size": 1282
+    },
+    {
+      "digest": "sha256:a4e729cfe728717352748aabc9ad23cc12011318b03e8e19d2ffb07dfac9ad11",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-security_policy-06886855bf.json",
+      "size": 1400
+    },
+    {
+      "digest": "sha256:eccc3d2fef8abac0e8396a2d4c60997fe9cd9fff0e6d216e020bc562c25fad9e",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-skill-og-d3fa760410.json",
+      "size": 1349
+    },
+    {
+      "digest": "sha256:e625c06671ee3ba984fe2e30f97685fff25e3c6f2b5d7dc015004454f83ad558",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-skill-og-dogfood-a2eca65b6b.json",
+      "size": 1376
+    },
+    {
+      "digest": "sha256:3eb6a702b109b4b165751efbb74084f4918bbcecc03a38289e521aa6c92a8c9f",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-skill-og-quality-pass-43a96bfad1.json",
+      "size": 1422
+    },
+    {
+      "digest": "sha256:420fa2298b52bcbeff7fa751bd863798a578afec9c676aaaa9ce99f06b3afe91",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-spec-v2-17cff67971.json",
+      "size": 1452
+    },
+    {
+      "digest": "sha256:7e12ac3106c67ae0dbd21d4564d5574fd38e003647a618d5b374d1abfafd1ccc",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-spec_implementation_matrix-6d9eee717a.json",
+      "size": 1443
+    },
+    {
+      "digest": "sha256:19025b1c12f077d8d5ab981a763429ca25cf16fd7a84ee08b6ad4c2a64e61710",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-tests-65f096e9c1.json",
+      "size": 1274
+    },
+    {
+      "digest": "sha256:753a62f93c8c2c17cbfdaaac6208b54f42413a2bc4a1929bc9f043e86ddca7fc",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-to-do-22141c013a.json",
+      "size": 1243
+    },
+    {
+      "digest": "sha256:e2e15bfdc7c707249a64f0e761eaa59550b0509c3b41a068477875bb0b4e10a6",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-to-do-schema-4fa49f68c4.json",
+      "size": 1269
+    },
+    {
+      "digest": "sha256:29d40edbc984e2d7b8cbe52183627e3e1f0053741ce19ce65efe247f22dc2685",
+      "kind": "file",
+      "path": ".outcomegraph/decisions/dec-uv-2c74dbb092.json",
+      "size": 1218
+    },
+    {
+      "digest": "sha256:359c2358a771a57ddb35bc62d1dffd7e8cad051c4eb5cfac71862183f003dc94",
+      "kind": "file",
+      "path": ".outcomegraph/export/AGENTS.md",
+      "size": 966
+    },
+    {
+      "digest": "sha256:73afbc83a6af00b2826eec80f798d0993b06ad58020ddd2633c804a1315e40fd",
+      "kind": "file",
+      "path": ".outcomegraph/export/README_OUTCOMES.md",
+      "size": 20427
+    },
+    {
+      "digest": "sha256:bf621e681359d4b5a78a4ed8b92e994d845cf1a1c758688c89989f83c6b546e5",
+      "kind": "file",
+      "path": ".outcomegraph/export/mcp-resources.json",
+      "size": 16389
+    },
+    {
+      "digest": "sha256:b7b3ce9e15534bec464a92494ebcb43b2509973cf48a49b781e78448b6adcc93",
+      "kind": "file",
+      "path": ".outcomegraph/materials.lock",
+      "size": 55123
+    },
+    {
+      "digest": "sha256:eef8259151e4bc37423b674b33b83343ee22043ddfcb49b49e8e68fbfc46af4f",
+      "kind": "file",
+      "path": ".outcomegraph/policy.yaml",
+      "size": 717
+    },
+    {
+      "digest": "sha256:6fb597d733c9cca281336a1a3ff74d40189739b3900c387387052ed6cfd7415d",
+      "kind": "file",
+      "path": ".outcomegraph/refs/agent_first_cli_review.json",
+      "size": 208
+    },
+    {
+      "digest": "sha256:1640c16e3cd9d9d63f693bff0eb84ac951208db556953189ff3d9ae31bc7f3be",
+      "kind": "file",
+      "path": ".outcomegraph/refs/agents.json",
+      "size": 176
+    },
+    {
+      "digest": "sha256:6930316ad2ad44bfcd525e2c2aa82ee5268599d9fc8b0232ea0d297104a89109",
+      "kind": "file",
+      "path": ".outcomegraph/refs/architecture.json",
+      "size": 188
+    },
+    {
+      "digest": "sha256:bfcd0d1eed94db276da0a949a5c4be930c9c767559fc3e64fcd00cf65b06c3e2",
+      "kind": "file",
+      "path": ".outcomegraph/refs/config.json",
+      "size": 176
+    },
+    {
+      "digest": "sha256:d355b955c69e1760d62f614d2df74989adfa71d2146601fb1525141baacb016c",
+      "kind": "file",
+      "path": ".outcomegraph/refs/constitution.json",
+      "size": 188
+    },
+    {
+      "digest": "sha256:ba9fe40d58fb52c35472a278432300fec0f311c1f4b9f7c1b345fe135f3f7a3f",
+      "kind": "file",
+      "path": ".outcomegraph/refs/materials.json",
+      "size": 182
+    },
+    {
+      "digest": "sha256:27ef4b69e99d8d076db2fb8699261caa2038aaef3129937aaa7f28a7d3f23f8a",
+      "kind": "file",
+      "path": ".outcomegraph/refs/migration_guide.json",
+      "size": 194
+    },
+    {
+      "digest": "sha256:b8896c49ebaf0d8c1b771ba08b23e10046b3bd12c8b6b07e840deb504a8a6099",
+      "kind": "file",
+      "path": ".outcomegraph/refs/og.json",
+      "size": 168
+    },
+    {
+      "digest": "sha256:9d53db7d2aad13311c9b73147ccc0d884eabe64f09865c2b9e93a5c2e8ac0947",
+      "kind": "file",
+      "path": ".outcomegraph/refs/ogd.json",
+      "size": 170
+    },
+    {
+      "digest": "sha256:efc494d9fd02b3da14f96dc309207bfccff01b11e695827d5f7a5ee7c1554992",
+      "kind": "file",
+      "path": ".outcomegraph/refs/plugin_api.json",
+      "size": 184
+    },
+    {
+      "digest": "sha256:9ca43b5988390eb50a760a50e2e37eafa757f2993093256226c2507276fdf683",
+      "kind": "file",
+      "path": ".outcomegraph/refs/policy.json",
+      "size": 176
+    },
+    {
+      "digest": "sha256:20e8e5cb5bf285d36b968b2d1e66dcda8722f1503bc572b653ff11aba34eb758",
+      "kind": "file",
+      "path": ".outcomegraph/refs/pyproject.json",
+      "size": 182
+    },
+    {
+      "digest": "sha256:d6096a23c4eae72625b4324ab8cd24b1e1da759bf481a41a27c67092a7ddcef7",
+      "kind": "file",
+      "path": ".outcomegraph/refs/quickstart.json",
+      "size": 184
+    },
+    {
+      "digest": "sha256:a3a7a6cfd601d7e7fb296465e964059a409d3af6c41918ebef0dc8d7a9a0ff06",
+      "kind": "file",
+      "path": ".outcomegraph/refs/readme.json",
+      "size": 176
+    },
+    {
+      "digest": "sha256:cb4d4984f6c077db17ae06f961894a790f086bd27b1f687fa863428cf4c54955",
+      "kind": "file",
+      "path": ".outcomegraph/refs/runbooks.json",
+      "size": 180
+    },
+    {
+      "digest": "sha256:badfeae4332a018a67dd202db819e3a31fe543f582f5923b4e85f75118edbc8b",
+      "kind": "file",
+      "path": ".outcomegraph/refs/runtime.json",
+      "size": 178
+    },
+    {
+      "digest": "sha256:b41a317aaf772a79d1fb6c07c56c394fd27dce4740565e509596eabb528cb33b",
+      "kind": "file",
+      "path": ".outcomegraph/refs/security_policy.json",
+      "size": 194
+    },
+    {
+      "digest": "sha256:b30902e3a0d22fc812607a0e83a4a4b3aa31632a539411dee0aca2f759586eeb",
+      "kind": "file",
+      "path": ".outcomegraph/refs/skill-og-dogfood.json",
+      "size": 196
+    },
+    {
+      "digest": "sha256:4313c200d1333f2e2a3c42c56f8fb0571ae90b14b845b333a807592c255e6ae2",
+      "kind": "file",
+      "path": ".outcomegraph/refs/skill-og-quality-pass.json",
+      "size": 206
+    },
+    {
+      "digest": "sha256:0dbe2633fbdb0f2d9ecdd194d6663100a18e6953ce7de8f2ddeb6400e6c350c6",
+      "kind": "file",
+      "path": ".outcomegraph/refs/skill-og.json",
+      "size": 180
+    },
+    {
+      "digest": "sha256:8817a99788a0b68a811e9b808cd45e5e147d84f21829ec0d208bd4a0ed7ad965",
+      "kind": "file",
+      "path": ".outcomegraph/refs/spec-v2.json",
+      "size": 178
+    },
+    {
+      "digest": "sha256:bf0fbc52c1a292cc8d0c788dc3ce22a0e5e65685f0736247f7c5c37f32555df4",
+      "kind": "file",
+      "path": ".outcomegraph/refs/spec_implementation_matrix.json",
+      "size": 216
+    },
+    {
+      "digest": "sha256:7fd81fad2209c4c0c4335bdf9a9164a0220aaae9b10d9b16e60d3f95c74ef7c3",
+      "kind": "file",
+      "path": ".outcomegraph/refs/tests.json",
+      "size": 174
+    },
+    {
+      "digest": "sha256:81985dd6fc39998cdc81dc0d35a0bf32be643f24668b0cb0ea7397fe67fbafb4",
+      "kind": "file",
+      "path": ".outcomegraph/refs/to-do-schema.json",
+      "size": 188
+    },
+    {
+      "digest": "sha256:644e7a6df0f06efa6a0b1da37d0b6189f137dcd3ec3822b1f10ab8ad7bca2aec",
+      "kind": "file",
+      "path": ".outcomegraph/refs/to-do.json",
+      "size": 174
+    },
+    {
+      "digest": "sha256:86b2f7d8fd396b3673345eecc3ac46d3e64882b41ad5a00598f9499891007313",
+      "kind": "file",
+      "path": ".outcomegraph/refs/uv.json",
+      "size": 168
+    },
+    {
+      "digest": "sha256:4af36592954ed08c12fc6f9b65437f6c8c2cea52094eea037cc846a64387e69c",
+      "kind": "file",
+      "path": "AGENT_FIRST_CLI_REVIEW.md",
+      "size": 6007
+    },
+    {
+      "digest": "sha256:ae244a50a771cbd7ffef1e32aba80637f36d07042baef027a599b3f76f06c7bc",
+      "kind": "file",
+      "path": "ARCHITECTURE.md",
+      "size": 11040
+    },
+    {
+      "digest": "sha256:7ad4a3e5db2a92b915ed6f5482954007a37f5a020656f466143a9612f2f86c24",
+      "kind": "file",
+      "path": "MIGRATION_GUIDE.md",
+      "size": 3306
+    },
+    {
+      "digest": "sha256:4cde375fca93213551c42cb24fe1911173c7029694ebf13620ac7e32a112b24c",
+      "kind": "file",
+      "path": "PLUGIN_API.md",
+      "size": 3605
+    },
+    {
+      "digest": "sha256:09f6150141a0dc807199f29983f746f83edcf12714160220e9a0fd6fa89471d2",
+      "kind": "file",
+      "path": "QUICKSTART.md",
+      "size": 3374
+    },
+    {
+      "digest": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "kind": "file",
+      "path": "README.md",
+      "size": 12651
+    },
+    {
+      "digest": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "kind": "file",
+      "path": "RUNBOOKS.md",
+      "size": 6606
+    },
+    {
+      "digest": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "kind": "file",
+      "path": "SECURITY_POLICY.md",
+      "size": 3050
+    },
+    {
+      "digest": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "kind": "file",
+      "path": "SPEC-v2.md",
+      "size": 31371
+    },
+    {
+      "digest": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "kind": "file",
+      "path": "SPEC_IMPLEMENTATION_MATRIX.md",
+      "size": 6613
+    },
+    {
+      "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
+      "kind": "file",
+      "path": "og",
+      "size": 225
+    },
+    {
+      "digest": "sha256:16a6dbed1c3010db4597231c90f291fc2f4c788634576d2de7d81faecc7227cb",
+      "kind": "file",
+      "path": "og.py",
+      "size": 521783
+    },
+    {
+      "digest": "sha256:5bfd50e1b1428f5d295ae6f4bc049c8c18bab863a962fd87e387c34d9d44b0ea",
+      "kind": "file",
+      "path": "ogd",
+      "size": 145
+    },
+    {
+      "digest": "sha256:2e9e83e77841e467e14538fab30ca43364074bf7b4d3e075a488fda256ab293b",
+      "kind": "file",
+      "path": "pyproject.toml",
+      "size": 1080
+    },
+    {
+      "digest": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+      "kind": "file",
+      "path": "skills/og-dogfood/SKILL.md",
+      "size": 3629
+    },
+    {
+      "digest": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+      "kind": "file",
+      "path": "skills/og-dogfood/agents/openai.yaml",
+      "size": 224
+    },
+    {
+      "digest": "sha256:7a7e93d304de47cd1188f118a9760995bff78a16377878fbe0e8c44bc05cd53e",
+      "kind": "file",
+      "path": "skills/og-dogfood/scripts/run_dogfood.sh",
+      "size": 4105
+    },
+    {
+      "digest": "sha256:00dbd85efd765c00a45a6da4896180890158cf60d345c6a2acf42fe51225d5fc",
+      "kind": "file",
+      "path": "skills/og-quality-pass/SKILL.md",
+      "size": 1403
+    },
+    {
+      "digest": "sha256:aba96d84d8e781e0aeed4c17c7ef836ad46d578fa0952ead442c966e5019ae8f",
+      "kind": "file",
+      "path": "skills/og-quality-pass/agents/openai.yaml",
+      "size": 231
+    },
+    {
+      "digest": "sha256:ce06297e7843697e3764d938ea734d9f54fe7d238cc01311828f4edf0f8a41de",
+      "kind": "file",
+      "path": "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "size": 1186
+    },
+    {
+      "digest": "sha256:86ce614bbd4719a2553240a88ed161f0cc86aa3edcce95c03f5e12958bc70961",
+      "kind": "file",
+      "path": "skills/og/SKILL.md",
+      "size": 2823
+    },
+    {
+      "digest": "sha256:f939e0a91735b7d6af03c79f45847fbdc305bbaa639211e7f93a713e29589b2f",
+      "kind": "file",
+      "path": "skills/outcome-steward/SKILL.md",
+      "size": 1315
+    },
+    {
+      "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+      "kind": "file",
+      "path": "tests/conftest.py",
+      "size": 240
+    },
+    {
+      "digest": "sha256:c5f1b8556a38cca5f4cab782fa5f975f0e2fef2ddadd773453470a6a2020de13",
+      "kind": "file",
+      "path": "tests/test_og_sync_verify_replay_hooks.py",
+      "size": 133683
+    },
+    {
+      "digest": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "kind": "file",
+      "path": "to-do.json",
+      "size": 62588
+    },
+    {
+      "digest": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+      "kind": "file",
+      "path": "to-do.schema.json",
+      "size": 1589
+    },
+    {
+      "digest": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+      "kind": "file",
+      "path": "uv.lock",
+      "size": 38920
+    }
+  ],
+  "id": "materials-lock",
+  "schema_version": 2,
+  "updated_at": "2026-03-06T22:21:21Z"
+}

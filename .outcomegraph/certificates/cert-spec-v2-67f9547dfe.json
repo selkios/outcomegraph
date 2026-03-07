@@ -1,0 +1,85 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "spec-v2",
+  "claim_refs": [
+    ".outcomegraph/claims/spec-v2-bounded-contexts.json",
+    ".outcomegraph/claims/spec-v2-cli-surface.json",
+    ".outcomegraph/claims/spec-v2-cli-validation-rules.json",
+    ".outcomegraph/claims/spec-v2-header-and-identities.json",
+    ".outcomegraph/claims/spec-v2-optimize-and-envelope-contract.json",
+    ".outcomegraph/claims/spec-v2-principles-and-goals.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-spec-v2-67f9547dfe",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "SPEC-v2.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:35f77c73dcf5dc3a85aba5edb581582619cc5ace9b45f1b42e706ea1c44a70f9",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6974,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:35f77c73dcf5dc3a85aba5edb581582619cc5ace9b45f1b42e706ea1c44a70f9",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6974,
+      "target": "sha256:35f77c73dcf5dc3a85aba5edb581582619cc5ace9b45f1b42e706ea1c44a70f9",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6709fa24c5c1934e11bfd6f824d52e1efc79736eefe93a26dcbda274ccd3c483",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 23511,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6709fa24c5c1934e11bfd6f824d52e1efc79736eefe93a26dcbda274ccd3c483",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 23511,
+      "target": "sha256:6709fa24c5c1934e11bfd6f824d52e1efc79736eefe93a26dcbda274ccd3c483",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b194b3200126f52882b279b2a8c94e5c58adecccf6b387dd6500838b9e78e759",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7624,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b194b3200126f52882b279b2a8c94e5c58adecccf6b387dd6500838b9e78e759",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7624,
+      "target": "sha256:b194b3200126f52882b279b2a8c94e5c58adecccf6b387dd6500838b9e78e759",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

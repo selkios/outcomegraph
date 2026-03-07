@@ -1,0 +1,41 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "All externally reachable behavior remains command-driven through explicit `og`/`ogd` invocations and is intended to stay scriptable in CI.",
+    "Canonical artifacts and plugin manifests stay on `schema_version: 2`, and the adapter interface family remains fixed at `interface_version: 1` until an explicit migration occurs.",
+    "Machine-facing contracts stay strict: unknown options are usage errors, identifiers are allowlisted, optimization inputs remain repository-relative, and mixed artifact versions are rejected.",
+    "Default autonomy remains observe-safe: application-code writes, dependency changes, unrestricted network access, and deployment actions are denied unless policy explicitly allows them."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-spec-v2-17cff67971.json",
+    "decisions/dec-spec-v2-74428ca608.json",
+    "decisions/dec-spec-v2-8eb3c0279c.json"
+  ],
+  "goal": "Capture the Draft v2.1 `SPEC-v2.md` baseline that defines OutcomeGraph/Steward identities, bounded contexts, CLI contracts, schema-versioned artifacts, adapter interfaces, safety policy, and verification/replay behavior.",
+  "id": "spec-v2",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "spec-v2-content-evidence",
+      "scope": [
+        "SPEC-v2.md"
+      ]
+    },
+    {
+      "command": null,
+      "name": "spec-v2-cli-contract-evidence",
+      "scope": [
+        "SPEC-v2.md"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "SPEC-v2.md"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

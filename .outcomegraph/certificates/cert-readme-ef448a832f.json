@@ -1,0 +1,82 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "readme",
+  "claim_refs": [
+    ".outcomegraph/claims/readme-1.json",
+    ".outcomegraph/claims/readme-2.json",
+    ".outcomegraph/claims/readme-3.json",
+    ".outcomegraph/claims/readme-4.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-readme-ef448a832f",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:495c9c6c55b9ced1a8d12710518699dec16ac4d3c65e53f5f2bb5132a84a0c9f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 21044,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:495c9c6c55b9ced1a8d12710518699dec16ac4d3c65e53f5f2bb5132a84a0c9f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 21044,
+      "target": "sha256:495c9c6c55b9ced1a8d12710518699dec16ac4d3c65e53f5f2bb5132a84a0c9f",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:4b451acfa699e143a1cd23a3e118f65aed45a2ef70f8d90af68ac6741ed906b3",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4023,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:4b451acfa699e143a1cd23a3e118f65aed45a2ef70f8d90af68ac6741ed906b3",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4023,
+      "target": "sha256:4b451acfa699e143a1cd23a3e118f65aed45a2ef70f8d90af68ac6741ed906b3",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a7cfebe2e980d9f244e5ab01bc736fb9e59e4772f0615175ecf5af478f4e4aed",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3478,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a7cfebe2e980d9f244e5ab01bc736fb9e59e4772f0615175ecf5af478f4e4aed",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3478,
+      "target": "sha256:a7cfebe2e980d9f244e5ab01bc736fb9e59e4772f0615175ecf5af478f4e4aed",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "schema_version": 2,
+      "target": "README.md",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

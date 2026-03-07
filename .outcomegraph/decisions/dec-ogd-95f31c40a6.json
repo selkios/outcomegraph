@@ -1,0 +1,24 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "ogd",
+  "claim_refs": [
+    ".outcomegraph/claims/claim-ogd-failfast-shell-contract.json",
+    ".outcomegraph/claims/claim-ogd-wrapper-delegation.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-7-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-7-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-7.json",
+    "ogd",
+    "sha256:1e169eb1b1dfc137a96bc49d120051e3db3a9d179e8de43a4f1b1bc3d57b3ef5",
+    "sha256:742e4c08bcdcc134809b76320cab13778242682216cb5f08a24e824c6c9ac0ba",
+    "sha256:f9d405b9c144c25c720f5ddb35b6c73557e588051628102789e30439b100ebb6"
+  ],
+  "id": "dec-ogd-95f31c40a6",
+  "rationale": "The supplied changed snapshot fully defines the current wrapper behavior, but the input does not include any repository-native executable verification command beyond observing the launcher file itself.",
+  "schema_version": 2,
+  "statement": "Capture `ogd` as a directory-local `uv` launcher with argument passthrough and fail-fast shell semantics.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

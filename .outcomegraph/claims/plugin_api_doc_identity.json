@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "plugin_api",
+  "category": "metadata",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "plugin_api_doc_identity",
+  "origin": {
+    "changed_files": [
+      "PLUGIN_API.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4cde375fca93213551c42cb24fe1911173c7029694ebf13620ac7e32a112b24c",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "PLUGIN_API.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "`PLUGIN_API.md` is the OutcomeGraph plugin API reference for draft v2.1, dated 2026-03-04, and states that it defines the versioned adapter contracts required by OutcomeGraph Steward for v2.1. It also states that adapters are discovered at startup and validated before runtime operations begin."
+}

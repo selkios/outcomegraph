@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "spec-v2",
+  "claim_refs": [
+    ".outcomegraph/claims/spec-v2-bounded-contexts.json",
+    ".outcomegraph/claims/spec-v2-cli-surface.json",
+    ".outcomegraph/claims/spec-v2-cli-validation-rules.json",
+    ".outcomegraph/claims/spec-v2-header-and-identities.json",
+    ".outcomegraph/claims/spec-v2-optimize-and-envelope-contract.json",
+    ".outcomegraph/claims/spec-v2-principles-and-goals.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-19.json",
+    "SPEC-v2.md",
+    "sha256:35f77c73dcf5dc3a85aba5edb581582619cc5ace9b45f1b42e706ea1c44a70f9",
+    "sha256:6709fa24c5c1934e11bfd6f824d52e1efc79736eefe93a26dcbda274ccd3c483",
+    "sha256:b194b3200126f52882b279b2a8c94e5c58adecccf6b387dd6500838b9e78e759"
+  ],
+  "id": "dec-spec-v2-74428ca608",
+  "rationale": "The supplied `SPEC-v2.md` snapshot contains enough concrete evidence to preserve the v2.1 product statement, bounded contexts, CLI surface, validation rules, and machine-output contract. The record is warning-level rather than fully complete because the snapshot is truncated mid-document and does not show a repository-native executable verification command for this spec.",
+  "schema_version": 2,
+  "statement": "Record `spec-v2` as the current visible v2.1 specification baseline for OutcomeGraph, Steward, and the `og`/`ogd` command contract, with completeness limited to the supplied snapshot.",
+  "status": "warn",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

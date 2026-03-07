@@ -1,0 +1,105 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "migration_guide",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-migration_guide-21cf1ab76e.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-migration_guide-21cf1ab76e",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1094,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-preflight-baseline-commands-not-executed-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1094,
+      "target": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1091,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-sync-not-confirmed-by-run-artifacts-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1091,
+      "target": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-verify-changed-not-confirmed-by-093142b338-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-replay-changed-not-confirmed-by-63e90349bb-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-materials-lock-repair-snippet-not-verified-against-live-file-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

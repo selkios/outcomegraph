@@ -1,0 +1,27 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "skill-og-dogfood",
+  "category": "failure_handling",
+  "created_at": "2026-03-06T20:37:57Z",
+  "id": "skill-og-dogfood.failure-handling",
+  "origin": {
+    "changed_files": [
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T203407Z-03b91c8afd"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+      "schema_version": 2,
+      "target": "skills/og-dogfood/SKILL.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Failure reporting is evidence-first: report the failing command, the evidence file being written, and the first actionable error lines, and inspect `.outcomegraph/events/dogfood-*.json` before branching into schema migration or repair work."
+}

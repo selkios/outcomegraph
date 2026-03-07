@@ -1,0 +1,83 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "spec_implementation_matrix",
+  "claim_refs": [
+    ".outcomegraph/claims/claim-spec-matrix-acceptance-checks.json",
+    ".outcomegraph/claims/claim-spec-matrix-header.json",
+    ".outcomegraph/claims/claim-spec-matrix-section-statuses.json",
+    ".outcomegraph/claims/claim-spec-matrix-tests.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-spec_implementation_matrix-fed7a82b46",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:2d6b7109454558c4240d54d41199f1e45b361493be6e6a50dd366d578982583c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5174,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:2d6b7109454558c4240d54d41199f1e45b361493be6e6a50dd366d578982583c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5174,
+      "target": "sha256:2d6b7109454558c4240d54d41199f1e45b361493be6e6a50dd366d578982583c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:92abc771300e71f16a060cb5474d1c733193f4e0bae98913a768674627798073",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 17921,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:92abc771300e71f16a060cb5474d1c733193f4e0bae98913a768674627798073",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 17921,
+      "target": "sha256:92abc771300e71f16a060cb5474d1c733193f4e0bae98913a768674627798073",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:d7c3e5ce7bd73a7764cca160a9cdc68b298fddcdd30a4c2ee608d5a30db6d7c0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4561,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:d7c3e5ce7bd73a7764cca160a9cdc68b298fddcdd30a4c2ee608d5a30db6d7c0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4561,
+      "target": "sha256:d7c3e5ce7bd73a7764cca160a9cdc68b298fddcdd30a4c2ee608d5a30db6d7c0",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "SPEC_IMPLEMENTATION_MATRIX.md",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

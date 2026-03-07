@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agent_first_cli_review",
+  "category": "verification_contract",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "agent_first_cli_review_verification_contract",
+  "origin": {
+    "changed_files": [
+      "AGENT_FIRST_CLI_REVIEW.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4af36592954ed08c12fc6f9b65437f6c8c2cea52094eea037cc846a64387e69c",
+      "schema_version": 2,
+      "target": "AGENT_FIRST_CLI_REVIEW.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The review preserves a concrete regeneration path via quick runtime checks (`./og --help`, nested help commands, JSON envelope smoke tests, and `./og status --output json --json` expecting exit 64) plus the regression suite `python3 -m unittest -q tests.test_og_sync_verify_replay_hooks`, which the review states passed with 36 tests."
+}

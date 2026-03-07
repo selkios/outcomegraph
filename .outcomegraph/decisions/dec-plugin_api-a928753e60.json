@@ -1,0 +1,30 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "plugin_api",
+  "claim_refs": [
+    ".outcomegraph/claims/plugin_api_discovery_contract.json",
+    ".outcomegraph/claims/plugin_api_interface_matrix.json",
+    ".outcomegraph/claims/plugin_api_manifest_schema.json",
+    ".outcomegraph/claims/plugin_api_required_methods.json",
+    ".outcomegraph/claims/plugin_api_runtime_api_and_defaults.json",
+    ".outcomegraph/claims/plugin_api_source_doc.json",
+    ".outcomegraph/claims/plugin_api_typed_payloads.json",
+    ".outcomegraph/claims/plugin_api_verification_gap.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-8-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-8-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-8.json",
+    "PLUGIN_API.md",
+    "sha256:8c64d7541f89784b8ebce200e8934d857bb2ee10da1c9cef9d62baff8583acdf",
+    "sha256:930222ad554eeab5670c6331939f9f452073b60db6652c7b7bf268d76af386ce",
+    "sha256:ee65828efdf4cbbcfaedd6a216c2d5e42777a9fae2947618908187f8f8bd2f39"
+  ],
+  "id": "dec-plugin_api-a928753e60",
+  "rationale": "The changed snapshot in PLUGIN_API.md is a self-identified v2.1 reference sourced from SPEC-v2.md and it captures the observable contract surface for discovery, manifest validation, interface enforcement, methods, shared payloads, runtime registration, failure behavior, and defaults.",
+  "schema_version": 2,
+  "statement": "Use PLUGIN_API.md as the reusable source of truth for regenerating the OutcomeGraph v2.1 plugin adapter API capability.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

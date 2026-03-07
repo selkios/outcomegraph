@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-tests-0bb60d5c32.json"
+  ],
+  "created_at": "2026-03-06T22:11:09Z",
+  "id": "cert-tests-0bb60d5c32",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:08a13b862d272fa176680085a9478b312ee9c1fe7ffc10f5b95ff8aafbc8179d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 612,
+      "target": ".outcomegraph/traces/tests-sync-20260306t220747z-9439e19cb4-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:08a13b862d272fa176680085a9478b312ee9c1fe7ffc10f5b95ff8aafbc8179d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 612,
+      "target": "sha256:08a13b862d272fa176680085a9478b312ee9c1fe7ffc10f5b95ff8aafbc8179d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:e29c53c1db3ffbc0713c8cf0bb536c10f73551732dd21d1847fbf1943da4d7b7",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 452,
+      "target": ".outcomegraph/traces/tests-sync-20260306t220747z-9439e19cb4-visible-test-file-contract-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:e29c53c1db3ffbc0713c8cf0bb536c10f73551732dd21d1847fbf1943da4d7b7",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 452,
+      "target": "sha256:e29c53c1db3ffbc0713c8cf0bb536c10f73551732dd21d1847fbf1943da4d7b7",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T220747Z-9439e19cb4",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T220747Z-9439e19cb4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:11:09Z"
+}

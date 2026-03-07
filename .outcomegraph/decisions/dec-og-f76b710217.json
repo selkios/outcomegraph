@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "og",
+  "claim_refs": [
+    ".outcomegraph/claims/og-error-contract-constants.json",
+    ".outcomegraph/claims/og-version-binding.json",
+    ".outcomegraph/claims/og-version-loader-order.json"
+  ],
+  "created_at": "2026-03-06T21:23:30Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-2-input.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-2-result.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-2.json",
+    "og.py",
+    "sha256:a26a0259fec2b24f45c8a313c15610a7b0826a8096e8f47b167bbd313b702880",
+    "sha256:a2ce182135d3828515b86e7b15c7fee87cf6320dd9f0a316015a17d201cd30db",
+    "sha256:e5011c6a61170528418a712349a898c30a9eee705a688aea380e25b26f89c01b"
+  ],
+  "id": "dec-og-f76b710217",
+  "rationale": "The provided `og.py` snapshot directly shows the stable CLI scaffold docstring, the runtime version loader, the import-time `VERSION` binding, and the module-level error/exit contract constants.",
+  "schema_version": 2,
+  "statement": "Record `og.py` as the OutcomeGraph CLI scaffold capsule for runtime version resolution and exported failure-contract constants.",
+  "status": "success",
+  "updated_at": "2026-03-06T21:23:30Z"
+}

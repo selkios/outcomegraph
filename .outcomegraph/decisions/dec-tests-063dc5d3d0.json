@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/tests-cli-contracts-visible.json",
+    ".outcomegraph/claims/tests-distill-snapshot-regressions.json",
+    ".outcomegraph/claims/tests-distill-update-shape.json",
+    ".outcomegraph/claims/tests-local-import-fixture.json",
+    ".outcomegraph/claims/tests-temp-repo-harness.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-21-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-21-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-21.json",
+    "sha256:3fa6e01aacdd129d1d8e949f2bd4e91d3fd0d308a34f416367237c8f2a646dc9",
+    "sha256:8911874231ce173d832493ba372cc5cb323f9a517cb14309f6d6f9808ca68b5f",
+    "sha256:f31c76dd5a0664b733c660af6826a1a60054c061b9480fc28fe813a2d8b90d09",
+    "tests/conftest.py",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "id": "dec-tests-063dc5d3d0",
+  "rationale": "The changed snapshots provide concrete pytest fixture and assertion evidence across both changed files, and the inherited capsule metadata preserves one executable verification command, but the main test file truncates mid-introspection and no supporting implementation snapshots were supplied.",
+  "schema_version": 2,
+  "statement": "Capture the `tests` capsule as the reusable regression record for pytest import setup, git-repo harnessing, distill helper behavior, and the visible CLI help/schema contracts.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

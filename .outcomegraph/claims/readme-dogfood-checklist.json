@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "readme",
+  "category": "verification",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "readme-dogfood-checklist",
+  "origin": {
+    "changed_files": [
+      "README.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "README.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "README.md defines a full-spec rollout and dogfood checklist using `uv run og status --json`, `uv run og sync --json`, `uv run og verify --changed --json`, and `uv run og drift`, and it names canonical evidence paths `.outcomegraph/events/sync-20260305T082953Z-8485041f63.json`, `.outcomegraph/events/sync-20260305T092058Z-9008c47e88.json`, and `.outcomegraph/events/verify-20260305T092059Z-a1789787d4.json`."
+}

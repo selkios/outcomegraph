@@ -1,0 +1,81 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "architecture",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cl-architecture-7a66c9373f",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "og",
+      "og.py",
+      "ogd",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0020c489e651ba47c2f10f7b1018154cf9a53ce0a5d5076c711c0414463b6635",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1122,
+      "target": ".outcomegraph/traces/architecture-sync-20260306t222121z-7d3ea2b95b-architecture-md--is-the-authoritative-evidence-snapshot-for-t-1b202ea25b-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0020c489e651ba47c2f10f7b1018154cf9a53ce0a5d5076c711c0414463b6635",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1122,
+      "target": "sha256:0020c489e651ba47c2f10f7b1018154cf9a53ce0a5d5076c711c0414463b6635",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:38361d735445b7aae4bd56e0284790e2d83cdf32005caf017aa5e5d97166cb6a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1183,
+      "target": ".outcomegraph/traces/architecture-sync-20260306t222121z-7d3ea2b95b-the-payload-does-not-provide-a-repo-native-executable-verific-66a3495441-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:38361d735445b7aae4bd56e0284790e2d83cdf32005caf017aa5e5d97166cb6a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1183,
+      "target": "sha256:38361d735445b7aae4bd56e0284790e2d83cdf32005caf017aa5e5d97166cb6a",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for architecture on 2 oracle checks."
+}

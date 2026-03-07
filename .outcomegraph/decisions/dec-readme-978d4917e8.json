@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "readme",
+  "claim_refs": [
+    ".outcomegraph/claims/readme-1.json",
+    ".outcomegraph/claims/readme-2.json",
+    ".outcomegraph/claims/readme-3.json",
+    ".outcomegraph/claims/readme-4.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-13.json",
+    "README.md",
+    "sha256:495c9c6c55b9ced1a8d12710518699dec16ac4d3c65e53f5f2bb5132a84a0c9f",
+    "sha256:4b451acfa699e143a1cd23a3e118f65aed45a2ef70f8d90af68ac6741ed906b3",
+    "sha256:a7cfebe2e980d9f244e5ab01bc736fb9e59e4772f0615175ecf5af478f4e4aed"
+  ],
+  "id": "dec-readme-978d4917e8",
+  "rationale": "The repository snapshot clearly captures user-facing command and pipeline documentation updates, but no executed command outputs are present to validate runtime behavior.",
+  "schema_version": 2,
+  "statement": "Update captures a reusable documentation-capability summary for regenerating README-surfaced CLI and contract behavior.",
+  "status": "warn",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

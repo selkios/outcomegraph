@@ -1,0 +1,88 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-tests-1ae79b0a56",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:31b32d5e2e9a1bbeaa12c9e71870111fdb73efead6f5e4bc923b3c034f42eca5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2832,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:31b32d5e2e9a1bbeaa12c9e71870111fdb73efead6f5e4bc923b3c034f42eca5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2832,
+      "target": "sha256:31b32d5e2e9a1bbeaa12c9e71870111fdb73efead6f5e4bc923b3c034f42eca5",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:5637b6f67313f96188fccd0e7136234aa967ea463012669c40d6e89eda436654",
+      "media_type": "text/x-python",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+      "media_type": "text/x-python",
+      "schema_version": 2,
+      "target": "tests/conftest.py",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7d7b84b2ab023030e87759e848c82bbcf58a15b369556e83de5379cf695f3b1c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3317,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7d7b84b2ab023030e87759e848c82bbcf58a15b369556e83de5379cf695f3b1c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3317,
+      "target": "sha256:7d7b84b2ab023030e87759e848c82bbcf58a15b369556e83de5379cf695f3b1c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:e63590ea4f84898160cec2d9bde81cfab3991076b8d2725c70cb04a0871ec8b1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14378,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:e63590ea4f84898160cec2d9bde81cfab3991076b8d2725c70cb04a0871ec8b1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14378,
+      "target": "sha256:e63590ea4f84898160cec2d9bde81cfab3991076b8d2725c70cb04a0871ec8b1",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

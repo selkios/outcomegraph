@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agent_first_cli_review",
+  "category": "review_status",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "agent_first_cli_review_checklist_status",
+  "origin": {
+    "changed_files": [
+      "AGENT_FIRST_CLI_REVIEW.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4af36592954ed08c12fc6f9b65437f6c8c2cea52094eea037cc846a64387e69c",
+      "schema_version": 2,
+      "target": "AGENT_FIRST_CLI_REVIEW.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The checklist marks CLI surface contract, structured output, error model, agent-oriented input design, runtime introspection, context/window controls, interaction trap removal, and security hardening as done; recovery tooling, explicit session contract, shipped agent guidance, and optional multi-surface support remain partial; AI-native outcome metrics remain an explicit failing gap."
+}

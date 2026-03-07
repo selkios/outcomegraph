@@ -1,0 +1,39 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Keep adapter discovery aligned with built-ins, `.outcomegraph/adapters/<type>/*.json`, and `$OG_ADAPTER_PATH`, with startup validation before runtime operations.",
+    "Preserve the manifest contract as `schema_version: 2` records containing `type`, `name`, `implementation_version`, `interface_version`, `capabilities`, and `entrypoint`.",
+    "Enforce `interface_version == 1` for worker, oracle, sandbox, store, and exporter adapters.",
+    "Retain the documented required method surface exactly for worker, oracle, sandbox, store, and exporter adapters.",
+    "Keep the shared payload type names aligned with the documented contract types in `PLUGIN_API.md`.",
+    "Model required adapter interface mismatches as `ADAPTER_INTERFACE_MISMATCH` startup failures with remediation context, while allowing only safe degraded handling for optional adapters.",
+    "Keep the documented built-in defaults aligned with worker `codex`, store `filesystem`, oracle `null-impl` fallback, local worktree sandbox, and `canonical` exporter."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-plugin_api-1812fcb9fb.json",
+    "decisions/dec-plugin_api-3e34b608f7.json",
+    "decisions/dec-plugin_api-a928753e60.json"
+  ],
+  "goal": "Document the versioned adapter contracts required by OutcomeGraph Steward for v2.1, including discovery, manifests, interface checks, required methods, shared payload types, runtime registration, failure behavior, and built-in defaults.",
+  "id": "plugin_api",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "payload_snapshot_only_no_verified_exec_contract",
+      "scope": [
+        "PLUGIN_API.md"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "Adapter discovery sources and manifest validation requirements for OutcomeGraph Steward v2.1.",
+    "Worker, oracle, sandbox, store, and exporter interface version requirements and required methods.",
+    "Shared payload types, runtime registration operations, startup failure handling, and documented built-in defaults."
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

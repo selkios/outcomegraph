@@ -1,0 +1,27 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "og",
+  "claim_refs": [
+    ".outcomegraph/claims/og-claim-1.json",
+    ".outcomegraph/claims/og-claim-2.json",
+    ".outcomegraph/claims/og-claim-3.json",
+    ".outcomegraph/claims/og-claim-4.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-7-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-7-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-7.json",
+    "og",
+    "og.py",
+    "sha256:a1842e96b48ca0c564c71b7ccf344373d78028aeb5f5ea656924baf4de73b672",
+    "sha256:c9721688c20f0a667da46a6c50962af52a9177ba0b7d610ca572320e9185ced6",
+    "sha256:dae138a7c267a57c92bfaae6289eb56591afd2e031a511de4d0c34f5633dafd1"
+  ],
+  "id": "dec-og-2d837aebb1",
+  "rationale": "The evidence establishes the launcher+contract surface that defines this capsule\u2019s external behavior, but `og.py` is truncated in the supplied snapshot, so internal command-dispatch logic is incomplete.",
+  "schema_version": 2,
+  "statement": "Capsule state is materially useful and reusable at the interface level, with an explicit gap in full `og.py` internals.",
+  "status": "warn",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

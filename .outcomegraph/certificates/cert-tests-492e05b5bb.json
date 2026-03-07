@@ -1,0 +1,82 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/tests.distill-update-shape.json",
+    ".outcomegraph/claims/tests.quality-pass-script.json",
+    ".outcomegraph/claims/tests.repo-fixture.json",
+    ".outcomegraph/claims/tests.top-level-help-contract.json"
+  ],
+  "created_at": "2026-03-06T20:37:57Z",
+  "id": "cert-tests-492e05b5bb",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:1b56ef774f373be59c31b8bc6527e98d7f8237d23f6a81f9ccb01c65c8ae55a2",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5090,
+      "target": ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1b56ef774f373be59c31b8bc6527e98d7f8237d23f6a81f9ccb01c65c8ae55a2",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5090,
+      "target": "sha256:1b56ef774f373be59c31b8bc6527e98d7f8237d23f6a81f9ccb01c65c8ae55a2",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:4eb9835afa59cfc4db5e286c6cc44164d1ed8e2c5e53127b9ec20444c2d9d482",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14966,
+      "target": ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:4eb9835afa59cfc4db5e286c6cc44164d1ed8e2c5e53127b9ec20444c2d9d482",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14966,
+      "target": "sha256:4eb9835afa59cfc4db5e286c6cc44164d1ed8e2c5e53127b9ec20444c2d9d482",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a30e42180403d449278f8267484a502da8746461870dea06067ff47c3c14b826",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4550,
+      "target": ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a30e42180403d449278f8267484a502da8746461870dea06067ff47c3c14b826",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4550,
+      "target": "sha256:a30e42180403d449278f8267484a502da8746461870dea06067ff47c3c14b826",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:dc84c2675e503e3f920d90a5772bbcf96bb970c71cd5a9d6d33dddefd272f12f",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T203407Z-03b91c8afd",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T203407Z-03b91c8afd",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T20:37:57Z"
+}

@@ -1,0 +1,29 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agents",
+  "category": "filesystem.symlink",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "agents.symlink-target",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass",
+      "type": "file"
+    },
+    {
+      "schema_version": 2,
+      "target": "skills/og-quality-pass",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The changed capsule path `.agents/skills/og-quality-pass` is observed as a symlink-backed directory entry that resolves to the backing skill directory `skills/og-quality-pass`."
+}

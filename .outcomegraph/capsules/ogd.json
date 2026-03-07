@@ -1,0 +1,36 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "The launcher is a Bash script and depends on Bash-specific `${BASH_SOURCE[0]}` behavior to locate its directory.",
+    "Strict mode is enabled with `set -euo pipefail`, so launcher failures abort immediately.",
+    "Successful execution requires `uv` to be available in `PATH` and an `ogd` target to resolve when run by `uv` in the script directory."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-ogd-440e151800.json",
+    "decisions/dec-ogd-95f31c40a6.json",
+    "decisions/dec-ogd-fca06483c0.json"
+  ],
+  "goal": "Reproduce the `ogd` launcher wrapper so invoking `ogd` executes the local `ogd` command through `uv run --directory \"$SCRIPT_DIR\"` with forwarded CLI arguments.",
+  "id": "ogd",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "Observed launcher snapshot oracle",
+      "scope": [
+        "ogd"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "entrypoint bootstrap",
+    "argument passthrough",
+    "directory-local command execution",
+    "uv-based runtime invocation"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

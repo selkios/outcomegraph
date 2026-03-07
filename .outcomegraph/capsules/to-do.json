@@ -1,0 +1,36 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Evidence is limited to a single truncated snapshot of `to-do.json`, so claims cover only content visible in that snapshot.",
+    "No supporting file snapshots or prior-version diff hunks were provided, so this capsule does not attribute which registry entries changed in this run.",
+    "Some visible task `files` arrays mix workspace-absolute and repo-relative entries; this capsule normalizes referenced paths to repo-relative form.",
+    "No repository-native executable verification command is evidenced in the payload, so the oracle remains observational with `command=null`."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-to-do-22141c013a.json",
+    "decisions/dec-to-do-8d175cb741.json",
+    "decisions/dec-to-do-db314e474b.json"
+  ],
+  "goal": "Capture the observable `to-do.json` task-registry state, including project metadata, visible worker and runtime milestones, the current in-progress agent frontier, and normalized file mappings for reuse by later agents.",
+  "id": "to-do",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "snapshot-only-task-registry-oracle",
+      "scope": [
+        "to-do.json"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "Record registry metadata and source-file anchors declared at the top of `to-do.json`.",
+    "Preserve the visible worker, runtime, and agent-contract task states and dependency cues from the snapshot.",
+    "Normalize task `files` references to repo-relative paths for downstream reuse."
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

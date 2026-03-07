@@ -1,0 +1,24 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "constitution",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/constitution/default.yaml",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-4-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-4-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-4.json",
+    "sha256:86963cc732f2dffaa5babd8ca81ca7728eeca3997e0dfd03770fa298de52bda0",
+    "sha256:8c3d94376a74642b5850e4041bbaae3063de1724e026f666495b1f28e73736b7",
+    "sha256:d9ba8d89aa405901f74b63f4a9c6596603f39578f6a2ab96edf03346fd38d3ed"
+  ],
+  "id": "dec-constitution-ed81610905",
+  "rationale": "The evidence payload contains the full snapshot for `.outcomegraph/constitution/default.yaml`, including policy and metadata, sufficient to reproduce the same governanced constraints.",
+  "schema_version": 2,
+  "statement": "Record constitution capsule as active observe-mode safety policy with explicit allow/deny boundaries.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

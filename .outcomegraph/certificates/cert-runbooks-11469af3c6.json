@@ -1,0 +1,185 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "runbooks",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-runbooks-11469af3c6.json"
+  ],
+  "created_at": "2026-03-06T22:35:43Z",
+  "id": "cert-runbooks-11469af3c6",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:e06e9182396f419e738322dd22c5e218b1cd63eb7b559b62668cdf9991d21d26",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1069,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-release-sync-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:e06e9182396f419e738322dd22c5e218b1cd63eb7b559b62668cdf9991d21d26",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1069,
+      "target": "sha256:e06e9182396f419e738322dd22c5e218b1cd63eb7b559b62668cdf9991d21d26",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c6307d3864548584d6912258295a734da18cf9f96e3b523f92b2017649413e97",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1071,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-release-status-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c6307d3864548584d6912258295a734da18cf9f96e3b523f92b2017649413e97",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1071,
+      "target": "sha256:c6307d3864548584d6912258295a734da18cf9f96e3b523f92b2017649413e97",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c1a0c035ede56f25768993827bb48ecb63ce018f821897b6a973d87cc112b36f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1071,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-release-verify-json--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c1a0c035ede56f25768993827bb48ecb63ce018f821897b6a973d87cc112b36f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1071,
+      "target": "sha256:c1a0c035ede56f25768993827bb48ecb63ce018f821897b6a973d87cc112b36f",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6e1d7900d05ebed28f331ce4b4a4bf0f2053f1ab2de7e382c2bc7435c95c78d0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-implementation-matrix-gate-scan--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6e1d7900d05ebed28f331ce4b4a4bf0f2053f1ab2de7e382c2bc7435c95c78d0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": "sha256:6e1d7900d05ebed28f331ce4b4a4bf0f2053f1ab2de7e382c2bc7435c95c78d0",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c4b5e87ae185f24fd2ecf10cfa474cff82b51f839c87aa5fbe97c51e657ff117",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1078,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-targeted-verification-test--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c4b5e87ae185f24fd2ecf10cfa474cff82b51f839c87aa5fbe97c51e657ff117",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1078,
+      "target": "sha256:c4b5e87ae185f24fd2ecf10cfa474cff82b51f839c87aa5fbe97c51e657ff117",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:9eade7a8c0a3bd8835d0f51355200a12256177449a9c645555e60a6717f80c43",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1074,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-dogfood-status-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:9eade7a8c0a3bd8835d0f51355200a12256177449a9c645555e60a6717f80c43",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1074,
+      "target": "sha256:9eade7a8c0a3bd8835d0f51355200a12256177449a9c645555e60a6717f80c43",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6267b7a9e70ccb85999e8bb477841a5aa86d4c04703607e52e6a5042cac2a612",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1072,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-dogfood-sync-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6267b7a9e70ccb85999e8bb477841a5aa86d4c04703607e52e6a5042cac2a612",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1072,
+      "target": "sha256:6267b7a9e70ccb85999e8bb477841a5aa86d4c04703607e52e6a5042cac2a612",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a9582e6eb5604baa25dd26e5c0aa57a6cf42ba8147243f64050fcceb17110c1e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1074,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-dogfood-verify-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a9582e6eb5604baa25dd26e5c0aa57a6cf42ba8147243f64050fcceb17110c1e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1074,
+      "target": "sha256:a9582e6eb5604baa25dd26e5c0aa57a6cf42ba8147243f64050fcceb17110c1e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:229b7d62dc96964716b5271c99b019e58ed12711cfd8350973b2dc98d75cb410",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1073,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-dogfood-drift-capture--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:229b7d62dc96964716b5271c99b019e58ed12711cfd8350973b2dc98d75cb410",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1073,
+      "target": "sha256:229b7d62dc96964716b5271c99b019e58ed12711cfd8350973b2dc98d75cb410",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:285d447dcc14155179cbf98b3202aa358ac607d89ef1813277c9c8b7b8291d1f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1206,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t222121z-7d3ea2b95b-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:285d447dcc14155179cbf98b3202aa358ac607d89ef1813277c9c8b7b8291d1f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1206,
+      "target": "sha256:285d447dcc14155179cbf98b3202aa358ac607d89ef1813277c9c8b7b8291d1f",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:43Z"
+}

@@ -1,0 +1,105 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "spec_implementation_matrix",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-spec_implementation_matrix-ab542d7c49.json"
+  ],
+  "created_at": "2026-03-06T22:35:51Z",
+  "id": "cert-spec_implementation_matrix-ab542d7c49",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0d4b1a56717dc64df65b3c1c1c395a3b01c5bccba0900e5ddbac33d76a8c647d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1085,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t222121z-7d3ea2b95b-matrix-gap-scan--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0d4b1a56717dc64df65b3c1c1c395a3b01c5bccba0900e5ddbac33d76a8c647d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1085,
+      "target": "sha256:0d4b1a56717dc64df65b3c1c1c395a3b01c5bccba0900e5ddbac33d76a8c647d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:acb324cd0a48dd695742057d5b7861e5600e970e249e8aa6f179d37af9a9c036",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t222121z-7d3ea2b95b-sync-verify-hooks-regression--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:acb324cd0a48dd695742057d5b7861e5600e970e249e8aa6f179d37af9a9c036",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": "sha256:acb324cd0a48dd695742057d5b7861e5600e970e249e8aa6f179d37af9a9c036",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:906a218be72ab68981b8fd712e2069e74fbc9cb3f0ac49b6a73871801df0353c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1086,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t222121z-7d3ea2b95b-sync-json-oracle--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:906a218be72ab68981b8fd712e2069e74fbc9cb3f0ac49b6a73871801df0353c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1086,
+      "target": "sha256:906a218be72ab68981b8fd712e2069e74fbc9cb3f0ac49b6a73871801df0353c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:01b6d9d97074d3a623e60fb20815f7bf497a398a94a08af93c9ed268f49e9771",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1096,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t222121z-7d3ea2b95b-verify-changed-json-oracle--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:01b6d9d97074d3a623e60fb20815f7bf497a398a94a08af93c9ed268f49e9771",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1096,
+      "target": "sha256:01b6d9d97074d3a623e60fb20815f7bf497a398a94a08af93c9ed268f49e9771",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:839a482e6999409b96bb553bfdc692fc2b89f7fdfecdc21a0ed12bf9af1756d1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1088,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t222121z-7d3ea2b95b-status-json-oracle--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:839a482e6999409b96bb553bfdc692fc2b89f7fdfecdc21a0ed12bf9af1756d1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1088,
+      "target": "sha256:839a482e6999409b96bb553bfdc692fc2b89f7fdfecdc21a0ed12bf9af1756d1",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:51Z"
+}

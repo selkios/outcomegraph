@@ -1,0 +1,31 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "verification",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "claim-security-policy-drift-check",
+  "origin": {
+    "changed_files": [
+      "SECURITY_POLICY.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "schema_version": 2,
+      "target": "SPEC-v2.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "schema_version": 2,
+      "target": "README.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "SPEC-v2.md and README.md make SECURITY_POLICY.md part of the published in-repo contract, require declarative versioned policy under .outcomegraph/policy.yaml, and identify uv run og drift as the repository-native health check for policy and certificate drift."
+}

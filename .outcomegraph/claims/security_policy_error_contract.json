@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "error_contract",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "security_policy_error_contract",
+  "origin": {
+    "changed_files": [
+      "SECURITY_POLICY.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "schema_version": 2,
+      "target": "SECURITY_POLICY.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Denied actions must emit a structured error payload with status: error, code: POLICY_DENIED, command, mode, category, target, and remediation suggestions; policy schema violations or unreadable policy files use usage-like exit code 64, and write actions in observe mode must resolve effective mode and evaluate policy before execution."
+}

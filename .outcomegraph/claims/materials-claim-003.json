@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "materials",
+  "category": "scope_control",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "materials-claim-003",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/materials.lock"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:8b7165fc0d6f6c3021540a85a7d7850953ac7241ba49e17cdc035e6fee97a1b3",
+      "schema_version": 2,
+      "size": 227,
+      "target": ".outcomegraph/materials.lock",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "This capsule targets a lockfile-only mutation: the observed `changed_files` set contains exactly `.outcomegraph/materials.lock` despite broader repository snapshot entries."
+}

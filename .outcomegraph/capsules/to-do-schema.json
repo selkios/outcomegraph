@@ -1,0 +1,37 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "The schema contract is defined by `to-do.schema.json` as a JSON Schema draft 2020-12 object schema titled `Codex RALF Todo`.",
+    "The root object must reject unknown keys because `additionalProperties` is `false` and must include `schema_version`, `source_files`, and `tasks`.",
+    "`schema_version` must equal integer `1`; `source_files` items must be strings; `project` may appear only as an object with optional `name` and `root` string fields.",
+    "Each task object must reject unknown keys, require `id`, `title`, `priority`, and `status`, and constrain `priority` to 1..5 and `status` to `todo|doing|blocked|done`.",
+    "Optional task metadata is limited to the typed fields defined in the schema, including `date-time` formatted `created_at` and `updated_at` strings."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-to-do-schema-4fa49f68c4.json",
+    "decisions/dec-to-do-schema-850c3cab9a.json",
+    "decisions/dec-to-do-schema-bd219e95b2.json"
+  ],
+  "goal": "Capture the current todo JSON Schema contract so another agent can recreate `to-do.schema.json` and compatible task records.",
+  "id": "to-do-schema",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "Snapshot evidence only; no repository validator command is present in the input payload",
+      "scope": [
+        "to-do.schema.json"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "to-do.schema.json",
+    "json-schema",
+    "todo-record-contract"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

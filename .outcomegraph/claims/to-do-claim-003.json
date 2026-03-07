@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "to-do",
+  "category": "capability-surface",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "to-do-claim-003",
+  "origin": {
+    "changed_files": [
+      "to-do.json"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "schema_version": 2,
+      "target": "to-do.json",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Those completed rows describe implemented rollout capabilities for OutcomeGraph: CLI command parsing and exit handling, canonical v2 schemas and migration checks, `og init` bootstrap, autopilot hook install and disable flows, single-sync locking with pending state, and change-detection baseline fallback/runtime-ignore rules."
+}

@@ -1,0 +1,73 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "skill-og",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-skill-og-e61dad2d20.json"
+  ],
+  "created_at": "2026-03-06T22:35:51Z",
+  "id": "cert-skill-og-e61dad2d20",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:78baaa54c41511cc97204e5721344eca0141afdd3028824fba0d8fa2b7abc8b3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1141,
+      "target": ".outcomegraph/traces/skill-og-sync-20260306t222121z-7d3ea2b95b-documentation-oracle-from-skills-og-skill-md-for-og-command-s-9a30ea9a54-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:78baaa54c41511cc97204e5721344eca0141afdd3028824fba0d8fa2b7abc8b3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1141,
+      "target": "sha256:78baaa54c41511cc97204e5721344eca0141afdd3028824fba0d8fa2b7abc8b3",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:009b922b291d1875efc4ebbe6b718036aeb4068d04623a35f6f1cc5bb2deaf25",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1177,
+      "target": ".outcomegraph/traces/skill-og-sync-20260306t222121z-7d3ea2b95b-entrypoint-and-runtime-path-oracle-from-og-and-og-py--the-pay-364671dae5-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:009b922b291d1875efc4ebbe6b718036aeb4068d04623a35f6f1cc5bb2deaf25",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1177,
+      "target": "sha256:009b922b291d1875efc4ebbe6b718036aeb4068d04623a35f6f1cc5bb2deaf25",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:d1b68400a8f60fcd9eee9f672cb034e9a1cdadee51c00c6cf6ff8ab3ed05e153",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1206,
+      "target": ".outcomegraph/traces/skill-og-sync-20260306t222121z-7d3ea2b95b-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:d1b68400a8f60fcd9eee9f672cb034e9a1cdadee51c00c6cf6ff8ab3ed05e153",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1206,
+      "target": "sha256:d1b68400a8f60fcd9eee9f672cb034e9a1cdadee51c00c6cf6ff8ab3ed05e153",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:51Z"
+}

@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "runbooks",
+  "category": "operational-workflow",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "runbooks-claim-1",
+  "origin": {
+    "changed_files": [
+      "RUNBOOKS.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "RUNBOOKS.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Section 1 defines the core v2.1 operational flow: bootstrap (`og init`, `og sync`, `og status`), day-to-day verification/replay (`og sync`, `og verify --changed`, `og replay --changed`), and autonomous execution (`og autopilot init`, `ogd start`)."
+}

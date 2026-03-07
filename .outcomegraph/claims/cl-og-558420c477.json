@@ -1,0 +1,55 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "og",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:11:01Z",
+  "id": "cl-og-558420c477",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "og.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T220747Z-9439e19cb4"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0d221040e98806f12a59076cc26eca2754560ba328fd149e3c9c31048c766103",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 609,
+      "target": ".outcomegraph/traces/og-sync-20260306t220747z-9439e19cb4-pytest-regression-suite-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0d221040e98806f12a59076cc26eca2754560ba328fd149e3c9c31048c766103",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 609,
+      "target": "sha256:0d221040e98806f12a59076cc26eca2754560ba328fd149e3c9c31048c766103",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6777854ee916bdd747af8a47559c271cc448c0e6f75c29921513b1b1b2a15414",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 665,
+      "target": ".outcomegraph/traces/og-sync-20260306t220747z-9439e19cb4-static-inspection-of-the-provided--og-py--snapshot-for-runtim-5f36569391-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6777854ee916bdd747af8a47559c271cc448c0e6f75c29921513b1b1b2a15414",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 665,
+      "target": "sha256:6777854ee916bdd747af8a47559c271cc448c0e6f75c29921513b1b1b2a15414",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for og on 2 oracle checks."
+}

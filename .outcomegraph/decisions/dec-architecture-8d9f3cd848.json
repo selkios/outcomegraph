@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "architecture",
+  "claim_refs": [
+    ".outcomegraph/claims/architecture-claim-1.json",
+    ".outcomegraph/claims/architecture-claim-2.json",
+    ".outcomegraph/claims/architecture-claim-3.json",
+    ".outcomegraph/claims/architecture-claim-4.json",
+    ".outcomegraph/claims/architecture-claim-5.json",
+    ".outcomegraph/claims/architecture-claim-6.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-2-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-2-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-2.json",
+    "ARCHITECTURE.md",
+    "sha256:61f3e4bd543d6f2f68c68bffeb466b96a26a7550240562c77f2e2c84b1419b77",
+    "sha256:65e8d573c63c504b7889cbdc6c4e0f472284f9ff3c4b2d68782b6a64e3c06e91",
+    "sha256:66d934c45776be50da29bea9815ac32d541d2939e07a40c9b227260dc00c5ea6"
+  ],
+  "id": "dec-architecture-8d9f3cd848",
+  "rationale": "Sufficient architectural semantics and operational contracts are present in ARCHITECTURE.md to encode this as a reusable capsule without inferring behavior outside the provided snapshot.",
+  "schema_version": 2,
+  "statement": "Reconstruct the `architecture` capsule as a source-of-truth record for sync/runtime loops, worker adaptation, plugin compatibility, and verification/recovery flows.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

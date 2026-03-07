@@ -1,0 +1,31 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "runbooks",
+  "category": "policy",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "runbooks-safety-policy",
+  "origin": {
+    "changed_files": [
+      "RUNBOOKS.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "schema_version": 2,
+      "target": "RUNBOOKS.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:eef8259151e4bc37423b674b33b83343ee22043ddfcb49b49e8e68fbfc46af4f",
+      "schema_version": 2,
+      "target": ".outcomegraph/policy.yaml",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The safe-mode runbook requires writable `.outcomegraph` and export paths, mandates `verify`/`replay` preflight checks before canonical writes, and treats code, dependency, and deployment changes as policy-gated autonomous actions; the observed `.outcomegraph/policy.yaml` matches that observe-mode posture."
+}

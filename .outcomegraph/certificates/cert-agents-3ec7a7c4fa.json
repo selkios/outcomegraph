@@ -1,0 +1,84 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agents",
+  "claim_refs": [
+    ".outcomegraph/claims/agents.min-content-contract.json",
+    ".outcomegraph/claims/agents.symlink-target.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-agents-3ec7a7c4fa",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:202a85cc0fbf54681a0915390b88ba2ff8e3e9af3795a6b1a7cd0b26c92cffb5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2982,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-1-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:202a85cc0fbf54681a0915390b88ba2ff8e3e9af3795a6b1a7cd0b26c92cffb5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2982,
+      "target": "sha256:202a85cc0fbf54681a0915390b88ba2ff8e3e9af3795a6b1a7cd0b26c92cffb5",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:88a002b3972b0ed67dde3e993a973333cc07b00f564ce37e662442a7d32aae58",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 7499,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-1-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:88a002b3972b0ed67dde3e993a973333cc07b00f564ce37e662442a7d32aae58",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 7499,
+      "target": "sha256:88a002b3972b0ed67dde3e993a973333cc07b00f564ce37e662442a7d32aae58",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:fd98952ee87bee53d441e9a72065f6f0bfbf7768052f893adcd6e481bfe53231",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3496,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-1.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:fd98952ee87bee53d441e9a72065f6f0bfbf7768052f893adcd6e481bfe53231",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3496,
+      "target": "sha256:fd98952ee87bee53d441e9a72065f6f0bfbf7768052f893adcd6e481bfe53231",
+      "type": "cas"
+    },
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass",
+      "type": "file"
+    },
+    {
+      "schema_version": 2,
+      "target": "skills/og-quality-pass",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

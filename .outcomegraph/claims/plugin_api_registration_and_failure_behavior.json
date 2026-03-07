@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "plugin_api",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "plugin_api_registration_and_failure_behavior",
+  "origin": {
+    "changed_files": [
+      "PLUGIN_API.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4cde375fca93213551c42cb24fe1911173c7029694ebf13620ac7e32a112b24c",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "PLUGIN_API.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Runtime registration behavior is documented through `register(type, name, impl, manifest)`, `set_default(type, name)`, `resolve(type, name?)`, and `list(type)`. Manifest or interface validation failures are documented as startup errors with code `ADAPTER_INTERFACE_MISMATCH`, including `type`, `name`, `required_interface_version`, `detected_interface_version`, and `remediation`; required adapters hard-fail startup, while optional adapters may continue in degraded mode when safe. The document explicitly notes that required adapters include worker and store interfaces."
+}

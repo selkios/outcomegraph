@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "to-do",
+  "claim_refs": [
+    ".outcomegraph/claims/to-do-claim-001.json",
+    ".outcomegraph/claims/to-do-claim-002.json",
+    ".outcomegraph/claims/to-do-claim-003.json",
+    ".outcomegraph/claims/to-do-claim-004.json",
+    ".outcomegraph/claims/to-do-claim-005.json",
+    ".outcomegraph/claims/to-do-claim-006.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-22-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-22-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-22.json",
+    "sha256:a3fd10522687c07850bd0b61810fa928b5c54839b47fda5f5a2466ba4416414e",
+    "sha256:e74bd5722018278e0027fdf49bb970bdc7fc60c8e20ef351c6bc1d66f794f0f2",
+    "sha256:f8abb69e5b426209521afa1e64ea166153538d642fca61d9509354d22545a8e1",
+    "to-do.json"
+  ],
+  "id": "dec-to-do-db314e474b",
+  "rationale": "The input includes a concrete `to-do.json` snapshot, changed-file context, and a content digest for that file. Although the snapshot is truncated and does not evidence an executable validation contract, the observable registry state is specific enough to preserve as a reusable capsule with explicit evidence limits.",
+  "schema_version": 2,
+  "statement": "Use the provided `to-do.json` snapshot as the authoritative evidence source for the `to-do` capsule and preserve only the observable registry state.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

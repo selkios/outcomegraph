@@ -1,0 +1,31 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "architecture",
+  "claim_refs": [
+    ".outcomegraph/claims/architecture-change-detection.json",
+    ".outcomegraph/claims/architecture-data-and-optimization.json",
+    ".outcomegraph/claims/architecture-distillation-flow.json",
+    ".outcomegraph/claims/architecture-failure-recovery.json",
+    ".outcomegraph/claims/architecture-plugin-contract.json",
+    ".outcomegraph/claims/architecture-safety-policy.json",
+    ".outcomegraph/claims/architecture-sync-loop.json",
+    ".outcomegraph/claims/architecture-system-overview.json",
+    ".outcomegraph/claims/architecture-verification-replay.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-2-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-2-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-2.json",
+    "ARCHITECTURE.md",
+    "sha256:5b18a1cd50144c937d9ec9e04033ecfa04075f318ddcbbe12fa2ad1e00e54745",
+    "sha256:7c5877f4a678c0a4842897c9809dadb574fb06c5999c0a8df14c2128d7752476",
+    "sha256:aa61be9823dbabf17c5074e55406c84aba909b0ee95364af5d3f8e653dcac13b"
+  ],
+  "id": "dec-architecture-3a93ecffc2",
+  "rationale": "The supplied `ARCHITECTURE.md` snapshot is a complete, current architecture spec covering core orchestration, bounded contexts, plugin lifecycle, safety policy, replay behavior, and recovery contracts, so the capsule can be refreshed directly from document evidence.",
+  "schema_version": 2,
+  "statement": "Refresh the `architecture` capsule to match the expanded OutcomeGraph and Steward architecture contract documented in `ARCHITECTURE.md`.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

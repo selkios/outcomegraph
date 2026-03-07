@@ -1,0 +1,24 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agents",
+  "category": "topology",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "agents-symlink-topology",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "`.agents/skills/og-quality-pass` is observed as a symlinked directory entry for the `agents` capsule, targeting `skills/og-quality-pass`."
+}

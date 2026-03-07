@@ -1,0 +1,145 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "quickstart",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:35:35Z",
+  "id": "cl-quickstart-11e4896f70",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "og",
+      "og.py",
+      "ogd",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:7369dfe891d23533b3a3a2cebcac2db9deec10624bd350a8d86f914291fed178",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1082,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-full-spec-rollout-drift-gate--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7369dfe891d23533b3a3a2cebcac2db9deec10624bd350a8d86f914291fed178",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1082,
+      "target": "sha256:7369dfe891d23533b3a3a2cebcac2db9deec10624bd350a8d86f914291fed178",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:998012d9878df16594341ef78976fd72d5de81687bff1f941c0ebca3472a8149",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1132,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-the--og-optimize-prompts--example-is-documented-capability-gu-5655a99633-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:998012d9878df16594341ef78976fd72d5de81687bff1f941c0ebca3472a8149",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1132,
+      "target": "sha256:998012d9878df16594341ef78976fd72d5de81687bff1f941c0ebca3472a8149",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:bc6a35b492c9720e279c33ef3be96e70d4a12f0815dd381f4a75f45d95eeb7cb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1129,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-discoverability-commands-in-the-quickstart-are-usage-examples-7ee9e1c0e0-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:bc6a35b492c9720e279c33ef3be96e70d4a12f0815dd381f4a75f45d95eeb7cb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1129,
+      "target": "sha256:bc6a35b492c9720e279c33ef3be96e70d4a12f0815dd381f4a75f45d95eeb7cb",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:cc0f6833ab61806ff12df4fee74b0ec44fea8623fc06b64253c1eb3f9abbbb27",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1081,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-full-spec-rollout-sync-gate--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:cc0f6833ab61806ff12df4fee74b0ec44fea8623fc06b64253c1eb3f9abbbb27",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1081,
+      "target": "sha256:cc0f6833ab61806ff12df4fee74b0ec44fea8623fc06b64253c1eb3f9abbbb27",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:dd52aff4aa37d312f37d07d6bde40eb0ad9c0adf0b782af149e6c32b8a816e66",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-full-spec-rollout-status-gate--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:dd52aff4aa37d312f37d07d6bde40eb0ad9c0adf0b782af149e6c32b8a816e66",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": "sha256:dd52aff4aa37d312f37d07d6bde40eb0ad9c0adf0b782af149e6c32b8a816e66",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:e207ea65ec5ab65f9818460eeb9bf5e08dbc2c477c9eb50f91a08c162ec93dc1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t222121z-7d3ea2b95b-full-spec-rollout-verify-gate--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:e207ea65ec5ab65f9818460eeb9bf5e08dbc2c477c9eb50f91a08c162ec93dc1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1083,
+      "target": "sha256:e207ea65ec5ab65f9818460eeb9bf5e08dbc2c477c9eb50f91a08c162ec93dc1",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for quickstart on 6 oracle checks."
+}

@@ -1,0 +1,89 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "spec_implementation_matrix",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-spec_implementation_matrix-d4daf5ba11.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-spec_implementation_matrix-d4daf5ba11",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:9082586d4c55cd197c8aa2d88ce5642280614bd6628b6130cb8f916f7a224052",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1381,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t195808z-63324af966-matrix-gap-scan-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:9082586d4c55cd197c8aa2d88ce5642280614bd6628b6130cb8f916f7a224052",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1381,
+      "target": "sha256:9082586d4c55cd197c8aa2d88ce5642280614bd6628b6130cb8f916f7a224052",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:0bd1e6d64196576691f6f03d53efd1c2519df4100a8ba46739353eb530cfcef3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1340,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t195808z-63324af966-sync-json-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0bd1e6d64196576691f6f03d53efd1c2519df4100a8ba46739353eb530cfcef3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1340,
+      "target": "sha256:0bd1e6d64196576691f6f03d53efd1c2519df4100a8ba46739353eb530cfcef3",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:ab3fad95cd02735cc6e150020ce2ffcb0fdcc9871926b711ee39e4942622e25f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1362,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t195808z-63324af966-verify-changed-json-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ab3fad95cd02735cc6e150020ce2ffcb0fdcc9871926b711ee39e4942622e25f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1362,
+      "target": "sha256:ab3fad95cd02735cc6e150020ce2ffcb0fdcc9871926b711ee39e4942622e25f",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:4e4a16f6cb638fc17f35d092ead829705990c7a6a46ab2ddccd9fbff4cb166b7",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1344,
+      "target": ".outcomegraph/traces/spec_implementation_matrix-sync-20260306t195808z-63324af966-status-json-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:4e4a16f6cb638fc17f35d092ead829705990c7a6a46ab2ddccd9fbff4cb166b7",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1344,
+      "target": "sha256:4e4a16f6cb638fc17f35d092ead829705990c7a6a46ab2ddccd9fbff4cb166b7",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

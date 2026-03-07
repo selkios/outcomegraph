@@ -1,0 +1,51 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Default execution mode is observe; only bounded-safe artifact/export writes and read-only verification or sandbox actions are allowed without explicit mode expansion.",
+    "When .outcomegraph/policy.yaml is present, it is the effective policy input and repository-level allowlist extensions are preferred over built-in defaults.",
+    "Application-code writes to src/**, lib/**, app/**, and packages/**, unrestricted network, dependency mutation commands, and deployment actions remain denied unless explicitly allowlisted in a broader mode.",
+    "Policy evaluation is fail-closed: explicit deny wins, explicit allow only enables actions in the active mode, and missing allow entries return POLICY_DENIED.",
+    "Agent-supplied IDs must stay within [a-z0-9._-]; optimization paths must be repository-relative and reject control characters, percent-encoding, absolute paths, and traversal.",
+    "Policy schema violations or unreadable policy files use exit code 64, and autonomous writes stay blocked while policy integrity or ledger health is degraded.",
+    "The repository's current observe policy additionally allows AGENTS.md writes and denies gha workflow_dispatch."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-security_policy-06886855bf.json",
+    "decisions/dec-security_policy-5129a034eb.json",
+    "decisions/dec-security_policy-6f2b1817e4.json"
+  ],
+  "goal": "Capture OutcomeGraph v2.1's safe-by-default observe security contract, fail-closed policy evaluation, CLI input sanitization, and the current repository observe policy so another agent can reconstruct the same execution boundary.",
+  "id": "security_policy",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "policy_certificate_drift_check (advisory only in observe mode)",
+      "scope": [
+        "SECURITY_POLICY.md",
+        ".outcomegraph/policy.yaml",
+        "README.md"
+      ]
+    },
+    {
+      "command": null,
+      "name": "security_policy_doc_contract_no_direct_oracle",
+      "scope": [
+        "SECURITY_POLICY.md",
+        "SPEC-v2.md",
+        "README.md"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "SECURITY_POLICY.md",
+    ".outcomegraph/policy.yaml",
+    "SPEC-v2.md",
+    "README.md"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

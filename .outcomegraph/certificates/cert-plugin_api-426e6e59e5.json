@@ -1,0 +1,83 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "plugin_api",
+  "claim_refs": [
+    ".outcomegraph/claims/plugin_api-claim-01.json",
+    ".outcomegraph/claims/plugin_api-claim-02.json",
+    ".outcomegraph/claims/plugin_api-claim-03.json",
+    ".outcomegraph/claims/plugin_api-claim-04.json",
+    ".outcomegraph/claims/plugin_api-claim-05.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-plugin_api-426e6e59e5",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:376cc1a0b30a6bff67fb29e3735701fcf75c2f751c8b212eaebe7475a70a108b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4394,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-9-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:376cc1a0b30a6bff67fb29e3735701fcf75c2f751c8b212eaebe7475a70a108b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4394,
+      "target": "sha256:376cc1a0b30a6bff67fb29e3735701fcf75c2f751c8b212eaebe7475a70a108b",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:4cde375fca93213551c42cb24fe1911173c7029694ebf13620ac7e32a112b24c",
+      "schema_version": 2,
+      "target": "PLUGIN_API.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:69f8242076bc7216a9330cc41a20f7e12fc921dec7f79696d91c77480c38c944",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4979,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-9.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:69f8242076bc7216a9330cc41a20f7e12fc921dec7f79696d91c77480c38c944",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4979,
+      "target": "sha256:69f8242076bc7216a9330cc41a20f7e12fc921dec7f79696d91c77480c38c944",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b99351777d46b3d60595a8a4ff011d3fc2d84250806514313bf89b8b5d7bad18",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 11755,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-9-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b99351777d46b3d60595a8a4ff011d3fc2d84250806514313bf89b8b5d7bad18",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 11755,
+      "target": "sha256:b99351777d46b3d60595a8a4ff011d3fc2d84250806514313bf89b8b5d7bad18",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "constitution",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-constitution-23cd9f2940.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-constitution-23cd9f2940",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:560b2446d33e67e8f2bf0934ca87c11849ef3ed28f58df6949a931bcd3effeb4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1117,
+      "target": ".outcomegraph/traces/constitution-sync-20260306t195808z-63324af966-constitution_file_snapshot_evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:560b2446d33e67e8f2bf0934ca87c11849ef3ed28f58df6949a931bcd3effeb4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1117,
+      "target": "sha256:560b2446d33e67e8f2bf0934ca87c11849ef3ed28f58df6949a931bcd3effeb4",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

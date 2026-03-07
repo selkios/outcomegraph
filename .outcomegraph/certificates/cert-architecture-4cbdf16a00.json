@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "architecture",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-architecture-4cbdf16a00.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-architecture-4cbdf16a00",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:10723c384cddca9a18e861d81273077d0e598d6e122b1bff615f117227f756fb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1136,
+      "target": ".outcomegraph/traces/architecture-sync-20260306t214821z-7d3ea2b95b-architecture-md-snapshot-is-the-authoritative-evidence-source-provided-for-the-architecture-capsule-in-this-run-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:10723c384cddca9a18e861d81273077d0e598d6e122b1bff615f117227f756fb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1136,
+      "target": "sha256:10723c384cddca9a18e861d81273077d0e598d6e122b1bff615f117227f756fb",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c1491b46a8ebc58eb97bca54f06ff88e86b7275e5c0447cfc2c72c024d285626",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1188,
+      "target": ".outcomegraph/traces/architecture-sync-20260306t214821z-7d3ea2b95b-no-executable-repo-native-verification-contract-is-evidenced-in-the-payload-for-this-capsule--so-oracle-evidence-remains-document-backed-rather-than-command-backed-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c1491b46a8ebc58eb97bca54f06ff88e86b7275e5c0447cfc2c72c024d285626",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1188,
+      "target": "sha256:c1491b46a8ebc58eb97bca54f06ff88e86b7275e5c0447cfc2c72c024d285626",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

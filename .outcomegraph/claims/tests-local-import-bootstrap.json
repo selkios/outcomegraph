@@ -1,0 +1,32 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "tests",
+  "category": "test-harness",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "tests-local-import-bootstrap",
+  "origin": {
+    "changed_files": [
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:5319fd898e4fd690df01512fc403ab276b24b1a3d826996308928bb9dabf5e6f",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+      "schema_version": 2,
+      "target": "tests/conftest.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "tests/conftest.py computes the repository root from the tests directory and prepends it to sys.path when absent, and the visible test module relies on that local import path by importing og directly."
+}

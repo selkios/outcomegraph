@@ -1,0 +1,129 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "migration_guide",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cl-migration_guide-21cf1ab76e",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "og",
+      "og.py",
+      "ogd",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-materials-lock-repair-snippet-not-verified-against-live-file-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1098,
+      "target": "sha256:0bfef72f93d7a924079f5770f0ac3522cbe2f93212e061fd9b9db69237b70a55",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-verify-changed-not-confirmed-by-093142b338-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": "sha256:368c76a2b725bb68a86722dfca61353d9f03cfdfba5f5a7b996ff758b781f71e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1094,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-preflight-baseline-commands-not-executed-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1094,
+      "target": "sha256:587526df2291fdf49e3ba36a66e240ef6bcf350ca8d56e33252bc0ddf68f031d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-replay-changed-not-confirmed-by-63e90349bb-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1101,
+      "target": "sha256:a9510f2a527d18fab43f003be3fb6f09d055d5dbc01a1d9d5fad7ebf29e5b72e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1091,
+      "target": ".outcomegraph/traces/migration_guide-sync-20260306t222121z-7d3ea2b95b-documented-post-migration-og-sync-not-confirmed-by-run-artifacts-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1091,
+      "target": "sha256:b7aaf09eb4e72c26a9f7349355d5966cf4ea29d43da783687c59f95c50ec3930",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for migration_guide on 5 oracle checks."
+}

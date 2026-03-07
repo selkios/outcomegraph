@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agent_first_cli_review",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-agent_first_cli_review-2a863eb72f.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-agent_first_cli_review-2a863eb72f",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:6f877426b7d280d7ca9fa1a0ffb53a97b1a6c2273d089a0d43b1bf7f4850983c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1089,
+      "target": ".outcomegraph/traces/agent_first_cli_review-sync-20260306t214821z-7d3ea2b95b-top_level_help_contract--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6f877426b7d280d7ca9fa1a0ffb53a97b1a6c2273d089a0d43b1bf7f4850983c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1089,
+      "target": "sha256:6f877426b7d280d7ca9fa1a0ffb53a97b1a6c2273d089a0d43b1bf7f4850983c",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

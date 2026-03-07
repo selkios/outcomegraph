@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "og",
+  "category": "runtime_contract",
+  "created_at": "2026-03-06T20:37:57Z",
+  "id": "og.version_binding",
+  "origin": {
+    "changed_files": [
+      "og.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T203407Z-03b91c8afd"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:09e38497164108e66b917c21b3de277012a19966990bc8bdb54a98bc3c3fa5c6",
+      "schema_version": 2,
+      "target": "og.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The module binds `VERSION = _load_runtime_version()`, so the exported runtime version is computed through the fallback loader rather than stored as an independent literal."
+}

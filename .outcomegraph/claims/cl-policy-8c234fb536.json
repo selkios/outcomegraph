@@ -1,0 +1,71 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "policy",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:11:01Z",
+  "id": "cl-policy-8c234fb536",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "og.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T220747Z-9439e19cb4"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:1a0b831924f56f4414736ee4294cc7f6a86ca85aadd011f58caf2173666b3b3d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 454,
+      "target": ".outcomegraph/traces/policy-sync-20260306t220747z-9439e19cb4-policy-file-source-of-truth-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1a0b831924f56f4414736ee4294cc7f6a86ca85aadd011f58caf2173666b3b3d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 454,
+      "target": "sha256:1a0b831924f56f4414736ee4294cc7f6a86ca85aadd011f58caf2173666b3b3d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:814833bcb1a9263178450e8e87f13a94f91bb5dae0128f1726424a60c3707ab3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 464,
+      "target": ".outcomegraph/traces/policy-sync-20260306t220747z-9439e19cb4-verify-command-list-is-allowance-only-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:814833bcb1a9263178450e8e87f13a94f91bb5dae0128f1726424a60c3707ab3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 464,
+      "target": "sha256:814833bcb1a9263178450e8e87f13a94f91bb5dae0128f1726424a60c3707ab3",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:a8ac3b5c7e562510c16c8c60c2f6b38cb9856fab23756091aa9fc42a94bdf9f8",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 461,
+      "target": ".outcomegraph/traces/policy-sync-20260306t220747z-9439e19cb4-deny-lists-declared-in-policy-file-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:a8ac3b5c7e562510c16c8c60c2f6b38cb9856fab23756091aa9fc42a94bdf9f8",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 461,
+      "target": "sha256:a8ac3b5c7e562510c16c8c60c2f6b38cb9856fab23756091aa9fc42a94bdf9f8",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for policy on 3 oracle checks."
+}

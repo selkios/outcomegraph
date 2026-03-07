@@ -1,0 +1,85 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "readme",
+  "claim_refs": [
+    ".outcomegraph/claims/readme-command-surface.json",
+    ".outcomegraph/claims/readme-dogfood-checklist.json",
+    ".outcomegraph/claims/readme-entrypoints.json",
+    ".outcomegraph/claims/readme-json-contract.json",
+    ".outcomegraph/claims/readme-overview.json",
+    ".outcomegraph/claims/readme-sync-pipeline.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-readme-74afd0b2ad",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:04f4049aa933c82f738c6b52d6f5d5ac8e207c834531f65a447230b90999afc1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6814,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-12-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:04f4049aa933c82f738c6b52d6f5d5ac8e207c834531f65a447230b90999afc1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6814,
+      "target": "sha256:04f4049aa933c82f738c6b52d6f5d5ac8e207c834531f65a447230b90999afc1",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "README.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ce6c1ac4d1589bdfb913a2f446defd1327702d9f37201f136b5fd286ec7fbaea",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7511,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-12.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ce6c1ac4d1589bdfb913a2f446defd1327702d9f37201f136b5fd286ec7fbaea",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7511,
+      "target": "sha256:ce6c1ac4d1589bdfb913a2f446defd1327702d9f37201f136b5fd286ec7fbaea",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:fe5ef91b6809613a6229afe903d7c0aa920bd3e8e73bf15f74bdca1da495eb86",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 23001,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-12-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:fe5ef91b6809613a6229afe903d7c0aa920bd3e8e73bf15f74bdca1da495eb86",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 23001,
+      "target": "sha256:fe5ef91b6809613a6229afe903d7c0aa920bd3e8e73bf15f74bdca1da495eb86",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

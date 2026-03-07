@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "config",
+  "category": "configuration",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "config.snapshot.mode_profile",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4edbe2e6f4dd89a1b0bf0e70adc7f476e74323ee697ace5e308a821ed9b3363e",
+      "schema_version": 2,
+      "target": ".outcomegraph/config.yaml",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The observed adapter configuration in `.outcomegraph/config.yaml` sets `mode: observe` and `profile: analyze`."
+}

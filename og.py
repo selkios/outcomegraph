@@ -10,6 +10,7 @@ import json
 import fnmatch
 import math
 import os
+import re
 import shutil
 import subprocess
 import datetime
@@ -305,6 +306,9 @@ WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS = frozenset(
 WORKER_ADAPTER_DISTILL_BATCH_SIZE = 1
 WORKER_ADAPTER_DISTILL_MAX_WORKERS = 4
 WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
+TRACE_SEGMENT_MAX_LENGTH = 72
+SNAPSHOT_DIFF_CONTEXT_LINES = 40
+SNAPSHOT_DIFF_MAX_SNIPPETS = 8
 REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
 ADAPTER_SCHEMA_VERSION = 2
 ADAPTER_PATH_ENV = "OG_ADAPTER_PATH"
@@ -4495,6 +4499,34 @@ def _safe_slug(value: str) -> str:
     return sanitized or "item"
 
 
+def _trace_segment(value: object, *, max_length: int = TRACE_SEGMENT_MAX_LENGTH) -> str:
+    if value is None:
+        raw_value = "item"
+    else:
+        raw_value = str(value)
+        if not raw_value.strip():
+            raw_value = "item"
+    slug = _safe_slug(raw_value)
+    if len(slug) <= max_length:
+        return slug
+    suffix = _short_hash(slug, length=10)
+    head_length = max(max_length - len(suffix) - 1, 1)
+    return f"{slug[:head_length].rstrip('-')}-{suffix}"
+
+
+def _build_trace_path(*segments: object) -> str:
+    normalized_segments: list[str] = []
+    for segment in segments:
+        if segment is None:
+            continue
+        if isinstance(segment, str) and not segment.strip():
+            continue
+        normalized_segments.append(_trace_segment(segment))
+    if not normalized_segments:
+        normalized_segments = ["trace"]
+    return f"{OG_ROOT}/traces/{'-'.join(normalized_segments)}.json"
+
+
 def _reject_invalid_control_characters(raw: str, field: str) -> str:
     if any((0 <= ord(char) <= 0x1F or ord(char) == 0x7F) for char in raw):
         raise ValueError(f"{field} contains control characters")
@@ -4857,6 +4889,8 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- Each capsule_updates entry must include field id copied from input.target_capsules[].id\n"
             "- Use repo-relative paths only\n"
             "- Use input.target_capsules[].changed_file_snapshots as the primary source of file context\n"
+            "- When input.target_capsules[].supporting_file_snapshots is present, use it to retain unchanged scope context that still matters for the capsule\n"
+            "- A snapshot with selection='diff_hunks' is an intentional changed-region view, not a simple file-prefix truncation\n"
             "- Use only the input payload below\n"
             "- Fill goal, scope, constraints, oracles, claims, decision, receipts, and changed_files from actual repository evidence\n"
             "- Set lineage.parent_capsule_ids to an array, using [] when there is no parent lineage\n"
@@ -8626,7 +8660,7 @@ def _run_oracle_check(
     command = oracle.get("command")
     command_text = command.strip() if isinstance(command, str) else None
     resolved_policy = policy or _default_policy()
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule_id)}-{_safe_slug(run_id)}-{_safe_slug(oracle_name)}-{_safe_slug(trace_label)}.json"
+    trace_path = _build_trace_path(capsule_id, run_id, oracle_name, trace_label)
     trace_write_check = _evaluate_policy_writes(
         resolved_policy,
         command="verify",
@@ -9001,7 +9035,7 @@ def _run_replay_step(
             result_payload["failures"] = [f"Replay step {step_index} failed: {exc}"]
 
     result_payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
-    trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-{_safe_slug(capsule_id)}-replay-step-{step_index}.json"
+    trace_path = _build_trace_path(run_id, capsule_id, "replay-step", step_index)
     trace_payload_bytes = json.dumps(result_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     full_trace_path = os.path.join(repo_root, trace_path)
     os.makedirs(os.path.dirname(full_trace_path), exist_ok=True)
@@ -9358,17 +9392,42 @@ def _build_distill_target_capsules(
     repo_root: str,
     changed_capsules: list[str],
     changed_files_by_capsule: dict[str, list[str]],
+    *,
+    diff_baseline: str | None = None,
+    force_full_sync: bool = False,
 ) -> list[dict[str, object]]:
     targets: list[dict[str, object]] = []
     for capsule_id in changed_capsules:
         normalized_capsule_id = _safe_slug(capsule_id) or "default"
         existing_capsule = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{normalized_capsule_id}.json"))
         changed_files = changed_files_by_capsule.get(normalized_capsule_id, [])
+        supporting_scope_paths = _collect_supporting_scope_paths(
+            repo_root,
+            _safe_string_list(existing_capsule.get("scope")) if existing_capsule else [],
+            changed_files,
+        )
         targets.append(
             {
                 "id": normalized_capsule_id,
                 "changed_files": changed_files,
-                "changed_file_snapshots": [snapshot for snapshot in (_read_repo_file_snapshot(repo_root, path) for path in changed_files) if snapshot],
+                "changed_file_snapshots": [
+                    snapshot
+                    for snapshot in (
+                        _read_repo_file_snapshot(
+                            repo_root,
+                            path,
+                            diff_baseline=diff_baseline,
+                            force_full=force_full_sync,
+                        )
+                        for path in changed_files
+                    )
+                    if snapshot
+                ],
+                "supporting_file_snapshots": [
+                    snapshot
+                    for snapshot in (_read_repo_file_snapshot(repo_root, path) for path in supporting_scope_paths)
+                    if snapshot
+                ],
                 "existing_capsule": (
                     {
                         "id": str(existing_capsule.get("id") or normalized_capsule_id),
@@ -9390,15 +9449,177 @@ def _snapshot_char_limit(relative_path: str) -> int:
     normalized_path = _normalize_repo_relative_path(relative_path)
     _, extension = os.path.splitext(normalized_path.lower())
     if extension in {".md", ".txt", ".rst"}:
-        return 8000
+        return 40000
     if extension in {".json", ".yaml", ".yml", ".toml", ".lock"}:
-        return 6000
+        return 48000
     if extension in {".py", ".sh"}:
-        return 4000
-    return 3000
+        return 12000
+    return 6000
 
 
-def _read_repo_file_snapshot(repo_root: str, relative_path: str, max_chars: int | None = None) -> dict[str, object] | None:
+def _snapshot_partial_char_limit(relative_path: str) -> int:
+    normalized_path = _normalize_repo_relative_path(relative_path)
+    _, extension = os.path.splitext(normalized_path.lower())
+    if extension in {".md", ".txt", ".rst"}:
+        return 32000
+    if extension in {".json", ".yaml", ".yml", ".toml", ".lock"}:
+        return 28000
+    if extension in {".py", ".sh"}:
+        return 20000
+    return 16000
+
+
+_DIFF_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def _merge_line_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    if not ranges:
+        return []
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if not merged or start > merged[-1][1] + 1:
+            merged.append((start, end))
+            continue
+        previous_start, previous_end = merged[-1]
+        merged[-1] = (previous_start, max(previous_end, end))
+    return merged
+
+
+def _collect_changed_line_ranges(diff_text: str, *, line_count: int) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    max_line = max(line_count, 1)
+    for line in diff_text.splitlines():
+        match = _DIFF_HUNK_HEADER_RE.match(line)
+        if match is None:
+            continue
+        changed_start = int(match.group(1))
+        changed_count = int(match.group(2) or "1")
+        if changed_count <= 0:
+            changed_count = 1
+        changed_end = changed_start + changed_count - 1
+        ranges.append(
+            (
+                max(1, changed_start - SNAPSHOT_DIFF_CONTEXT_LINES),
+                min(max_line, changed_end + SNAPSHOT_DIFF_CONTEXT_LINES),
+            )
+        )
+    return _merge_line_ranges(ranges)
+
+
+def _build_partial_file_snapshot(
+    repo_root: str,
+    normalized_path: str,
+    full_path: str,
+    *,
+    diff_baseline: str,
+) -> dict[str, object] | None:
+    diff_result = _run_git(repo_root, ["diff", "--unified=0", diff_baseline, "--", normalized_path])
+    diff_text = diff_result.stdout if diff_result.returncode == 0 else ""
+    if not diff_text.strip():
+        return None
+    try:
+        with open(full_path, "r", encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    line_ranges = _collect_changed_line_ranges(diff_text, line_count=len(lines))
+    if not line_ranges:
+        return None
+
+    snippets: list[dict[str, object]] = []
+    rendered_sections: list[str] = []
+    chars_remaining = _snapshot_partial_char_limit(normalized_path)
+    truncated = False
+
+    for start_line, end_line in line_ranges:
+        if len(snippets) >= SNAPSHOT_DIFF_MAX_SNIPPETS:
+            truncated = True
+            break
+        if chars_remaining <= 0:
+            truncated = True
+            break
+
+        selected_lines: list[str] = []
+        included_end_line = start_line - 1
+        for line_number in range(start_line, end_line + 1):
+            source_line = lines[line_number - 1]
+            if selected_lines and len(source_line) > chars_remaining:
+                truncated = True
+                break
+            if not selected_lines and len(source_line) > chars_remaining:
+                selected_lines.append(source_line[:chars_remaining])
+                included_end_line = line_number
+                chars_remaining = 0
+                truncated = True
+                break
+            if len(source_line) > chars_remaining:
+                truncated = True
+                break
+            selected_lines.append(source_line)
+            included_end_line = line_number
+            chars_remaining -= len(source_line)
+
+        if not selected_lines:
+            truncated = True
+            break
+
+        snippet_text = "".join(selected_lines)
+        snippets.append(
+            {
+                "path": normalized_path,
+                "start_line": start_line,
+                "end_line": included_end_line,
+                "content": snippet_text,
+            }
+        )
+        rendered_sections.append(f"@@ lines {start_line}-{included_end_line} @@\n{snippet_text}")
+        if included_end_line < end_line:
+            truncated = True
+            break
+
+    return {
+        "path": normalized_path,
+        "digest": _file_sha256(normalized_path, repo_root),
+        "kind": "symlink_file" if os.path.islink(full_path) else "file",
+        "content": "\n\n".join(rendered_sections),
+        "truncated": False,
+        "partial": True,
+        "selection": "diff_hunks",
+        "line_count": len(lines),
+        "snippets": snippets,
+        "snippets_truncated": truncated,
+    }
+
+
+def _collect_supporting_scope_paths(repo_root: str, scope: list[str], changed_files: list[str]) -> list[str]:
+    changed = {item for item in changed_files if item}
+    supporting: list[str] = []
+    seen: set[str] = set()
+    for raw_path in scope:
+        candidate = _normalize_repo_relative_path(raw_path)
+        if not candidate or candidate in seen or candidate in changed:
+            continue
+        if any(candidate.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
+            continue
+        full_path = os.path.join(repo_root, candidate)
+        if not (os.path.isfile(full_path) or os.path.isdir(full_path)):
+            continue
+        supporting.append(candidate)
+        seen.add(candidate)
+        if len(supporting) >= 4:
+            break
+    return supporting
+
+
+def _read_repo_file_snapshot(
+    repo_root: str,
+    relative_path: str,
+    max_chars: int | None = None,
+    *,
+    diff_baseline: str | None = None,
+    force_full: bool = False,
+) -> dict[str, object] | None:
     normalized_path = _normalize_repo_relative_path(relative_path)
     if not normalized_path:
         return None
@@ -9421,6 +9642,20 @@ def _read_repo_file_snapshot(repo_root: str, relative_path: str, max_chars: int 
         }
     if not os.path.isfile(full_path):
         return None
+    if not force_full and diff_baseline and diff_baseline != EMPTY_TREE_OBJECT_ID:
+        partial_snapshot = _build_partial_file_snapshot(
+            repo_root,
+            normalized_path,
+            full_path,
+            diff_baseline=diff_baseline,
+        )
+        if partial_snapshot is not None:
+            if os.path.islink(full_path):
+                try:
+                    partial_snapshot["symlink_target"] = os.readlink(full_path)
+                except OSError:
+                    pass
+            return partial_snapshot
     try:
         with open(full_path, "r", encoding="utf-8") as handle:
             content = handle.read(max_chars + 1)
@@ -9747,8 +9982,8 @@ def _normalize_capsule_oracles_for_apply(
             }
         )
         executable_commands.add("pytest -q")
-        if status in {"warn", "warning", "pending"}:
-            status = "success"
+    if python_or_test_scope and executable_commands and status in {"warn", "warning", "pending"}:
+        status = "success"
 
     if not normalized:
         normalized = [{"name": f"{_safe_slug(capsule_id)}-verify", "command": None, "scope": oracle_scope}]
@@ -9895,7 +10130,20 @@ def _run_distill_stage(
             "errors": [str(exc)],
         }
     distill_timeout_seconds = _select_distill_worker_timeout(repo_root, snapshot)
-    target_capsules = _build_distill_target_capsules(repo_root, changed_capsules, changed_files_by_capsule)
+    diff_baseline = None
+    if isinstance(snapshot, dict):
+        baseline = snapshot.get("diff_baseline")
+        if isinstance(baseline, dict):
+            resolved_baseline = baseline.get("resolved")
+            if isinstance(resolved_baseline, str) and resolved_baseline.strip():
+                diff_baseline = resolved_baseline.strip()
+    target_capsules = _build_distill_target_capsules(
+        repo_root,
+        changed_capsules,
+        changed_files_by_capsule,
+        diff_baseline=diff_baseline,
+        force_full_sync=bool(snapshot.get("force_full_sync")) if isinstance(snapshot, dict) else False,
+    )
     try:
         deltas = []
         batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
@@ -9908,7 +10156,7 @@ def _run_distill_stage(
                 batch_changed_files.extend(_safe_string_list(capsule_descriptor.get("changed_files")))
             if not batch_changed_files:
                 batch_changed_files = changed_files
-            trace_path = f"{OG_ROOT}/traces/{_safe_slug(run_id)}-distill-batch-{batch_index // WORKER_ADAPTER_DISTILL_BATCH_SIZE}.json"
+            trace_path = _build_trace_path(run_id, "distill-batch", batch_index // WORKER_ADAPTER_DISTILL_BATCH_SIZE)
             batch_specs.append((batch_index, batch_capsules, sorted(set(batch_changed_files)), trace_path))
 
         completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]]]] = {}
@@ -10709,7 +10957,7 @@ def _run_replay_stage(
     replay_error_code: str | None = None
 
     for capsule in targets:
-        trace_path = f"{OG_ROOT}/traces/{_safe_slug(capsule)}-{_safe_slug(run_id)}-replay.json"
+        trace_path = _build_trace_path(capsule, run_id, "replay")
         capsule_payload = _load_capsule_payload(repo_root, capsule)
         scope_materials = _collect_capsule_scope_materials(repo_root, capsule, changed_materials)
         baseline_equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule)

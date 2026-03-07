@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "uv",
+  "claim_refs": [
+    ".outcomegraph/claims/uv-claim-1.json",
+    ".outcomegraph/claims/uv-claim-2.json",
+    ".outcomegraph/claims/uv-claim-3.json",
+    ".outcomegraph/claims/uv-claim-4.json",
+    ".outcomegraph/claims/uv-claim-5.json",
+    ".outcomegraph/claims/uv-claim-6.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24.json",
+    "sha256:55b5096b3e9298542e3017c86991a1d94ece38020435d2a48eae2b730049879d",
+    "sha256:6158fb661480ef6b6c8b0a4079cdf596f94ab7f68abc6f20ca29027308d4e524",
+    "sha256:d95a3bfe16a5d615cd60ee5ade4c0feacf34d5775378599aca4aa032f890ce35",
+    "uv.lock"
+  ],
+  "id": "dec-uv-a7a66c97ac",
+  "rationale": "The supplied `uv.lock` snapshot is complete (`truncated=false`) and contains the lockfile header, root editable package metadata, resolved package entries, and artifact metadata needed to reconstruct the current observable dependency state. The input does not provide an executable repository verification contract, so validation remains evidence-based.",
+  "schema_version": 2,
+  "statement": "Captured the observable `uv.lock` dependency resolution and lockfile metadata for OutcomeGraph from the supplied snapshot.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

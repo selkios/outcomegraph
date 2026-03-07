@@ -1,0 +1,30 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agent_first_cli_review",
+  "category": "gap",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cl-062a6d997c",
+  "origin": {
+    "changed_files": [
+      "AGENT_FIRST_CLI_REVIEW.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4af36592954ed08c12fc6f9b65437f6c8c2cea52094eea037cc846a64387e69c",
+      "schema_version": 2,
+      "target": "AGENT_FIRST_CLI_REVIEW.md",
+      "type": "file"
+    },
+    {
+      "schema_version": 2,
+      "target": "og.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Recovery tooling remains partial: `replay` and `clean --dry-run` exist, but evidence flags missing general `--dry-run`/`validate` separation for mutating commands and missing retry/timeout control flags and `doctor` command."
+}

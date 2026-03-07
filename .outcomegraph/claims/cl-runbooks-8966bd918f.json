@@ -1,0 +1,163 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "runbooks",
+  "category": "behavior",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cl-runbooks-8966bd918f",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/.gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/materials.lock",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "og",
+      "og.py",
+      "ogd",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:13abe9516349ade139c8acf1e83c1f7a6aa903dd62d53a9a2be4d4a900b70a1b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1383,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-implementation-matrix-gate-scan-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:13abe9516349ade139c8acf1e83c1f7a6aa903dd62d53a9a2be4d4a900b70a1b",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1383,
+      "target": "sha256:13abe9516349ade139c8acf1e83c1f7a6aa903dd62d53a9a2be4d4a900b70a1b",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:13eee081c0523ddd79ace6fdd9a83299e305a59cb92c04e1368e4cbd34cb5b27",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1552,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-dogfood-evidence-bundle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:13eee081c0523ddd79ace6fdd9a83299e305a59cb92c04e1368e4cbd34cb5b27",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1552,
+      "target": "sha256:13eee081c0523ddd79ace6fdd9a83299e305a59cb92c04e1368e4cbd34cb5b27",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:5b6270446807a73cd1426829c3fc8c0652f5421554906f2c7450b00d34c9652f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1368,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-targeted-verification-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:5b6270446807a73cd1426829c3fc8c0652f5421554906f2c7450b00d34c9652f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1368,
+      "target": "sha256:5b6270446807a73cd1426829c3fc8c0652f5421554906f2c7450b00d34c9652f",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6dab4a8f23e385049922a376b586cbaae78940934c129904fe9b1212e18d9251",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1338,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-daily-uncertain-surface-validation-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6dab4a8f23e385049922a376b586cbaae78940934c129904fe9b1212e18d9251",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1338,
+      "target": "sha256:6dab4a8f23e385049922a376b586cbaae78940934c129904fe9b1212e18d9251",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:9c9db60a3d7d4036db22a04e7c96f9e8d865999c2823ba1ff9508d011f4a67f5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1332,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-bootstrap-verification-loop-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:9c9db60a3d7d4036db22a04e7c96f9e8d865999c2823ba1ff9508d011f4a67f5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1332,
+      "target": "sha256:9c9db60a3d7d4036db22a04e7c96f9e8d865999c2823ba1ff9508d011f4a67f5",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c917d30ec37404d75933a388a7b10709e3479f342583972141138cd0dd6cd04e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1332,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-behavioral-confirmation-loop-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c917d30ec37404d75933a388a7b10709e3479f342583972141138cd0dd6cd04e",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1332,
+      "target": "sha256:c917d30ec37404d75933a388a7b10709e3479f342583972141138cd0dd6cd04e",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:ef4d66695e6bc9327dff1c4a0404d53bb8d95338b16101f542dcfec9b274715a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1376,
+      "target": ".outcomegraph/traces/runbooks-sync-20260306t195808z-63324af966-core_release-readiness-gate-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ef4d66695e6bc9327dff1c4a0404d53bb8d95338b16101f542dcfec9b274715a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1376,
+      "target": "sha256:ef4d66695e6bc9327dff1c4a0404d53bb8d95338b16101f542dcfec9b274715a",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for runbooks on 7 oracle checks."
+}

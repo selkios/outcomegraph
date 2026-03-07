@@ -1,0 +1,65 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "This capsule is derived only from `README.md` in `changed_file_snapshots`; no supporting snapshots or command-output artifacts were provided.",
+    "Documented commands are repository evidence for the intended contract, but this observe-mode payload does not prove they were executed in this run.",
+    "`README.md` names canonical `.outcomegraph/events/...` artifacts and companion docs, but their contents were not included in the payload."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-readme-978d4917e8.json",
+    "decisions/dec-readme-cbfe9eb7d0.json",
+    "decisions/dec-readme-f56740ba46.json"
+  ],
+  "goal": "Regenerate the README-backed OutcomeGraph operator guide that defines the CLI boundary, reconciliation pipeline, verification workflow, and cleanup surface from repository-root documentation.",
+  "id": "readme",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "readme-rollout-status-json (advisory only in observe mode)",
+      "scope": [
+        "README.md",
+        "full-spec rollout and dogfood checklist",
+        "status/state health contract"
+      ]
+    },
+    {
+      "command": null,
+      "name": "readme-rollout-sync-json (advisory only in observe mode)",
+      "scope": [
+        "README.md",
+        "full-spec rollout and dogfood checklist",
+        "distill/apply/verify/export contract"
+      ]
+    },
+    {
+      "command": null,
+      "name": "readme-rollout-verify-changed-json (advisory only in observe mode)",
+      "scope": [
+        "README.md",
+        "full-spec rollout and dogfood checklist",
+        "changed-capsule verification and export refresh contract"
+      ]
+    },
+    {
+      "command": null,
+      "name": "readme-rollout-drift (advisory only in observe mode)",
+      "scope": [
+        "README.md",
+        "full-spec rollout and dogfood checklist",
+        "policy and certificate health contract"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "README.md repository overview and quick-start guidance",
+    "README.md rollout validation and dogfood checklist for `uv run og ...` flows",
+    "README.md stable CLI contract: commands, flags, machine bootstrap, JSON envelope, and exit codes",
+    "README.md pipeline, daemon, autopilot, optimize, and cleanup behavior summaries"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

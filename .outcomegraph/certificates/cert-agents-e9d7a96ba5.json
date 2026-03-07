@@ -1,0 +1,84 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agents",
+  "claim_refs": [
+    ".outcomegraph/claims/agents-claim-01.json",
+    ".outcomegraph/claims/agents-claim-02.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-agents-e9d7a96ba5",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:327dec33e30a241bab51303de55536a778a0c8dbcdc14bc7693e54391da9e1aa",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4465,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:327dec33e30a241bab51303de55536a778a0c8dbcdc14bc7693e54391da9e1aa",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4465,
+      "target": "sha256:327dec33e30a241bab51303de55536a778a0c8dbcdc14bc7693e54391da9e1aa",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:43bf10edbb9bfc3e9ea6d0a1e857bd0f4fdfd43c5857f7b3c552eaa238f11dcd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2429,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:43bf10edbb9bfc3e9ea6d0a1e857bd0f4fdfd43c5857f7b3c552eaa238f11dcd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2429,
+      "target": "sha256:43bf10edbb9bfc3e9ea6d0a1e857bd0f4fdfd43c5857f7b3c552eaa238f11dcd",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:e886b526e0b6683a3e1cf7f79dd1266e0c2533db92ed44b8b1b4064521360ef3",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2905,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-1.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:e886b526e0b6683a3e1cf7f79dd1266e0c2533db92ed44b8b1b4064521360ef3",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 2905,
+      "target": "sha256:e886b526e0b6683a3e1cf7f79dd1266e0c2533db92ed44b8b1b4064521360ef3",
+      "type": "cas"
+    },
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass",
+      "type": "file"
+    },
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass/SKILL.md",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

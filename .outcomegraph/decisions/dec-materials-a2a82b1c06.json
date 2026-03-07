@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "materials",
+  "claim_refs": [
+    ".outcomegraph/claims/materials-claim-001.json",
+    ".outcomegraph/claims/materials-claim-002.json",
+    ".outcomegraph/claims/materials-claim-003.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/materials.lock",
+    ".outcomegraph/policy.yaml",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-5-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-5-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-5.json",
+    "sha256:7f8ec1b49878c8a386891a89a80e06542e445ba8c35811362bd2af067ba56f66",
+    "sha256:c85fdaa5b92ba80b8a39323536f0327d3028601e828cca8811e4023090d13956",
+    "sha256:d53c5fd09d6e72d49e538b80189a470d5f7e3f72c6c85c4ac056b024cfae1c41"
+  ],
+  "id": "dec-materials-a2a82b1c06",
+  "rationale": "Observable state is concrete and directly reconstructible from the provided snapshot metadata and checksums; no hidden file edits are present for this capsule. The exact regenerate command is not included in provided payload, but manifest-based regeneration is still reproducible with the referenced policy/config context.",
+  "schema_version": 2,
+  "statement": "Record lockfile refresh as a concrete, reusable materials snapshot artifact.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

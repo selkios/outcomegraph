@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-22.json",
+    "sha256:31b32d5e2e9a1bbeaa12c9e71870111fdb73efead6f5e4bc923b3c034f42eca5",
+    "sha256:7d7b84b2ab023030e87759e848c82bbcf58a15b369556e83de5379cf695f3b1c",
+    "sha256:e63590ea4f84898160cec2d9bde81cfab3991076b8d2725c70cb04a0871ec8b1",
+    "tests/conftest.py",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "id": "dec-tests-65f096e9c1",
+  "rationale": "These snapshots provide concrete, testable contracts about test harness import setup and CLI help/contract coverage, so the observed behavior is reproducible as a capsule.",
+  "schema_version": 2,
+  "statement": "Preserve this test-capsule scope to enable deterministic replay of the observed help/strict-contract behavior and local import setup.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

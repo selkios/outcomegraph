@@ -1,0 +1,37 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Recreate `.agents/skills/og-quality-pass` as a symlink-backed capsule entry targeting `skills/og-quality-pass`.",
+    "Preserve `SKILL.md`, `agents`, and `scripts` as the minimum top-level content contract for `skills/og-quality-pass`.",
+    "Keep verification observation-only; no executable oracle command is evidenced in the provided input."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-agents-a79660c3f9.json",
+    "decisions/dec-agents-af6f3b8385.json",
+    "decisions/dec-agents-fa3d042530.json"
+  ],
+  "goal": "Encode how to regenerate the OutcomeGraph `agents` symlink capsule for the `og-quality-pass` distillation path.",
+  "id": "agents",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "snapshot-based registration check (observation-only)",
+      "scope": [
+        "agents",
+        ".agents/skills/og-quality-pass",
+        "skills/og-quality-pass"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "agents",
+    ".agents/skills/og-quality-pass",
+    "skills/og-quality-pass"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

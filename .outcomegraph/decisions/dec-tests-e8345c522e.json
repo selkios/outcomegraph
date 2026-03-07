@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/tests-distill-update-shape.json",
+    ".outcomegraph/claims/tests-help-contract.json",
+    ".outcomegraph/claims/tests-repo-fixture.json"
+  ],
+  "created_at": "2026-03-06T22:06:44Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-4-input.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-4-result.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-4.json",
+    "sha256:2a9a222886a424622ef5ae27cb88d42df8cb9f2466fcfb19e4ddc5ce3385319e",
+    "sha256:626d2c78dd2b6eea96d9dbdec1d6d5af51126f69b14b52d0c8198ffe12e11e11",
+    "sha256:d98e2926a1ed344c6bbe82f7e975f606ddc87efc227b1eea1e7bd1ea4616a763",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "id": "dec-tests-e8345c522e",
+  "rationale": "The provided snapshot contains concrete, reusable regression-test helpers and help-output assertions that can be preserved as the current observable contract, while the capsule scope is narrowed to the single changed file because the snapshot is truncated.",
+  "schema_version": 2,
+  "statement": "Record the visible regression-test behavior in tests/test_og_sync_verify_replay_hooks.py as the current tests capsule contract.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:06:44Z"
+}

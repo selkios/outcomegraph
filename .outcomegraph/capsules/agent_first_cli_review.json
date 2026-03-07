@@ -1,0 +1,118 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Claims are grounded in the supplied `AGENT_FIRST_CLI_REVIEW.md` snapshot; the referenced `og.py`, `README.md`, `SPEC-v2.md`, `.outcomegraph/export/AGENTS.md`, `skills/outcome-steward/SKILL.md`, and `tests/test_og_sync_verify_replay_hooks.py` files were not reread in this observe-only pass.",
+    "The quick runtime checks and unittest result are preserved as prior execution evidence recorded by the review, not rerun by this adapter.",
+    "No shell commands were executed in this adapter run, so this capsule captures the documented current state and regeneration contract rather than a fresh live verification transcript."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-agent_first_cli_review-4b6b7e17b5.json",
+    "decisions/dec-agent_first_cli_review-bf87cd29cb.json",
+    "decisions/dec-agent_first_cli_review-ee6ce7def7.json"
+  ],
+  "goal": "Encode the current OutcomeGraph agent-first CLI review outcome for `og`, including shipped help/JSON/error/introspection/input-safety contracts, documented verification commands, and the remaining gaps another agent would need to close or re-check.",
+  "id": "agent_first_cli_review",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "top_level_help_contract (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "help-contracts",
+        "top-level"
+      ]
+    },
+    {
+      "command": null,
+      "name": "daemon_help_contract (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "help-contracts",
+        "nested"
+      ]
+    },
+    {
+      "command": null,
+      "name": "autopilot_help_contract (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "help-contracts",
+        "nested"
+      ]
+    },
+    {
+      "command": null,
+      "name": "daemon_run_help_contract (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "help-contracts",
+        "nested"
+      ]
+    },
+    {
+      "command": null,
+      "name": "status_rejects_output_mode_with_json (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "json-output",
+        "error-contract"
+      ]
+    },
+    {
+      "command": null,
+      "name": "status_json_envelope (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "json-output",
+        "status"
+      ]
+    },
+    {
+      "command": null,
+      "name": "mcp_server_json_envelope (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "json-output",
+        "mcp"
+      ]
+    },
+    {
+      "command": null,
+      "name": "clean_runtime_dry_run_json (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "json-output",
+        "recovery"
+      ]
+    },
+    {
+      "command": null,
+      "name": "daemon_status_json (advisory only in observe mode)",
+      "scope": [
+        "cli",
+        "json-output",
+        "daemon"
+      ]
+    },
+    {
+      "command": null,
+      "name": "sync_verify_replay_regression_suite (advisory only in observe mode)",
+      "scope": [
+        "tests",
+        "regression",
+        "verification"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "AGENT_FIRST_CLI_REVIEW.md review artifact for the OutcomeGraph `og` CLI",
+    "`og` command/help/output/error/introspection/path-safety behavior as summarized by the 2026-03-05 review",
+    "Documented runtime verification commands and unittest coverage captured in the review"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

@@ -1,0 +1,33 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "quickstart",
+  "claim_refs": [
+    ".outcomegraph/claims/quickstart-bootstrap-manual-flow.json",
+    ".outcomegraph/claims/quickstart-discoverability-contracts.json",
+    ".outcomegraph/claims/quickstart-eval-dataset-contract.json",
+    ".outcomegraph/claims/quickstart-observe-mode-and-canonical-truth.json",
+    ".outcomegraph/claims/quickstart-prompt-optimization.json",
+    ".outcomegraph/claims/quickstart-rollout-gate-and-migration-blocker.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/events/sync-20260305T082953Z-8485041f63.json",
+    ".outcomegraph/events/sync-20260305T092058Z-9008c47e88.json",
+    ".outcomegraph/events/verify-20260305T092059Z-a1789787d4.json",
+    ".outcomegraph/materials.lock",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-11-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-11-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-11.json",
+    "MIGRATION_GUIDE.md",
+    "QUICKSTART.md",
+    "sha256:67409b7d70d136893ee4fef534845c2dea2f0676841e8216ca49a0bd2bd7729f",
+    "sha256:ca474166e9638665540d7e36d4b9339b90a4dbf773960399418fdb4354fe25c9",
+    "sha256:d0fffc575bd4b957d5680c5c5903a841924bbde8ab2e27bb9e8b4e679a87d543"
+  ],
+  "id": "dec-quickstart-57c8fd979a",
+  "rationale": "`QUICKSTART.md` is the changed artifact and now carries reusable operational guidance for bootstrap, steady-state usage, prompt optimization, safety boundaries, and rollout verification. Capturing those doc-backed contracts as a capsule preserves the current observable behavior without inventing execution evidence beyond the named repository artifacts.",
+  "schema_version": 2,
+  "statement": "Refresh the `quickstart` capsule from `QUICKSTART.md` so another agent can regenerate the same OutcomeGraph quickstart behavior and rollout gate.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

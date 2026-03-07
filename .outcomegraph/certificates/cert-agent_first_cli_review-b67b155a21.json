@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agent_first_cli_review",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-agent_first_cli_review-b67b155a21.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-agent_first_cli_review-b67b155a21",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0cdd9bfad40867df61c249377f4558d8b77688ba24767021f9f614c471a723f1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1089,
+      "target": ".outcomegraph/traces/agent_first_cli_review-sync-20260306t222121z-7d3ea2b95b-top_level_help_contract--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0cdd9bfad40867df61c249377f4558d8b77688ba24767021f9f614c471a723f1",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1089,
+      "target": "sha256:0cdd9bfad40867df61c249377f4558d8b77688ba24767021f9f614c471a723f1",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

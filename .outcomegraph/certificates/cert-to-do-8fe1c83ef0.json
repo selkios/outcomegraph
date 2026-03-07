@@ -1,0 +1,81 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "to-do",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-76c6ee0493.json",
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-to-do-8fe1c83ef0",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:2afdd1b7fbeca5566b8debea20b5135b857c2cb30db34e7142023822626b76a8",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3056,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-23-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:2afdd1b7fbeca5566b8debea20b5135b857c2cb30db34e7142023822626b76a8",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3056,
+      "target": "sha256:2afdd1b7fbeca5566b8debea20b5135b857c2cb30db34e7142023822626b76a8",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:3fb1a594f8f9cb2fa6e1442d55c47afd8966cc5d31bbac45bb3637213a3a95ff",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3553,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-23.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:3fb1a594f8f9cb2fa6e1442d55c47afd8966cc5d31bbac45bb3637213a3a95ff",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3553,
+      "target": "sha256:3fb1a594f8f9cb2fa6e1442d55c47afd8966cc5d31bbac45bb3637213a3a95ff",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:4dd35fc64ed59dd34cca9f996217f7a52e1eec21f7881668b559539b38ab183d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 18120,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-23-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:4dd35fc64ed59dd34cca9f996217f7a52e1eec21f7881668b559539b38ab183d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 18120,
+      "target": "sha256:4dd35fc64ed59dd34cca9f996217f7a52e1eec21f7881668b559539b38ab183d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "schema_version": 2,
+      "target": "to-do.json",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

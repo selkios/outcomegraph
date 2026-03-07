@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "spec_implementation_matrix",
+  "claim_refs": [
+    ".outcomegraph/claims/claim-spec-matrix-acceptance-checks.json",
+    ".outcomegraph/claims/claim-spec-matrix-header.json",
+    ".outcomegraph/claims/claim-spec-matrix-section-statuses.json",
+    ".outcomegraph/claims/claim-spec-matrix-tests.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-21.json",
+    "SPEC_IMPLEMENTATION_MATRIX.md",
+    "sha256:2d6b7109454558c4240d54d41199f1e45b361493be6e6a50dd366d578982583c",
+    "sha256:92abc771300e71f16a060cb5474d1c733193f4e0bae98913a768674627798073",
+    "sha256:d7c3e5ce7bd73a7764cca160a9cdc68b298fddcdd30a4c2ee608d5a30db6d7c0"
+  ],
+  "id": "dec-spec_implementation_matrix-6d9eee717a",
+  "rationale": "The matrix content provides sufficient state and acceptance criteria to reconstruct this capsule\u2019s purpose and repeatable checks, with no extra repository writes required.",
+  "schema_version": 2,
+  "statement": "Treat the matrix snapshot as a living conformance contract for OG-SPEC-001 and use the listed commands as the canonical replay oracles.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

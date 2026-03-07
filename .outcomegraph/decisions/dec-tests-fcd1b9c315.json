@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/tests.distill-update-shape.json",
+    ".outcomegraph/claims/tests.quality-pass-script.json",
+    ".outcomegraph/claims/tests.repo-fixture.json",
+    ".outcomegraph/claims/tests.top-level-help-contract.json"
+  ],
+  "created_at": "2026-03-06T20:37:57Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5-input.json",
+    ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5-result.json",
+    ".outcomegraph/traces/sync-20260306t203407z-03b91c8afd-distill-batch-5.json",
+    "sha256:1b56ef774f373be59c31b8bc6527e98d7f8237d23f6a81f9ccb01c65c8ae55a2",
+    "sha256:4eb9835afa59cfc4db5e286c6cc44164d1ed8e2c5e53127b9ec20444c2d9d482",
+    "sha256:a30e42180403d449278f8267484a502da8746461870dea06067ff47c3c14b826",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "id": "dec-tests-fcd1b9c315",
+  "rationale": "The visible snapshot contains concrete helper behavior and a top-level CLI help assertion that another agent can preserve, but the truncation and missing companion file snapshot leave important context unresolved.",
+  "schema_version": 2,
+  "statement": "Capture the observable contracts from the visible portion of `tests/test_og_sync_verify_replay_hooks.py` as the current reusable `tests` capsule state.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T20:37:57Z"
+}

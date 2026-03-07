@@ -1,0 +1,55 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "og",
+  "category": "behavior",
+  "created_at": "2026-03-06T22:06:51Z",
+  "id": "cl-og-df96b34ef8",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "og.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T220320Z-9439e19cb4"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:65a2b44eb81c873a51b82d70b94a71c8864d08ca782e989be660af00b5a81555",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 834,
+      "target": ".outcomegraph/traces/og-sync-20260306t220320z-9439e19cb4-repository-regression-suite-carried-forward-for-cli-contract-coverage-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:65a2b44eb81c873a51b82d70b94a71c8864d08ca782e989be660af00b5a81555",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 834,
+      "target": "sha256:65a2b44eb81c873a51b82d70b94a71c8864d08ca782e989be660af00b5a81555",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c62256d7bee619535bd164608886f66b6d1a9542899bd7da71fd6394f2333503",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 489,
+      "target": ".outcomegraph/traces/og-sync-20260306t220320z-9439e19cb4-static-snapshot-inspection-of-the-visible--og-py--contract-surface-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c62256d7bee619535bd164608886f66b6d1a9542899bd7da71fd6394f2333503",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 489,
+      "target": "sha256:c62256d7bee619535bd164608886f66b6d1a9542899bd7da71fd6394f2333503",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification failed for og; previous valid certificates preserved."
+}

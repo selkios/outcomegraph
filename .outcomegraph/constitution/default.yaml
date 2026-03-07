@@ -1,0 +1,12 @@
+schema_version: 2
+created_at: "2026-03-06T19:58:02Z"
+mode: observe
+policy:
+  default_mode: observe
+  allow:
+    - ".outcomegraph/**"
+    - "AGENTS.md"
+  deny:
+    - "autonomous application code edits"
+    - "dependency installation"
+    - "network actions"

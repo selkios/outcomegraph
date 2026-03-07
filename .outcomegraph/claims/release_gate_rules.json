@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "spec_implementation_matrix",
+  "category": "release_gate",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "release_gate_rules",
+  "origin": {
+    "changed_files": [
+      "SPEC_IMPLEMENTATION_MATRIX.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "schema_version": 2,
+      "target": "SPEC_IMPLEMENTATION_MATRIX.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The release workflow requires that no `missing` status remain for release gates, that each `partial` entry is paired with explicit blocking tasks and accepted mitigations, and that policy plus adapter contract tests pass before release."
+}

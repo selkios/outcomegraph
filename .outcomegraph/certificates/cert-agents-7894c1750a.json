@@ -1,0 +1,80 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agents",
+  "claim_refs": [
+    ".outcomegraph/claims/agents-content-contract.json",
+    ".outcomegraph/claims/agents-symlink-topology.json",
+    ".outcomegraph/claims/agents-verification-contract.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-agents-7894c1750a",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:66c184b3000223b4a1f3d9c68fd8e5249b81a0be723bfa8a754aa9373e43966a",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3294,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-1.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:66c184b3000223b4a1f3d9c68fd8e5249b81a0be723bfa8a754aa9373e43966a",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3294,
+      "target": "sha256:66c184b3000223b4a1f3d9c68fd8e5249b81a0be723bfa8a754aa9373e43966a",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:d90fb6961e2779a8f0bfbd2170a3104ab75e6f0801718a73b522d031c4b9da7c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2794,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-1-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:d90fb6961e2779a8f0bfbd2170a3104ab75e6f0801718a73b522d031c4b9da7c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 2794,
+      "target": "sha256:d90fb6961e2779a8f0bfbd2170a3104ab75e6f0801718a73b522d031c4b9da7c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:ff64a79bfffee1434296e676069e746818714712a1977bf532eda03494bebf4c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6274,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-1-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ff64a79bfffee1434296e676069e746818714712a1977bf532eda03494bebf4c",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6274,
+      "target": "sha256:ff64a79bfffee1434296e676069e746818714712a1977bf532eda03494bebf4c",
+      "type": "cas"
+    },
+    {
+      "schema_version": 2,
+      "target": ".agents/skills/og-quality-pass",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "migration_guide",
+  "category": "requirements",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "claim-migration-guidance",
+  "origin": {
+    "changed_files": [
+      "MIGRATION_GUIDE.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:7ad4a3e5db2a92b915ed6f5482954007a37f5a020656f466143a9612f2f86c24",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "MIGRATION_GUIDE.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The guide explicitly codifies OutcomeGraph v2 migration behavior: canonical artifacts must be schema_version 2 with `artifact_type`, mixed-version rejection is mandatory, adapters should be schema_version 2 with interface_version 1, and migration should be explicit with post-change verification via `og sync`, `og verify --changed`, and `og replay --changed`."
+}

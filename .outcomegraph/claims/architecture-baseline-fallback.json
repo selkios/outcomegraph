@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "architecture",
+  "category": "change_detection",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "architecture-baseline-fallback",
+  "origin": {
+    "changed_files": [
+      "ARCHITECTURE.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:ae244a50a771cbd7ffef1e32aba80637f36d07042baef027a599b3f76f06c7bc",
+      "schema_version": 2,
+      "target": "ARCHITECTURE.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Baseline resolution is ordered as `HEAD~1`, then `git merge-base ORIG_HEAD HEAD` when `HEAD~1` is unavailable and `ORIG_HEAD` exists, then a synthetic empty-tree baseline. Before mapping, sync ignores `.outcomegraph/work/**`, `.outcomegraph/cache/**`, `.outcomegraph/events/**`, and `.outcomegraph/objects/**`; if filtering removes all diff paths, the pass is treated as unchanged unless a full-sync flag is requested."
+}

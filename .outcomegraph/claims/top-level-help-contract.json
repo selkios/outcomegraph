@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "tests",
+  "category": "cli_contract",
+  "created_at": "2026-03-06T22:10:53Z",
+  "id": "top-level-help-contract",
+  "origin": {
+    "changed_files": [
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T220747Z-9439e19cb4"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:f756d9e32a41d04831e52073f69d84aba728e502ab604cd720036fceb0b220f0",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "test_top_level_help_includes_global_contract asserts that og --help exits with code 0 and prints the global usage line with --json, --strict, --non-interactive, analyze|propose|apply profiles, observe|autonomous modes, command-specific help guidance, and the Core commands header."
+}

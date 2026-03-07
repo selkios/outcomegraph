@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "readme",
+  "category": "interface",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "readme-command-surface",
+  "origin": {
+    "changed_files": [
+      "README.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:b3ef2d41d50e5fd8032c9eb91aacc84976bd3f70da3396fca7176b0176157430",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "README.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The README enumerates the stable top-level command surface: `init`, `sync`, `verify`, `replay`, `status`, `export`, `explain`, `drift`, `mcp-server`, `optimize prompts`, `autopilot init|disable`, `daemon install|start|stop|status|run`, `schema`, and `describe <command>`; it also states that every top-level command supports `--help` and calls out `og schema`, `og describe sync`, and `og describe daemon status` as machine bootstrap entrypoints."
+}

@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "config",
+  "category": "safety",
+  "created_at": "2026-03-06T22:10:53Z",
+  "id": "config.safety_envelope",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T220747Z-9439e19cb4"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4edbe2e6f4dd89a1b0bf0e70adc7f476e74323ee697ace5e308a821ed9b3363e",
+      "schema_version": 2,
+      "target": ".outcomegraph/config.yaml",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The `safety` block in `.outcomegraph/config.yaml` sets `policy_file: policy.yaml` and caps `max_writes_per_run` at `64`."
+}

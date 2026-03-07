@@ -1,0 +1,39 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "constitution",
+  "category": "behavior",
+  "created_at": "2026-03-06T21:23:30Z",
+  "id": "cl-constitution-8c93da2e32",
+  "origin": {
+    "changed_files": [
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "og.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T212059Z-bfdeaf732b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:1227ff56430bd5b47bc1aed509ea453157b3677b93c6a9df93622f03cc96f713",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 463,
+      "target": ".outcomegraph/traces/constitution-sync-20260306t212059z-bfdeaf732b-constitution_snapshot_evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1227ff56430bd5b47bc1aed509ea453157b3677b93c6a9df93622f03cc96f713",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 463,
+      "target": "sha256:1227ff56430bd5b47bc1aed509ea453157b3677b93c6a9df93622f03cc96f713",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for constitution on 1 oracle checks."
+}

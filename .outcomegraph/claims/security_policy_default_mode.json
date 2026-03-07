@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "default_mode",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "security_policy_default_mode",
+  "origin": {
+    "changed_files": [
+      "SECURITY_POLICY.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "schema_version": 2,
+      "target": "SECURITY_POLICY.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "SECURITY_POLICY.md documents a safe-by-default observe mode: observe-mode artifact updates and generated exports, plus read-only verification and sandbox execution where configured, are allowed by default, while application code writes, dependency mutation, deployment actions, and unrestricted network are denied by default."
+}

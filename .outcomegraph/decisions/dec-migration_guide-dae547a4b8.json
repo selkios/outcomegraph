@@ -1,0 +1,27 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "migration_guide",
+  "claim_refs": [
+    ".outcomegraph/claims/migration_guide_materials_lock_blocker.json",
+    ".outcomegraph/claims/migration_guide_metadata.json",
+    ".outcomegraph/claims/migration_guide_migration_flow.json",
+    ".outcomegraph/claims/migration_guide_post_migration_expectations.json",
+    ".outcomegraph/claims/migration_guide_v2_requirements.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-5-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-5-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-5.json",
+    "MIGRATION_GUIDE.md",
+    "sha256:047e3a28b25f9f1462658e8be49b95186388ab7080ceea2e045a50493de5d85b",
+    "sha256:6314f93b01258cf897a1eb735efd3992907a97a4f47194a628e3b003bfbdb747",
+    "sha256:f3a8a77d3a9065c211f5766432ff66b054ac5d731120bd52b9a6140239b48283"
+  ],
+  "id": "dec-migration_guide-dae547a4b8",
+  "rationale": "The changed snapshot contains concrete migration requirements, an explicit migration procedure, documented validation checkpoints, and a specific `materials.lock` blocker with remediation details. No live execution evidence was provided, so the capsule records documentary oracles only.",
+  "schema_version": 2,
+  "statement": "Record `MIGRATION_GUIDE.md` as the current reusable migration contract for OutcomeGraph schema v2 rollout and the documented `materials.lock` blocker.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

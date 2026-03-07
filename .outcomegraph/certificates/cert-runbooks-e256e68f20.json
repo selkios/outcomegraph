@@ -1,0 +1,107 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "runbooks",
+  "claim_refs": [
+    ".outcomegraph/claims/runbooks-daemon-provenance.json",
+    ".outcomegraph/claims/runbooks-dogfood-rollout.json",
+    ".outcomegraph/claims/runbooks-release-gates.json",
+    ".outcomegraph/claims/runbooks-safety-policy.json",
+    ".outcomegraph/claims/runbooks-workflows.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-runbooks-e256e68f20",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "schema_version": 2,
+      "target": "SPEC-v2.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:381f1345dc59b0d0d13077e633af2b3d7071fcc602a27694260550a931819c49",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 9651,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-13.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:381f1345dc59b0d0d13077e633af2b3d7071fcc602a27694260550a931819c49",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 9651,
+      "target": "sha256:381f1345dc59b0d0d13077e633af2b3d7071fcc602a27694260550a931819c49",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:816ca5faba6530acac6443e9351e75409a673234e245fb8620261c53633ec931",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 140164,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-13-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:816ca5faba6530acac6443e9351e75409a673234e245fb8620261c53633ec931",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 140164,
+      "target": "sha256:816ca5faba6530acac6443e9351e75409a673234e245fb8620261c53633ec931",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c5f1b8556a38cca5f4cab782fa5f975f0e2fef2ddadd773453470a6a2020de13",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "schema_version": 2,
+      "target": "RUNBOOKS.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c86dddf0512c33c1992c23300aba11774724f1b1fa465f344131033e25c440f2",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 8739,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-13-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c86dddf0512c33c1992c23300aba11774724f1b1fa465f344131033e25c440f2",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 8739,
+      "target": "sha256:c86dddf0512c33c1992c23300aba11774724f1b1fa465f344131033e25c440f2",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:eef8259151e4bc37423b674b33b83343ee22043ddfcb49b49e8e68fbfc46af4f",
+      "schema_version": 2,
+      "target": ".outcomegraph/policy.yaml",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "schema_version": 2,
+      "target": "SPEC_IMPLEMENTATION_MATRIX.md",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

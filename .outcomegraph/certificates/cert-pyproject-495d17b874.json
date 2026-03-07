@@ -1,0 +1,83 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "pyproject",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-0030f45840.json",
+    ".outcomegraph/claims/cl-76c6ee0493.json",
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-pyproject-495d17b874",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:037af11b380d972aa5875a94c52eca2094defd8b9810a381f719b0abda06d152",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3942,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-11.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:037af11b380d972aa5875a94c52eca2094defd8b9810a381f719b0abda06d152",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 3942,
+      "target": "sha256:037af11b380d972aa5875a94c52eca2094defd8b9810a381f719b0abda06d152",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:1642ab024168dd1930bbdfca5cb7a68193880890c0bf731d514b128b0fbdb7c4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6737,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-11-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1642ab024168dd1930bbdfca5cb7a68193880890c0bf731d514b128b0fbdb7c4",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6737,
+      "target": "sha256:1642ab024168dd1930bbdfca5cb7a68193880890c0bf731d514b128b0fbdb7c4",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:2e9e83e77841e467e14538fab30ca43364074bf7b4d3e075a488fda256ab293b",
+      "media_type": "text/toml",
+      "schema_version": 2,
+      "target": "pyproject.toml",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:45fabd32e2148a6802f3fef09315c5ee2a37610cb738fa9c5a13676db1878ce5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3356,
+      "target": ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-11-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:45fabd32e2148a6802f3fef09315c5ee2a37610cb738fa9c5a13676db1878ce5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 3356,
+      "target": "sha256:45fabd32e2148a6802f3fef09315c5ee2a37610cb738fa9c5a13676db1878ce5",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

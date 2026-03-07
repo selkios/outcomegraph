@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "plugin_api",
+  "category": "runtime",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "plugin_api_runtime_api_and_defaults",
+  "origin": {
+    "changed_files": [
+      "PLUGIN_API.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4cde375fca93213551c42cb24fe1911173c7029694ebf13620ac7e32a112b24c",
+      "schema_version": 2,
+      "target": "PLUGIN_API.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The runtime registration surface consists of register, set_default, resolve, and list operations, and the documented v2.1 built-in defaults are codex for worker, filesystem for store, null-impl as an oracle fallback in recovery mode where applicable, a local worktree sandbox, and a canonical deterministic exporter."
+}

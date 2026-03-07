@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "to-do",
+  "category": "runtime_capabilities",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "to-do-claim-runtime-surface-status",
+  "origin": {
+    "changed_files": [
+      "to-do.json"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:588afe249f0a98b33367de883267c8f47d36b7e0476657416c6ca7a1d63a25f5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "target": "to-do.json",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The visible runtime and control-surface tasks are marked `done`, including `OG-SYNC-001`, `OG-VERIFY-001`, `OG-VERIFY-002`, `OG-REPLAY-001`, `OG-REPLAY-002`, `OG-STATUS-001`, `OG-EXPLAIN-001`, `OG-EXPORT-001`, and `OG-MCP-001`, so the registry treats sync, verify, replay, status, explain, export, and MCP exposure as implemented capabilities."
+}

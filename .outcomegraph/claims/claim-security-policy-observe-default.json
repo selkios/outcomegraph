@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "contract",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "claim-security-policy-observe-default",
+  "origin": {
+    "changed_files": [
+      "SECURITY_POLICY.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "schema_version": 2,
+      "target": "SECURITY_POLICY.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "SECURITY_POLICY.md v2.1 documents an observe-by-default security model: bounded-safe artifact and export writes plus read-only verification or sandbox work are allowed, while application code writes, dependency mutation, deployment, and unrestricted network stay denied unless policy or mode is explicitly expanded."
+}

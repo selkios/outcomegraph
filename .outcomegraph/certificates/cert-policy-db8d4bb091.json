@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "policy",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-policy-db8d4bb091.json"
+  ],
+  "created_at": "2026-03-06T22:06:51Z",
+  "id": "cert-policy-db8d4bb091",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:771a32f10619fdaf6d0ea01c7d8e4037a6ae6bcd5e3af369a834a62868ad7fd5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 457,
+      "target": ".outcomegraph/traces/policy-sync-20260306t220320z-9439e19cb4-policy-file-is-source-of-truth-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:771a32f10619fdaf6d0ea01c7d8e4037a6ae6bcd5e3af369a834a62868ad7fd5",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 457,
+      "target": "sha256:771a32f10619fdaf6d0ea01c7d8e4037a6ae6bcd5e3af369a834a62868ad7fd5",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6aa32c1323e612fb41041072195538c25f732bc84b93743a6cb3f8125d94bc97",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 464,
+      "target": ".outcomegraph/traces/policy-sync-20260306t220320z-9439e19cb4-verify-command-list-is-allowance-only-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6aa32c1323e612fb41041072195538c25f732bc84b93743a6cb3f8125d94bc97",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 464,
+      "target": "sha256:6aa32c1323e612fb41041072195538c25f732bc84b93743a6cb3f8125d94bc97",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T220320Z-9439e19cb4",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T220320Z-9439e19cb4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:06:51Z"
+}

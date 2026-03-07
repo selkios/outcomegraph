@@ -1,0 +1,85 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "migration_guide",
+  "claim_refs": [
+    ".outcomegraph/claims/migration-guide-adapter-contract.json",
+    ".outcomegraph/claims/migration-guide-explicit-migration-flow.json",
+    ".outcomegraph/claims/migration-guide-fail-fast-policy.json",
+    ".outcomegraph/claims/migration-guide-materials-lock-blocker.json",
+    ".outcomegraph/claims/migration-guide-v2-requirements.json",
+    ".outcomegraph/claims/migration-guide-v2_1-metadata.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "cert-migration_guide-ce1e4e1a96",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f085de2afb338974f0350ee0607cb0b6da2f50cb3c78e5f71581d0d0a079483",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14298,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-5-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0f085de2afb338974f0350ee0607cb0b6da2f50cb3c78e5f71581d0d0a079483",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 14298,
+      "target": "sha256:0f085de2afb338974f0350ee0607cb0b6da2f50cb3c78e5f71581d0d0a079483",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:34639c4da59e9fdece412fd4425ff4c7dcb17df4391da33102a49ebec66acde2",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7049,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-5.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:34639c4da59e9fdece412fd4425ff4c7dcb17df4391da33102a49ebec66acde2",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 7049,
+      "target": "sha256:34639c4da59e9fdece412fd4425ff4c7dcb17df4391da33102a49ebec66acde2",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:7ad4a3e5db2a92b915ed6f5482954007a37f5a020656f466143a9612f2f86c24",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "MIGRATION_GUIDE.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b8caf4544cf6c302524e408941bf24f04482cd57877a1ca4de4138745d592dba",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6359,
+      "target": ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-5-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b8caf4544cf6c302524e408941bf24f04482cd57877a1ca4de4138745d592dba",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 6359,
+      "target": "sha256:b8caf4544cf6c302524e408941bf24f04482cd57877a1ca4de4138745d592dba",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T214821Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

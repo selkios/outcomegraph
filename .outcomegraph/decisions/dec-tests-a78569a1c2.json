@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "tests",
+  "claim_refs": [
+    ".outcomegraph/claims/tests-cli-004.json",
+    ".outcomegraph/claims/tests-fixture-001.json",
+    ".outcomegraph/claims/tests-helper-002.json",
+    ".outcomegraph/claims/tests-shape-003.json"
+  ],
+  "created_at": "2026-03-06T21:23:30Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-4-input.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-4-result.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-4.json",
+    "sha256:1e542f2055a617087c90664f268d7c442d8b5f47d3306e1cdec7acca206f353c",
+    "sha256:2ecc503ab716030c1c7458d205d0ac4535fef90fe23d537e57f1f6213a9cc6b8",
+    "sha256:b94f8de45da7133ab1dba2baed2c13ae19f3941fd86ec8cec0ddf0d1ac00d006",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "id": "dec-tests-a78569a1c2",
+  "rationale": "The snapshot exposes concrete helper behavior and visible assertions that define the observable regression-test contract for this file.",
+  "schema_version": 2,
+  "statement": "Track the visible regression-test behavior in `tests/test_og_sync_verify_replay_hooks.py` as the current `tests` capsule state.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T21:23:30Z"
+}

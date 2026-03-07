@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "config",
+  "claim_refs": [
+    ".outcomegraph/claims/config.snapshot.metadata.json",
+    ".outcomegraph/claims/config.snapshot.mode_profile.json",
+    ".outcomegraph/claims/config.snapshot.safety.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/config.yaml",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-3-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-3-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-3.json",
+    "sha256:58369be0a908e30a8d8979a80ec8059b6a4d7a65c98b09a03852ed2d9af3a859",
+    "sha256:e205e66b070b3eb1b241d03f279e6182338ad33be0d4e9878ff89558162d598c",
+    "sha256:e51d27e31ef05a12d8a9be633a63e90e1b648387c06bc33d449a8f65a200486d"
+  ],
+  "id": "dec-config-4697c99c06",
+  "rationale": "The provided snapshot contains the full current contents of `.outcomegraph/config.yaml` plus a content digest, which is sufficient to preserve the observable analyze/observe configuration and its safety envelope without inventing unsupported verification steps.",
+  "schema_version": 2,
+  "statement": "Capture `.outcomegraph/config.yaml` as the reusable configuration capsule for the current analyze/observe adapter state.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

@@ -1,0 +1,85 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "uv",
+  "claim_refs": [
+    ".outcomegraph/claims/uv-claim-1.json",
+    ".outcomegraph/claims/uv-claim-2.json",
+    ".outcomegraph/claims/uv-claim-3.json",
+    ".outcomegraph/claims/uv-claim-4.json",
+    ".outcomegraph/claims/uv-claim-5.json",
+    ".outcomegraph/claims/uv-claim-6.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-uv-2e45bc9984",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:55b5096b3e9298542e3017c86991a1d94ece38020435d2a48eae2b730049879d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 5332,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:55b5096b3e9298542e3017c86991a1d94ece38020435d2a48eae2b730049879d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 5332,
+      "target": "sha256:55b5096b3e9298542e3017c86991a1d94ece38020435d2a48eae2b730049879d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:6158fb661480ef6b6c8b0a4079cdf596f94ab7f68abc6f20ca29027308d4e524",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 88717,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:6158fb661480ef6b6c8b0a4079cdf596f94ab7f68abc6f20ca29027308d4e524",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 88717,
+      "target": "sha256:6158fb661480ef6b6c8b0a4079cdf596f94ab7f68abc6f20ca29027308d4e524",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+      "media_type": "text/plain",
+      "schema_version": 2,
+      "target": "uv.lock",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:d95a3bfe16a5d615cd60ee5ade4c0feacf34d5775378599aca4aa032f890ce35",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5984,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-24.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:d95a3bfe16a5d615cd60ee5ade4c0feacf34d5775378599aca4aa032f890ce35",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5984,
+      "target": "sha256:d95a3bfe16a5d615cd60ee5ade4c0feacf34d5775378599aca4aa032f890ce35",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

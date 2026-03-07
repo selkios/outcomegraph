@@ -1,0 +1,30 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "quickstart",
+  "claim_refs": [
+    ".outcomegraph/claims/quickstart-claim-autopilot-flow.json",
+    ".outcomegraph/claims/quickstart-claim-bootstrap-manual-flow.json",
+    ".outcomegraph/claims/quickstart-claim-materials-lock-migration-context.json",
+    ".outcomegraph/claims/quickstart-claim-prompt-optimization.json",
+    ".outcomegraph/claims/quickstart-claim-rollout-validation-gate.json",
+    ".outcomegraph/claims/quickstart-claim-safety-and-canonical-state.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/materials.lock",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-11-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-11-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-11.json",
+    "MIGRATION_GUIDE.md",
+    "QUICKSTART.md",
+    "sha256:9364b493d013e3cc0dc1b7328db12a2fde85ef10b20ed7aa5e74ccc6b78528e0",
+    "sha256:dcb69cd73bddfc6040d8855e224faf83da6514accf4a87bc5907442ad715aa82",
+    "sha256:e024862286edc86f2e1a224d661f23a0feed4c5f082758d6413b96f32e58cfca"
+  ],
+  "id": "dec-quickstart-f14d39c038",
+  "rationale": "The changed `QUICKSTART.md` snapshot now carries the operative bootstrap, workflow, optimization, safety, and rollout-gate instructions. The supporting `MIGRATION_GUIDE.md` and `.outcomegraph/materials.lock` snapshots retain unchanged context that materially explains the documented rollout blocker and the current lock shape.",
+  "schema_version": 2,
+  "statement": "Update the `quickstart` capsule to center the current quickstart operator contract while preserving migration and materials-lock evidence that conditions rollout readiness.",
+  "status": "updated",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

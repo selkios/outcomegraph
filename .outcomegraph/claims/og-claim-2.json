@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "og",
+  "category": "runtime",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "og-claim-2",
+  "origin": {
+    "changed_files": [
+      "og",
+      "og.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:841dd0396513ab143c5d3245f50f0054a46c7478b0676642d6af7c968b85b34b",
+      "schema_version": 2,
+      "target": "og.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "`og.py` defines `_load_runtime_version()` which reads `pyproject.toml` via `tomllib`, falls back to `importlib.metadata.version('outcomegraph')`, then defaults to `\"0.1.0\"`, and assigns the result to `VERSION`."
+}

@@ -1,0 +1,38 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Execution mode is observe.",
+    "Policy default mode is observe.",
+    "Allowed paths are .outcomegraph/** and AGENTS.md.",
+    "Denied actions are autonomous application code edits, dependency installation, and network actions."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-constitution-09b99c0b17.json",
+    "decisions/dec-constitution-1da9dcc7e7.json",
+    "decisions/dec-constitution-2350e0d6ad.json",
+    "decisions/dec-constitution-38ce3e9174.json",
+    "decisions/dec-constitution-b843090dd2.json",
+    "decisions/dec-constitution-e7f42521b9.json",
+    "decisions/dec-constitution-ed81610905.json"
+  ],
+  "goal": "Define the repository-local observe-mode constitution, including the default execution mode, allowed paths, and denied actions.",
+  "id": "constitution",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "constitution_snapshot_evidence_only",
+      "scope": [
+        ".outcomegraph/constitution/default.yaml"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    ".outcomegraph/constitution/default.yaml"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

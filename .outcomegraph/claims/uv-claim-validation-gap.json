@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "uv",
+  "category": "validation_contract",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "uv-claim-validation-gap",
+  "origin": {
+    "changed_files": [
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b",
+      "schema_version": 2,
+      "target": "uv.lock",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The supplied payload does not evidence a repository-native uv regeneration or verification command for this lockfile change, so the supported validation contract here is snapshot review only."
+}

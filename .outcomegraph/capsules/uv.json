@@ -1,0 +1,38 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Python resolution is constrained by `requires-python = \">=3.11\"` in `uv.lock`.",
+    "The root package is locked as editable source `.` with version `0.1.0`.",
+    "The root runtime dependency contract visible in the lockfile is `pydantic >=2,<3` and `typer >=0.24,<1`.",
+    "This capsule captures the observable state of `uv.lock` only; no prior lockfile state or repository-native regeneration command is present in the input."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-uv-2c74dbb092.json",
+    "decisions/dec-uv-a7a66c97ac.json",
+    "decisions/dec-uv-ee5c7aeda8.json"
+  ],
+  "goal": "Capture the observed `uv.lock` dependency resolution for OutcomeGraph so another agent can reproduce the visible Python environment contract from the supplied snapshot.",
+  "id": "uv",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "uv-lock-snapshot-reconciliation",
+      "scope": [
+        "uv.lock",
+        "Compare a future `uv.lock` against digest `sha256:97e37121d05ecde981197f00c819e094651a18e54f50c953d613da8b9794e60b` and the package/version claims recorded in this capsule",
+        "No repository-native executable verification command was supplied in the input payload"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "uv.lock format and interpreter requirement",
+    "Editable root package dependency contract for `outcomegraph`",
+    "Resolved direct and transitive package pins visible in `uv.lock`"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

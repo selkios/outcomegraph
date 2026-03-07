@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "spec-v2",
+  "category": "bounded_contexts",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "spec-v2-bounded-contexts",
+  "origin": {
+    "changed_files": [
+      "SPEC-v2.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "SPEC-v2.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The specification organizes the system into six DDD bounded contexts: `ArtifactGraph` (canonical schemas, referential integrity, artifact evolution), `StewardRuntime` (trigger intake, locking, orchestration, retries), `Verification` (oracle runs, replay, equivalence, resilience sampling), `Adapters` (stable plugin interfaces and lifecycle compatibility), `ExportSurface` (deterministic agents/skills/MCP exports), and `Optimization` (prompt packs, eval datasets/results, and promotion gates)."
+}

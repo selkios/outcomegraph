@@ -1,0 +1,27 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "skill-og-dogfood",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-76c6ee0493.json",
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-18-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-18-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-18.json",
+    "sha256:5df90df7c2b055c882c35921f148a5c6472e3a5956f0862aff7fcc85b8f300db",
+    "sha256:6cd89c558a03e0a4ff2c35d8df6c3f6e508f016d1d7983f696af6f44f7036b54",
+    "sha256:9df507ca03ce2f7b88915feb4238bfc3288d49191a2dc303928dee143a22e816",
+    "skills/og-dogfood/SKILL.md",
+    "skills/og-dogfood/agents/openai.yaml",
+    "skills/og-dogfood/scripts/run_dogfood.sh"
+  ],
+  "id": "dec-skill-og-dogfood-a2eca65b6b",
+  "rationale": "The modified files jointly encode both the user-facing skill contract and the executable script needed to regenerate the same dogfood validation behavior.",
+  "schema_version": 2,
+  "statement": "Create/refresh a reusable OG dogfood capsule that runs a deterministic end-to-end live dogfood flow and validates captured evidence.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

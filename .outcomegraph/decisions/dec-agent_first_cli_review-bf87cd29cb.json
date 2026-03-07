@@ -1,0 +1,27 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "agent_first_cli_review",
+  "claim_refs": [
+    ".outcomegraph/claims/claim_help_surface_complete.json",
+    ".outcomegraph/claims/claim_introspection_and_safe_inputs.json",
+    ".outcomegraph/claims/claim_observed_runtime_checks_and_tests.json",
+    ".outcomegraph/claims/claim_remaining_partial_and_missing_areas.json",
+    ".outcomegraph/claims/claim_versioned_json_and_typed_errors.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-0-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-0-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-0.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "sha256:2e2cd696a7d5f42f37513480d6e3eedaae6c36761fee8f080a10318de66e3abc",
+    "sha256:abb760c0fef2c0ad2a27970d1d90ee0fe256a3a4e23d04f54cdc82181df2eeb7",
+    "sha256:ee8e0175b07dbb203387ff036919c966dc93ee739e2a71e707c1b92f575bbf73"
+  ],
+  "id": "dec-agent_first_cli_review-bf87cd29cb",
+  "rationale": "The supplied review snapshot aggregates prioritized findings, checklist outcomes, referenced implementation/test/doc loci, and explicit validation commands, which is sufficient to preserve the current agent-first CLI capability description without a live repo scan.",
+  "schema_version": 2,
+  "statement": "Capture `AGENT_FIRST_CLI_REVIEW.md` as the reusable evidence artifact for OutcomeGraph's current agent-first CLI contract state.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

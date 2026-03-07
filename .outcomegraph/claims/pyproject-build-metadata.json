@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "pyproject",
+  "category": "build-system",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "pyproject-build-metadata",
+  "origin": {
+    "changed_files": [
+      "pyproject.toml"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:2e9e83e77841e467e14538fab30ca43364074bf7b4d3e075a488fda256ab293b",
+      "schema_version": 2,
+      "target": "pyproject.toml",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "`pyproject.toml` defines a setuptools build with `requires = [\"setuptools>=68\", \"wheel\"]` and `build-backend = \"setuptools.build_meta\"`, and sets project metadata to `name = \"outcomegraph\"`, `version = \"0.1.0\"`, `description = \"OutcomeGraph CLI and artifact reconciliation workflow\"`, `readme = \"README.md\"`, and `requires-python = \">=3.11\"`."
+}

@@ -1,0 +1,83 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "pyproject",
+  "claim_refs": [
+    ".outcomegraph/claims/pyproject-build-system.json",
+    ".outcomegraph/claims/pyproject-entrypoints.json",
+    ".outcomegraph/claims/pyproject-project-metadata.json",
+    ".outcomegraph/claims/pyproject-pytest-ruff.json",
+    ".outcomegraph/claims/pyproject-ty.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-pyproject-a40d4d917b",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:2e9e83e77841e467e14538fab30ca43364074bf7b4d3e075a488fda256ab293b",
+      "schema_version": 2,
+      "target": "pyproject.toml",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b083abd685ac8f3e66d3fd39cb376704a917ca7eea2d93653007d12cbf6c2eec",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5876,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-10.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b083abd685ac8f3e66d3fd39cb376704a917ca7eea2d93653007d12cbf6c2eec",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 5876,
+      "target": "sha256:b083abd685ac8f3e66d3fd39cb376704a917ca7eea2d93653007d12cbf6c2eec",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:c93e4801c021e333a30eab4761dc1bec94af93bc5b3a9ecbfdf53b101f53d554",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 10955,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-10-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c93e4801c021e333a30eab4761dc1bec94af93bc5b3a9ecbfdf53b101f53d554",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 10955,
+      "target": "sha256:c93e4801c021e333a30eab4761dc1bec94af93bc5b3a9ecbfdf53b101f53d554",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:ec97484fd3a12502c10dfa5aada6fdb9a8e2fbcaa8277c81713a9587e0bbf634",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 5187,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-10-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:ec97484fd3a12502c10dfa5aada6fdb9a8e2fbcaa8277c81713a9587e0bbf634",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 5187,
+      "target": "sha256:ec97484fd3a12502c10dfa5aada6fdb9a8e2fbcaa8277c81713a9587e0bbf634",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

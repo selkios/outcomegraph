@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "readme",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-readme-f35ca11fd4.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-readme-f35ca11fd4",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:7f03912537a99d0f55a44b6cb4ec11b237e07945a9ba6d19ea7c05528e762f31",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1105,
+      "target": ".outcomegraph/traces/readme-sync-20260306t195808z-63324af966-readme-documentation-contract-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:7f03912537a99d0f55a44b6cb4ec11b237e07945a9ba6d19ea7c05528e762f31",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1105,
+      "target": "sha256:7f03912537a99d0f55a44b6cb4ec11b237e07945a9ba6d19ea7c05528e762f31",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

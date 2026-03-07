@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "spec-v2",
+  "category": "cli_surface",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "spec-v2-cli-surface",
+  "origin": {
+    "changed_files": [
+      "SPEC-v2.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0f598aa97b385a15eb85ddb6b04620d398676269389f3e8c0792330b643ced4b",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "SPEC-v2.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The stable CLI surface shown in the snapshot includes `og init`, `og sync`, `og verify`, `og replay`, `og status`, `og export`, `og explain`, `og drift`, `og mcp-server`, `og optimize prompts`, `og autopilot init`, `og autopilot disable`, `og daemon install|start|stop|status`, `og schema`, `og describe <command>`, and `ogd install|start|stop|status`."
+}

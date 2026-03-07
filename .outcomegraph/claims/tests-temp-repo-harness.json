@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "tests",
+  "category": "test-fixture",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "tests-temp-repo-harness",
+  "origin": {
+    "changed_files": [
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c5f1b8556a38cca5f4cab782fa5f975f0e2fef2ddadd773453470a6a2020de13",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The shared `_RepoTestCase` creates a temporary git repository, configures git user identity, exposes a patch helper for `og._git_root`, and can write an executable quality-pass hook at `og.AUTOPILOT_PRE_COMMIT_QUALITY_PASS` that records `.outcomegraph/work/quality-pass-ran` before exiting with a requested status."
+}

@@ -1,0 +1,57 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "skill-og-dogfood",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-skill-og-dogfood-51887540a6.json"
+  ],
+  "created_at": "2026-03-06T22:35:51Z",
+  "id": "cert-skill-og-dogfood-51887540a6",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c0301e5bb1fc251a9d8200548e9f76d9c4347aa9140a4b3f845cfad8828e2216",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1086,
+      "target": ".outcomegraph/traces/skill-og-dogfood-sync-20260306t222121z-7d3ea2b95b-repo-root-live-dogfood-run--advisory-only-in-observe-mode-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c0301e5bb1fc251a9d8200548e9f76d9c4347aa9140a4b3f845cfad8828e2216",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1086,
+      "target": "sha256:c0301e5bb1fc251a9d8200548e9f76d9c4347aa9140a4b3f845cfad8828e2216",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:45bfa7898f0f74cd8c9e04c01b5860e16392064aa0bd1cdbf7f71797786c0914",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1103,
+      "target": ".outcomegraph/traces/skill-og-dogfood-sync-20260306t222121z-7d3ea2b95b-explicit-checkout-argument-live-dogfood-run--advisory-only-in-71f56d5ce6-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:45bfa7898f0f74cd8c9e04c01b5860e16392064aa0bd1cdbf7f71797786c0914",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1103,
+      "target": "sha256:45bfa7898f0f74cd8c9e04c01b5860e16392064aa0bd1cdbf7f71797786c0914",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:51Z"
+}

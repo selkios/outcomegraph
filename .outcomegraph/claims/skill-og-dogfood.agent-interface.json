@@ -1,0 +1,27 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "skill-og-dogfood",
+  "category": "agent_interface",
+  "created_at": "2026-03-06T20:37:57Z",
+  "id": "skill-og-dogfood.agent-interface",
+  "origin": {
+    "changed_files": [
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T203407Z-03b91c8afd"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+      "schema_version": 2,
+      "target": "skills/og-dogfood/agents/openai.yaml",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The OpenAI-facing skill metadata exposes the capability as `OG Dogfood`, describes it as running OutcomeGraph live dogfood validation, and seeds the default prompt to run the live flow in the repository and summarize the evidence."
+}

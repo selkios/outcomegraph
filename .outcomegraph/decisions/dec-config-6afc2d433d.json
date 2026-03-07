@@ -1,0 +1,24 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "config",
+  "claim_refs": [
+    ".outcomegraph/claims/config-core-settings.json",
+    ".outcomegraph/claims/config-safety-envelope.json"
+  ],
+  "created_at": "2026-03-06T21:23:30Z",
+  "evidence_refs": [
+    ".outcomegraph/config.yaml",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-0-input.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-0-result.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-0.json",
+    "sha256:768c1604ae1a8cddfe268730604fdfacc6385f02b5fecdd0d9ae7a2386086224",
+    "sha256:a1087145c4af62da33a70a58f48f04169f4b0776c5469320dab316af674a5358",
+    "sha256:dcd49dae706aa6557e4f0f38b777ff1db6d0ffed550f4a411e7a09744c337466"
+  ],
+  "id": "dec-config-6afc2d433d",
+  "rationale": "The provided file snapshot contains the full YAML content and SHA-256 digest for the only changed file, which is sufficient to preserve the observable analyze/observe configuration and its safety envelope.",
+  "schema_version": 2,
+  "statement": "Capture the current `.outcomegraph/config.yaml` snapshot as the reusable configuration capsule for the distill worker's analyze/observe mode.",
+  "status": "confirmed",
+  "updated_at": "2026-03-06T21:23:30Z"
+}

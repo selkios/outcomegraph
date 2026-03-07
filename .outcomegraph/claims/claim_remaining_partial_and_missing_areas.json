@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "agent_first_cli_review",
+  "category": "known_gaps",
+  "created_at": "2026-03-06T22:01:14Z",
+  "id": "claim_remaining_partial_and_missing_areas",
+  "origin": {
+    "changed_files": [
+      "AGENT_FIRST_CLI_REVIEW.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T214821Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:4af36592954ed08c12fc6f9b65437f6c8c2cea52094eea037cc846a64387e69c",
+      "schema_version": 2,
+      "target": "AGENT_FIRST_CLI_REVIEW.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The review snapshot still marks recovery tooling, explicit session contracts, a stable top-level versioned agent guidance file, fuller multi-surface/MCP defaults, and AI-native outcome metrics as partial or missing."
+}

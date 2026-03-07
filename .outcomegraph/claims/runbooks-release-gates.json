@@ -1,0 +1,37 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "runbooks",
+  "category": "release",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "runbooks-release-gates",
+  "origin": {
+    "changed_files": [
+      "RUNBOOKS.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c5f1b8556a38cca5f4cab782fa5f975f0e2fef2ddadd773453470a6a2020de13",
+      "schema_version": 2,
+      "target": "tests/test_og_sync_verify_replay_hooks.py",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c7fcfc0a77c81e8d3ff9fdceeee3b8d1e4136e44ab3ec508f4f6003b2777c611",
+      "schema_version": 2,
+      "target": "RUNBOOKS.md",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:f42f2803c90e6ee41ce3e7a8a06f0a2ecb215a05e777f5d6aba4ae0ef241661e",
+      "schema_version": 2,
+      "target": "SPEC_IMPLEMENTATION_MATRIX.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Release/readiness review is documented around `og sync --json`, `og status --json`, `og verify --changed --json`, a `partial|missing` scan of `SPEC_IMPLEMENTATION_MATRIX.md`, and `uv run pytest tests/test_og_sync_verify_replay_hooks.py`; the matrix snapshot still records multiple `partial` conformance items."
+}

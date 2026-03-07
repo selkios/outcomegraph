@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "ogd",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-ogd-9e3cc0de21.json"
+  ],
+  "created_at": "2026-03-06T22:35:35Z",
+  "id": "cert-ogd-9e3cc0de21",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:843596e7d75f7d1f31706728946bb66a5420560217441da1fcf0e7f3619c7a32",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1048,
+      "target": ".outcomegraph/traces/ogd-sync-20260306t222121z-7d3ea2b95b-observed-launcher-snapshot-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:843596e7d75f7d1f31706728946bb66a5420560217441da1fcf0e7f3619c7a32",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1048,
+      "target": "sha256:843596e7d75f7d1f31706728946bb66a5420560217441da1fcf0e7f3619c7a32",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:35Z"
+}

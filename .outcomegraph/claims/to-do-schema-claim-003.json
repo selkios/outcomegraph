@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "to-do-schema",
+  "category": "contract",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "to-do-schema-claim-003",
+  "origin": {
+    "changed_files": [
+      "to-do.schema.json"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:d216c0efd1a24b88c762e25084c294e3d962700da5592fb8d54bbd7fa546d9cb",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "target": "to-do.schema.json",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Each `tasks` item requires `id`, `title`, `priority`, `status`; `priority` is integer 1..5 and `status` enum is `todo|doing|blocked|done`; optional fields include `details`, `steps`, `blockers`, `tags`, `files`, `depends_on`, and timestamp fields."
+}

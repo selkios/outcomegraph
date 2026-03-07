@@ -1,0 +1,24 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "config",
+  "claim_refs": [
+    ".outcomegraph/claims/config.observe-profile.json",
+    ".outcomegraph/claims/config.safety.json"
+  ],
+  "created_at": "2026-03-06T22:06:44Z",
+  "evidence_refs": [
+    ".outcomegraph/config.yaml",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-input.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch-result.json",
+    ".outcomegraph/traces/sync-20260306t220320z-9439e19cb4-distill-batch.json",
+    "sha256:60ffba80221759e408ec4d57091eccebe1db50bcdd6795d01f56ccaccd9774bd",
+    "sha256:8aa277024042922cf0b4231e76b376aaf87f4a3a9827607dceb2d1ca89cf9f5b",
+    "sha256:bff4e0ea8c321983dcac409d7e999637d0689423faa6caa6cc8588a61a6411d8"
+  ],
+  "id": "dec-config-4fb440bf9f",
+  "rationale": "The only changed file snapshot is complete and non-truncated, and it fully captures the observable configuration fields needed to reproduce this capability.",
+  "schema_version": 2,
+  "statement": "Treat `.outcomegraph/config.yaml` as the authoritative observe/analyze adapter snapshot for this capsule.",
+  "status": "recorded",
+  "updated_at": "2026-03-06T22:06:44Z"
+}

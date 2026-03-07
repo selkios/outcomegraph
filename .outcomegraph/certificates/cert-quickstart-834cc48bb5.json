@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "quickstart",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-quickstart-834cc48bb5.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-quickstart-834cc48bb5",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:90c5330f3195dfe90062504042a880a769f30654f2d894afc2ca282e8b808eab",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1200,
+      "target": ".outcomegraph/traces/quickstart-sync-20260306t195808z-63324af966-command-catalog-references-are-documented-examples--not-a-hard-verification-contract-unless-backed-by-execution-evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:90c5330f3195dfe90062504042a880a769f30654f2d894afc2ca282e8b808eab",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1200,
+      "target": "sha256:90c5330f3195dfe90062504042a880a769f30654f2d894afc2ca282e8b808eab",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

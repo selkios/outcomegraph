@@ -1,0 +1,38 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Scope is limited to `.outcomegraph/config.yaml`; no supporting file snapshots were supplied for this capsule.",
+    "The captured `.outcomegraph/config.yaml` snapshot is a full, untruncated file view and fixes `mode: observe` with `profile: analyze`.",
+    "The captured safety settings reference `policy.yaml` and set `max_writes_per_run: 64`, but the policy file contents are not included in this capsule input.",
+    "No executable repository verification command is evidenced in the input, so validation is limited to snapshot-content and digest matching."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-config-0bb27abaca.json",
+    "decisions/dec-config-115ca54158.json",
+    "decisions/dec-config-4697c99c06.json",
+    "decisions/dec-config-4fb440bf9f.json",
+    "decisions/dec-config-667b06aaf3.json",
+    "decisions/dec-config-6afc2d433d.json",
+    "decisions/dec-config-7c0e23419b.json"
+  ],
+  "goal": "Capture the observed OutcomeGraph adapter configuration in `.outcomegraph/config.yaml` so another agent can recreate the same `observe`/`analyze` setup and safety envelope.",
+  "id": "config",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "Match `.outcomegraph/config.yaml` to the recorded full snapshot and digest `sha256:4edbe2e6f4dd89a1b0bf0e70adc7f476e74323ee697ace5e308a821ed9b3363e`; no executable repository verification command is evidenced in the input.",
+      "scope": [
+        ".outcomegraph/config.yaml"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    ".outcomegraph/config.yaml"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

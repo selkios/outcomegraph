@@ -1,0 +1,26 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "input_validation_and_errors",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "security_policy_claim_5",
+  "origin": {
+    "changed_files": [
+      "SECURITY_POLICY.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0eda446e441b9c66aac14fa96c0f3e493271364b962ed08ca211b6c3a48f72a0",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "SECURITY_POLICY.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Section 3b/4 describe strict input guards for IDs/paths (`[a-z0-9._-]`, no control chars, bounded/relative optimization paths) and mandated denial payloads with `status: error` and `code: POLICY_DENIED`."
+}

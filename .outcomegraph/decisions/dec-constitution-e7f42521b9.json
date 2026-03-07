@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "constitution",
+  "claim_refs": [
+    ".outcomegraph/claims/constitution.allowlist.json",
+    ".outcomegraph/claims/constitution.denylist.json",
+    ".outcomegraph/claims/constitution.metadata.json",
+    ".outcomegraph/claims/constitution.mode_policy.json"
+  ],
+  "created_at": "2026-03-06T22:10:53Z",
+  "evidence_refs": [
+    ".outcomegraph/constitution/default.yaml",
+    ".outcomegraph/traces/sync-20260306t220747z-9439e19cb4-distill-batch-1-input.json",
+    ".outcomegraph/traces/sync-20260306t220747z-9439e19cb4-distill-batch-1-result.json",
+    ".outcomegraph/traces/sync-20260306t220747z-9439e19cb4-distill-batch-1.json",
+    "sha256:899bcfc67fb9ceb6d8869eab69afd0777a24ab8f215b9caa7bab3457406a2bd7",
+    "sha256:8fb10086e677271502eb686b3efd4de32bd9ec6ab1a103b00c13631333effb94",
+    "sha256:ddd74941a9e2792c1d62636771bd49d0ac8e7b3bf82eae973f42254495d00465"
+  ],
+  "id": "dec-constitution-e7f42521b9",
+  "rationale": "The provided snapshot fully specifies the constitution state in .outcomegraph/constitution/default.yaml, including mode, policy.default_mode, allowlist, and denylist. The input payload does not evidence a repository-native executable verification command, so the oracle remains snapshot-based with command=null.",
+  "schema_version": 2,
+  "statement": "Capture the current observe-mode constitution from the changed file snapshot as the reusable capsule state.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:10:53Z"
+}

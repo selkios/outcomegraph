@@ -1,0 +1,28 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "plugin_api",
+  "claim_refs": [
+    ".outcomegraph/claims/plugin_api_builtin_defaults.json",
+    ".outcomegraph/claims/plugin_api_discovery_and_manifest.json",
+    ".outcomegraph/claims/plugin_api_doc_identity.json",
+    ".outcomegraph/claims/plugin_api_interface_versions_and_methods.json",
+    ".outcomegraph/claims/plugin_api_registration_and_failure_behavior.json",
+    ".outcomegraph/claims/plugin_api_shared_payload_types.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-8-input.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-8-result.json",
+    ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-8.json",
+    "PLUGIN_API.md",
+    "sha256:8c3fe619350872a94f332218c3a44c165b4c05107398b71498147b6476d38952",
+    "sha256:9825572f22dcb2c83b382cdfc570aaaa45aa103c1b04ff33e63c9faf8c7d40a1",
+    "sha256:fb1b9d9e337cae62fb7dea6d164cf619d733b1b78a5a3011112adb6e8e23c570"
+  ],
+  "id": "dec-plugin_api-1812fcb9fb",
+  "rationale": "The payload includes a full untruncated snapshot of `PLUGIN_API.md` that directly documents the v2.1 adapter contract surface. That snapshot is sufficient to capture discovery, manifest requirements, interface/version rules, method signatures, payload names, registration behavior, failure handling, and built-in defaults. No repository-backed executable verification command is evidenced in the payload, so the oracle remains documentation-only.",
+  "schema_version": 2,
+  "statement": "Refresh the `plugin_api` capsule from the `PLUGIN_API.md` v2.1 reference snapshot.",
+  "status": "captured",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

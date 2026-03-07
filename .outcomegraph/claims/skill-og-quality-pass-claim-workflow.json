@@ -1,0 +1,28 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "skill-og-quality-pass",
+  "category": "workflow",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "skill-og-quality-pass-claim-workflow",
+  "origin": {
+    "changed_files": [
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:00dbd85efd765c00a45a6da4896180890158cf60d345c6a2acf42fe51225d5fc",
+      "media_type": "text/markdown",
+      "schema_version": 2,
+      "target": "skills/og-quality-pass/SKILL.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "The skill contract defines a deterministic OutcomeGraph quality pass that must run through the bundled wrapper in the order `ruff` -> `ty` -> `pytest` and reduce the overall result to a single pass/fail summary."
+}

@@ -1,0 +1,27 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "skill-og",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-0030f45840.json",
+    ".outcomegraph/claims/cl-76c6ee0493.json",
+    ".outcomegraph/claims/cl-7c1c3c267a.json",
+    ".outcomegraph/claims/cl-81f2d6903e.json",
+    ".outcomegraph/claims/cl-9c5669cccf.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-17-input.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-17-result.json",
+    ".outcomegraph/traces/sync-20260306t195808z-63324af966-distill-batch-17.json",
+    "sha256:34eb85366825db19decc78806b079a3f7f0ff26482bb54106d6f1d6c1e68d603",
+    "sha256:3698e625dcae56ad3c2e4e767a8e81b1e9f65393c2b56da85d749760ca8f08be",
+    "sha256:b643dd134c1f5aaa08f22e6d62d3c5624ab1503744b8c06113c7fe662a75e7e2",
+    "skills/og/SKILL.md"
+  ],
+  "id": "dec-skill-og-d3fa760410",
+  "rationale": "The changed file snapshot gives a complete, explicit skill specification for OG behavior in this repository, with commands, path anchors, and validation expectations suitable for regenerating the capability.",
+  "schema_version": 2,
+  "statement": "Reusable capability captured from authoritative local skill spec snapshot.",
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

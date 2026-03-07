@@ -1,0 +1,82 @@
+{
+  "adapter": {
+    "name": "codex",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "policy",
+  "claim_refs": [
+    ".outcomegraph/claims/allow-writes-and-sandbox.json",
+    ".outcomegraph/claims/deny-rules.json",
+    ".outcomegraph/claims/policy-identity.json",
+    ".outcomegraph/claims/verify-command-catalog.json"
+  ],
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "cert-policy-ae4006a467",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:15ea4e37b46009c62743de3bad2b3d4794f152d1ba71d1585aa8d59f7a14099d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 9550,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-9-input.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:15ea4e37b46009c62743de3bad2b3d4794f152d1ba71d1585aa8d59f7a14099d",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 9550,
+      "target": "sha256:15ea4e37b46009c62743de3bad2b3d4794f152d1ba71d1585aa8d59f7a14099d",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:3fe2ec32eca31c6f71544b0c07e178d5cca7ce3c6de93f7f1b57177a14accc6c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4630,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-9.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:3fe2ec32eca31c6f71544b0c07e178d5cca7ce3c6de93f7f1b57177a14accc6c",
+      "media_type": "application/x-ndjson",
+      "schema_version": 2,
+      "size": 4630,
+      "target": "sha256:3fe2ec32eca31c6f71544b0c07e178d5cca7ce3c6de93f7f1b57177a14accc6c",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:eb806630b6b66607fba7e60aa002f6171ccd21a1f7721a90517c86003c6fd4ae",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4066,
+      "target": ".outcomegraph/traces/sync-20260306t222121z-7d3ea2b95b-distill-batch-9-result.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:eb806630b6b66607fba7e60aa002f6171ccd21a1f7721a90517c86003c6fd4ae",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4066,
+      "target": "sha256:eb806630b6b66607fba7e60aa002f6171ccd21a1f7721a90517c86003c6fd4ae",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:eef8259151e4bc37423b674b33b83343ee22043ddfcb49b49e8e68fbfc46af4f",
+      "schema_version": 2,
+      "target": ".outcomegraph/policy.yaml",
+      "type": "file"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "analyze",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "distill"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

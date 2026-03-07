@@ -81,6 +81,81 @@ def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = 
     }
 
 
+class TestDistillSnapshotSelection(_RepoTestCase):
+    def test_read_repo_file_snapshot_uses_diff_hunks_for_large_changed_python_file(self) -> None:
+        file_path = self.repo / "tests" / "large_case.py"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        original_lines = [f"line_{index:04d} = '{'x' * 40}'\n" for index in range(1, 1401)]
+        file_path.write_text("".join(original_lines), encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tests/large_case.py"], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "baseline"], check=True)
+        baseline = subprocess.run(
+            ["git", "-C", str(self.repo), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        updated_lines = list(original_lines)
+        updated_lines[1199] = "SPECIAL_LATE_TOKEN = 'diff-visible'\n"
+        file_path.write_text("".join(updated_lines), encoding="utf-8")
+
+        snapshot = og._read_repo_file_snapshot(
+            str(self.repo),
+            "tests/large_case.py",
+            diff_baseline=baseline,
+        )
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot["selection"], "diff_hunks")
+        self.assertTrue(snapshot["partial"])
+        self.assertIn("SPECIAL_LATE_TOKEN", snapshot["content"])
+        self.assertFalse(snapshot["truncated"])
+
+    def test_build_distill_target_capsules_includes_supporting_scope_snapshots(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            (self.repo / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+            runtime_payload = og._build_capsule_payload(
+                "runtime",
+                [".gitignore", ".outcomegraph/.gitignore"],
+                [],
+                None,
+                og._utc_timestamp(),
+                goal="Track runtime ignore rules.",
+                scope=[".gitignore", ".outcomegraph/.gitignore"],
+                constraints=[],
+                oracles=[{"name": "runtime-verify", "command": None, "scope": [".gitignore", ".outcomegraph/.gitignore"]}],
+                status="success",
+            )
+            (self.repo / ".outcomegraph" / "capsules" / "runtime.json").write_text(
+                json.dumps(runtime_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+
+            targets = og._build_distill_target_capsules(
+                str(self.repo),
+                ["runtime"],
+                {"runtime": [".gitignore"]},
+            )
+
+        supporting = targets[0]["supporting_file_snapshots"]
+        self.assertEqual(targets[0]["changed_files"], [".gitignore"])
+        self.assertTrue(any(snapshot["path"] == ".outcomegraph/.gitignore" for snapshot in supporting))
+
+    def test_read_repo_file_snapshot_keeps_moderate_docs_and_lockfiles_complete(self) -> None:
+        spec_path = self.repo / "SPEC-v2.md"
+        lock_path = self.repo / "uv.lock"
+        spec_path.write_text("spec-section\n" * 2500, encoding="utf-8")
+        lock_path.write_text("package = 'demo'\n" * 2400, encoding="utf-8")
+
+        spec_snapshot = og._read_repo_file_snapshot(str(self.repo), "SPEC-v2.md")
+        lock_snapshot = og._read_repo_file_snapshot(str(self.repo), "uv.lock")
+
+        self.assertFalse(spec_snapshot["truncated"])
+        self.assertFalse(lock_snapshot["truncated"])
+
+
 class TestHelpContracts(TestCase):
     def _run_main(self, args: list[str]) -> tuple[int, str]:
         buffer = io.StringIO()
@@ -2499,6 +2574,34 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(capsule_payload["status"], "success")
         self.assertIn("pytest -q", oracle_commands)
 
+    def test_run_apply_stage_promotes_warn_python_capsule_with_executable_oracle(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("tests", ["tests/test_example.py"], status="warn")
+            delta["oracles"] = [
+                {
+                    "name": "pytest regression suite",
+                    "command": "pytest -q",
+                    "scope": ["tests/test_example.py"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["tests"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(capsule_payload["status"], "success")
+
     def test_run_apply_stage_downgrades_policy_blocked_oracle_to_advisory_only(self) -> None:
         with self.git_root_patch():
             og._init_outcomegraph()
@@ -2556,6 +2659,27 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(len(checks), 1)
         self.assertEqual(checks[0].get("code"), og.POLICY_DENIED_CODE)
         self.assertEqual(checks[0].get("status"), "skipped")
+
+    def test_run_oracle_check_shortens_overlong_trace_names(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            oracle_result = og._run_oracle_check(
+                str(self.repo),
+                "default",
+                {
+                    "name": "very long oracle " + ("evidence-" * 40),
+                    "command": None,
+                    "scope": [],
+                },
+                [],
+                "run-long",
+                "observe",
+            )
+
+        trace_path = self.repo / oracle_result["trace"]
+        self.assertEqual(oracle_result["status"], "pass")
+        self.assertTrue(trace_path.exists())
+        self.assertLess(len(trace_path.name), 255)
 
     def test_run_replay_stage_blocks_disallowed_sandbox_operation(self) -> None:
         (self.repo / ".outcomegraph").mkdir()

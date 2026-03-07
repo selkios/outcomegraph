@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "architecture",
+  "category": "sync_loop",
+  "created_at": "2026-03-06T22:35:27Z",
+  "id": "architecture-sync-loop",
+  "origin": {
+    "changed_files": [
+      "ARCHITECTURE.md"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:ae244a50a771cbd7ffef1e32aba80637f36d07042baef027a599b3f76f06c7bc",
+      "schema_version": 2,
+      "target": "ARCHITECTURE.md",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "All autonomous entrypoints are intentionally collapsed into `og sync`, whose documented loop is lock acquisition, baseline resolution, change detection, capsule mapping, WorkerAdapter distillation, structured delta application, optional fast verification, export refresh, sync summary recording, and lock release."
+}

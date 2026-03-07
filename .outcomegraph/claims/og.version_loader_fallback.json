@@ -1,0 +1,25 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "og",
+  "category": "version_resolution",
+  "created_at": "2026-03-06T20:37:57Z",
+  "id": "og.version_loader_fallback",
+  "origin": {
+    "changed_files": [
+      "og.py"
+    ],
+    "mode": "observe",
+    "profile": "analyze",
+    "run_id": "sync-20260306T203407Z-03b91c8afd"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:09e38497164108e66b917c21b3de277012a19966990bc8bdb54a98bc3c3fa5c6",
+      "schema_version": 2,
+      "target": "og.py",
+      "type": "file"
+    }
+  ],
+  "schema_version": 2,
+  "text": "`og.py` defines `_load_runtime_version()` to open `pyproject.toml` from the module directory, read `project.version` with `tomllib` when available, fall back to `importlib.metadata.version(\"outcomegraph\")`, and return `\"0.1.0\"` if neither source yields a usable version."
+}

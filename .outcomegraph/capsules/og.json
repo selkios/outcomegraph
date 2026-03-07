@@ -1,0 +1,55 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "og must remain a thin executable Python shim that imports main from og and exits with SystemExit(main(sys.argv[1:])).",
+    "_load_runtime_version() must resolve pyproject.toml beside og.py, then installed outcomegraph package metadata, then 0.1.0.",
+    "VERSION = _load_runtime_version() must remain at module scope.",
+    "The visible og.py CLI contract prefix must keep exported exit codes, named error codes, POLICY_SCHEMA_VERSION = 2, error-class labels, and ERROR_CLASS_BY_CODE."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-og-0844297f59.json",
+    "decisions/dec-og-11fc939cbb.json",
+    "decisions/dec-og-2d837aebb1.json",
+    "decisions/dec-og-5355e2db1f.json",
+    "decisions/dec-og-afa722e837.json",
+    "decisions/dec-og-f5958de6a9.json",
+    "decisions/dec-og-f76b710217.json"
+  ],
+  "goal": "Maintain OutcomeGraph's stable CLI entrypoint contract: the og executable delegates to og.main, and og.py resolves runtime versioning while exposing module-level CLI exit and error metadata.",
+  "id": "og",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "Static inspection of the provided og and og.py snapshots confirms the wrapper entrypoint, runtime version fallback, and visible CLI contract prefix; the snapshots do not themselves establish a repository-native executable verification command.",
+      "scope": [
+        "og",
+        "og.py",
+        "snapshot",
+        "CLI entrypoint contract"
+      ]
+    },
+    {
+      "command": "pytest -q",
+      "name": "Existing capsule regression suite for the stable CLI contract scaffold",
+      "scope": [
+        "og.py",
+        "runtime version resolution",
+        "module-level version binding",
+        "exported exit and error metadata"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "executable CLI shim",
+    "stable CLI contract scaffold",
+    "runtime version resolution",
+    "module-level version binding",
+    "exported exit and policy/error metadata"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

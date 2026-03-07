@@ -1,0 +1,77 @@
+{
+  "artifact_type": "capsule",
+  "constraints": [
+    "Prefer --json for scripts, CI, and other machine-safe automation flows.",
+    "Treat status: error as a non-zero automation failure condition.",
+    "Persist status and run summaries in .outcomegraph/work/, .outcomegraph/events/, .outcomegraph/claims/, and .outcomegraph/certificates/.",
+    "Do not conclude success unless outputs include explicit parseable status data and deterministic runtime, status, and message fields.",
+    "For daemon sync paths, malformed or non-JSON og sync --json output must be treated as failure.",
+    "Keep edits minimal and production-safe, preserve existing ok/warn/error conventions, and avoid speculative refactors."
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "decision_refs": [
+    "decisions/dec-skill-og-1ad8d0472b.json",
+    "decisions/dec-skill-og-81d0fd6a93.json",
+    "decisions/dec-skill-og-d3fa760410.json"
+  ],
+  "goal": "Capture the repository-documented og operational contract so another agent can reconstruct OutcomeGraph command selection, safety checks, and anchor paths from repository evidence.",
+  "id": "skill-og",
+  "lineage": {},
+  "materials_lock_ref": ".outcomegraph/materials.lock",
+  "oracles": [
+    {
+      "command": null,
+      "name": "Documentation oracle from skills/og/SKILL.md for og command selection, pipeline ordering, safety checks, and anchor paths",
+      "scope": [
+        "skills/og/SKILL.md"
+      ]
+    },
+    {
+      "command": null,
+      "name": "Entrypoint and runtime-path oracle from og and og.py; the payload corroborates wrapper and path constants but does not include executed verification commands",
+      "scope": [
+        "og",
+        "og.py"
+      ]
+    },
+    {
+      "command": null,
+      "name": "Filesystem topology oracle from .outcomegraph snapshots; directory listings confirm persisted state locations but not live CLI behavior",
+      "scope": [
+        ".outcomegraph/",
+        ".outcomegraph/claims/"
+      ]
+    },
+    {
+      "command": "pytest -q",
+      "name": "pytest regression suite",
+      "scope": [
+        ".outcomegraph/",
+        ".outcomegraph/certificates/",
+        ".outcomegraph/claims/",
+        ".outcomegraph/events/",
+        ".outcomegraph/export/",
+        ".outcomegraph/work/",
+        ".outcomegraph/work/daemon/",
+        "og",
+        "og.py",
+        "skills/og/SKILL.md"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "scope": [
+    "skills/og/SKILL.md",
+    "og",
+    "og.py",
+    ".outcomegraph/",
+    ".outcomegraph/work/",
+    ".outcomegraph/work/daemon/",
+    ".outcomegraph/events/",
+    ".outcomegraph/claims/",
+    ".outcomegraph/certificates/",
+    ".outcomegraph/export/"
+  ],
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:27Z"
+}

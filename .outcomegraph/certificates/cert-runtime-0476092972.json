@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "runtime",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-runtime-0476092972.json"
+  ],
+  "created_at": "2026-03-06T22:35:43Z",
+  "id": "cert-runtime-0476092972",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:1e5d0745325c60a0a53f68152dc63a69ebd0ad904f786f9ffdcd0c06da4a42e3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1201,
+      "target": ".outcomegraph/traces/runtime-sync-20260306t222121z-7d3ea2b95b-no-executable-oracle-was-supplied-in-evidence--verify-the-roo-44e4f5dbec-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:1e5d0745325c60a0a53f68152dc63a69ebd0ad904f786f9ffdcd0c06da4a42e3",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1201,
+      "target": "sha256:1e5d0745325c60a0a53f68152dc63a69ebd0ad904f786f9ffdcd0c06da4a42e3",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T222121Z-7d3ea2b95b",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T22:35:43Z"
+}

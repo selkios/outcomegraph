@@ -1,0 +1,83 @@
+{
+  "artifact_type": "claim",
+  "capsule_id": "security_policy",
+  "category": "behavior",
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cl-security_policy-1e39ba1434",
+  "origin": {
+    "changed_files": [
+      ".agents/skills/og-quality-pass",
+      ".gitignore",
+      ".outcomegraph/.gitignore",
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/materials.lock",
+      ".outcomegraph/policy.yaml",
+      "AGENT_FIRST_CLI_REVIEW.md",
+      "ARCHITECTURE.md",
+      "MIGRATION_GUIDE.md",
+      "PLUGIN_API.md",
+      "QUICKSTART.md",
+      "README.md",
+      "RUNBOOKS.md",
+      "SECURITY_POLICY.md",
+      "SPEC-v2.md",
+      "SPEC_IMPLEMENTATION_MATRIX.md",
+      "og",
+      "og.py",
+      "ogd",
+      "pyproject.toml",
+      "skills/og-dogfood/SKILL.md",
+      "skills/og-dogfood/agents/openai.yaml",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "skills/og-quality-pass/SKILL.md",
+      "skills/og-quality-pass/agents/openai.yaml",
+      "skills/og-quality-pass/scripts/run_quality_pass.sh",
+      "skills/og/SKILL.md",
+      "tests/conftest.py",
+      "tests/test_og_sync_verify_replay_hooks.py",
+      "to-do.json",
+      "to-do.schema.json",
+      "uv.lock"
+    ],
+    "mode": "observe",
+    "profile": "verify",
+    "run_id": "sync-20260306T195808Z-63324af966"
+  },
+  "receipt_pointers": [
+    {
+      "hash": "sha256:35c7cf1a6e07e4b21523169b710a13772bae25aee0c356e1e3da9f694be6042a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1118,
+      "target": ".outcomegraph/traces/security_policy-sync-20260306t195808z-63324af966-security_policy-document-evidence-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:35c7cf1a6e07e4b21523169b710a13772bae25aee0c356e1e3da9f694be6042a",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1118,
+      "target": "sha256:35c7cf1a6e07e4b21523169b710a13772bae25aee0c356e1e3da9f694be6042a",
+      "type": "cas"
+    },
+    {
+      "hash": "sha256:9201aec41ae4cab9bc75eca413a18648c562ec60886b7c0902233f5ca2cb4017",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1129,
+      "target": ".outcomegraph/traces/security_policy-sync-20260306t195808z-63324af966-security_policy-verify-command-allowlist-gap-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:9201aec41ae4cab9bc75eca413a18648c562ec60886b7c0902233f5ca2cb4017",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1129,
+      "target": "sha256:9201aec41ae4cab9bc75eca413a18648c562ec60886b7c0902233f5ca2cb4017",
+      "type": "cas"
+    }
+  ],
+  "schema_version": 2,
+  "text": "Verification checkpoints for security_policy on 2 oracle checks."
+}

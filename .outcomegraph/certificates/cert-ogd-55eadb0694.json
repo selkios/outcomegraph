@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "ogd",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-ogd-55eadb0694.json"
+  ],
+  "created_at": "2026-03-06T19:59:05Z",
+  "id": "cert-ogd-55eadb0694",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:643449c1723d46d5eed49eb96fff9cec70cd3d879bbe79e52f87db6419b7da79",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1110,
+      "target": ".outcomegraph/traces/ogd-sync-20260306t195808z-63324af966-observed-script-reconstruction-oracle-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:643449c1723d46d5eed49eb96fff9cec70cd3d879bbe79e52f87db6419b7da79",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 1110,
+      "target": "sha256:643449c1723d46d5eed49eb96fff9cec70cd3d879bbe79e52f87db6419b7da79",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "sync-20260306T195808Z-63324af966",
+    "source": "oracle-loop"
+  },
+  "run_id": "sync-20260306T195808Z-63324af966",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-06T19:59:05Z"
+}

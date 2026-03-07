@@ -1,0 +1,26 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "og",
+  "claim_refs": [
+    ".outcomegraph/claims/og-cli-error-contract.json",
+    ".outcomegraph/claims/og-runtime-version-loader.json",
+    ".outcomegraph/claims/og-wrapper-entrypoint.json"
+  ],
+  "created_at": "2026-03-06T22:01:14Z",
+  "evidence_refs": [
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-6-input.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-6-result.json",
+    ".outcomegraph/traces/sync-20260306t214821z-7d3ea2b95b-distill-batch-6.json",
+    "og",
+    "og.py",
+    "sha256:2b4fee5d09fb3988d23ac9928d915c69554c61b1d8bcbf0d0ed82fb5bd1430a3",
+    "sha256:a988bb4a6dda944a7cbbeb77c276aceb99bc8d9f40fbea6b8e74b3e842974063",
+    "sha256:b0ad3ef12badaa4837a720104fdda14b400ceb1f5eade8fd736b1fe994b2dec5"
+  ],
+  "id": "dec-og-5355e2db1f",
+  "rationale": "The input provides full evidence for the wrapper script and a truncated but still concrete `og.py` snapshot covering version resolution and the exported error-contract constants. That is enough to capture the current observable capsule surface, while limiting claims to what is explicitly visible.",
+  "schema_version": 2,
+  "statement": "Capture `og` as the OutcomeGraph CLI adapter surface: a wrapper executable over `og.main` plus the visible stable contract exported by `og.py`.",
+  "status": "success",
+  "updated_at": "2026-03-06T22:01:14Z"
+}

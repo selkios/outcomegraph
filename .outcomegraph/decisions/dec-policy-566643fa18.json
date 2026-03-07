@@ -1,0 +1,25 @@
+{
+  "artifact_type": "decision",
+  "capsule_id": "policy",
+  "claim_refs": [
+    ".outcomegraph/claims/policy-allowlist.json",
+    ".outcomegraph/claims/policy-denylist.json",
+    ".outcomegraph/claims/policy-header.json"
+  ],
+  "created_at": "2026-03-06T21:23:30Z",
+  "evidence_refs": [
+    ".outcomegraph/policy.yaml",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-3-input.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-3-result.json",
+    ".outcomegraph/traces/sync-20260306t212059z-bfdeaf732b-distill-batch-3.json",
+    "sha256:50e061bbcb06f0afa53bcc0bebc5214c5bc75a8d863232b8339d017830a735b2",
+    "sha256:c18bc404c5d03019ebcbb411d1057916b4d3db59a155b5f443a6aa7b56bfd3bb",
+    "sha256:e6f3f81ba8e8b05c260242a4a4945d96f8dabed5ba360d991d6cc15f466fbb92"
+  ],
+  "id": "dec-policy-566643fa18",
+  "rationale": "The provided non-truncated snapshot contains the full observe-policy header, allowlists, and denylists needed to reconstruct the current capsule state without inferring missing repository context.",
+  "schema_version": 2,
+  "statement": "The current observe-mode policy state is fully captured from `.outcomegraph/policy.yaml`.",
+  "status": "accepted",
+  "updated_at": "2026-03-06T21:23:30Z"
+}
