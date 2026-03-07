@@ -1828,7 +1828,7 @@
       "id": "OG-DISTILL-001",
       "title": "Enrich distill payloads with code-aware feature context",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Phase 3 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: improve distill inputs so Codex sees feature-relevant context instead of mainly file snapshots and path lists.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 3 and extend the distill payload with changed-region context, stronger supporting scope inputs, existing capsule summaries, and related test/oracle hints",
@@ -1848,10 +1848,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tasks/og-distill-001/TASK.md",
+        "tasks/og-distill-001/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T09:21:23Z"
     },
     {
       "id": "OG-DISTILL-002",

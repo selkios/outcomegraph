@@ -145,6 +145,168 @@ class TestDistillSnapshotSelection(_RepoTestCase):
         self.assertEqual(targets[0]["existing_capsule"]["kind"], "runtime")
         self.assertTrue(any(snapshot["path"] == ".outcomegraph/.gitignore" for snapshot in supporting))
 
+    def test_build_distill_target_capsules_exposes_changed_region_context(self) -> None:
+        file_path = self.repo / "tests" / "large_case.py"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        original_lines = [f"line_{index:04d} = '{'x' * 40}'\n" for index in range(1, 1401)]
+        file_path.write_text("".join(original_lines), encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tests/large_case.py"], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "baseline"], check=True)
+        baseline = subprocess.run(
+            ["git", "-C", str(self.repo), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        updated_lines = list(original_lines)
+        updated_lines[1199] = "SPECIAL_LATE_TOKEN = 'diff-visible'\n"
+        file_path.write_text("".join(updated_lines), encoding="utf-8")
+
+        targets = og._build_distill_target_capsules(
+            str(self.repo),
+            ["tests"],
+            {"tests": ["tests/large_case.py"]},
+            diff_baseline=baseline,
+        )
+
+        region = targets[0]["changed_region_context"][0]
+        self.assertEqual(region["path"], "tests/large_case.py")
+        self.assertEqual(region["selection"], "diff_hunks")
+        self.assertTrue(region["partial"])
+        self.assertTrue(any(item["start_line"] <= 1200 <= item["end_line"] for item in region["snippets"]))
+
+    def test_build_distill_target_capsules_discovers_related_test_support_for_code_change(self) -> None:
+        source_path = self.repo / "src" / "widget.py"
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text("def build_widget() -> str:\n    return 'ok'\n", encoding="utf-8")
+        test_path = self.repo / "tests" / "test_widget.py"
+        test_path.parent.mkdir(parents=True, exist_ok=True)
+        test_path.write_text(
+            "from src.widget import build_widget\n\n\ndef test_build_widget() -> None:\n    assert build_widget() == 'ok'\n",
+            encoding="utf-8",
+        )
+
+        targets = og._build_distill_target_capsules(
+            str(self.repo),
+            ["widget"],
+            {"widget": ["src/widget.py"]},
+        )
+
+        self.assertIn("tests/test_widget.py", targets[0]["supporting_scope_paths"])
+        self.assertTrue(any(snapshot["path"] == "tests/test_widget.py" for snapshot in targets[0]["supporting_file_snapshots"]))
+        self.assertIn(
+            {"path": "tests/test_widget.py", "reason": "discovered from changed-file feature tokens"},
+            targets[0]["related_test_hints"],
+        )
+
+    def test_build_distill_target_capsules_adds_existing_capsule_material_and_oracle_context(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            source_path = self.repo / "src" / "feature.py"
+            source_path.parent.mkdir(parents=True, exist_ok=True)
+            source_path.write_text("def feature_flag() -> str:\n    return 'enabled'\n", encoding="utf-8")
+            test_path = self.repo / "tests" / "test_feature.py"
+            test_path.parent.mkdir(parents=True, exist_ok=True)
+            test_path.write_text(
+                "from src.feature import feature_flag\n\n\ndef test_feature_flag() -> None:\n    assert feature_flag() == 'enabled'\n",
+                encoding="utf-8",
+            )
+
+            capsule_payload = og._build_capsule_payload(
+                "feature",
+                ["src/feature.py"],
+                [],
+                None,
+                og._utc_timestamp(),
+                goal="Preserve the feature flag behavior.",
+                scope=["src/feature.py", "tests/test_feature.py"],
+                constraints=["Keep the public return value stable."],
+                oracles=[
+                    {
+                        "name": "feature-tests",
+                        "command": "pytest -q tests/test_feature.py",
+                        "scope": ["src/feature.py", "tests/test_feature.py"],
+                    }
+                ],
+                status="success",
+            )
+            (self.repo / ".outcomegraph" / "capsules" / "feature.json").write_text(
+                json.dumps(capsule_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+
+            claim_path = f"{og.OG_ROOT}/claims/cl-feature.json"
+            claim_payload = og._build_claim_payload(
+                "cl-feature",
+                "feature",
+                "run-1",
+                "analyze",
+                "observe",
+                ["src/feature.py"],
+                [],
+                text="Feature flag remains enabled for the stable path.",
+            )
+            (self.repo / claim_path).write_text(json.dumps(claim_payload, indent=2, sort_keys=True), encoding="utf-8")
+
+            decision_path = f"{og.OG_ROOT}/decisions/dec-feature.json"
+            decision_payload = og._build_decision_payload(
+                "dec-feature",
+                "feature",
+                [claim_path],
+                [],
+                None,
+                statement="Retain the feature capsule as the replay contract.",
+                rationale="The feature still uses the same source and test boundary.",
+                status="accepted",
+            )
+            (self.repo / decision_path).write_text(json.dumps(decision_payload, indent=2, sort_keys=True), encoding="utf-8")
+
+            certificate_path = f"{og.OG_ROOT}/certificates/cert-feature.json"
+            certificate_payload = og._build_certificate_payload(
+                "cert-feature",
+                "feature",
+                "run-1",
+                [claim_path],
+                "analyze",
+                "observe",
+                [],
+                status="success",
+            )
+            (self.repo / certificate_path).write_text(
+                json.dumps(certificate_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+
+            materials_payload = og._build_materials_lock_payload(
+                og._utc_timestamp(),
+                [
+                    {"path": "src/feature.py", "digest": og._file_sha256("src/feature.py", str(self.repo)), "kind": "file"},
+                    {"path": "tests/test_feature.py", "digest": og._file_sha256("tests/test_feature.py", str(self.repo)), "kind": "file"},
+                ],
+            )
+            (self.repo / og.OG_ROOT / "materials.lock").write_text(
+                json.dumps(materials_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+
+        changed_materials = [{"path": "src/feature.py", "digest": og._file_sha256("src/feature.py", str(self.repo))}]
+        targets = og._build_distill_target_capsules(
+            str(self.repo),
+            ["feature"],
+            {"feature": ["src/feature.py"]},
+            changed_materials=changed_materials,
+        )
+
+        summary = targets[0]["existing_capsule_summary"]
+        self.assertEqual(summary["claim_highlights"][0]["id"], "cl-feature")
+        self.assertEqual(summary["decision_highlights"][0]["id"], "dec-feature")
+        self.assertIn(f"{og.OG_ROOT}/certificates/cert-feature.json", summary["successful_certificate_refs"])
+        self.assertTrue(any(hint["name"] == "feature-tests" for hint in targets[0]["related_oracle_hints"]))
+        self.assertEqual(targets[0]["materials_context"]["changed_material_count"], 1)
+        self.assertEqual(targets[0]["materials_context"]["scope_material_count"], 2)
+        self.assertTrue(any(item["path"] == "tests/test_feature.py" for item in targets[0]["materials_context"]["scope_materials"]))
+
     def test_read_repo_file_snapshot_keeps_moderate_docs_and_lockfiles_complete(self) -> None:
         spec_path = self.repo / "SPEC-v2.md"
         lock_path = self.repo / "uv.lock"

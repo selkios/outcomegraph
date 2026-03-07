@@ -1,0 +1,41 @@
+{
+  "task_id": "OG-DISTILL-001",
+  "title": "Enrich distill payloads with code-aware feature context",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "write_files": [
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-distill-001/TASK.md",
+    "tasks/og-distill-001/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Add bounded feature-context fields to distill target payload assembly",
+      "status": "done"
+    },
+    {
+      "step": "Add regression tests for changed-region, supporting test discovery, and existing capsule context",
+      "status": "done"
+    },
+    {
+      "step": "Verify the distill path with the targeted unittest suite",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m unittest -q tests.test_og_sync_verify_replay_hooks"
+  ]
+}

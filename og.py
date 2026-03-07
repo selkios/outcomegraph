@@ -377,6 +377,32 @@ WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 TRACE_SEGMENT_MAX_LENGTH = 72
 SNAPSHOT_DIFF_CONTEXT_LINES = 40
 SNAPSHOT_DIFF_MAX_SNIPPETS = 8
+DISTILL_SUPPORTING_SNAPSHOT_LIMIT = 6
+DISTILL_RELATED_HINT_LIMIT = 4
+DISTILL_EXISTING_CLAIM_LIMIT = 3
+DISTILL_EXISTING_DECISION_LIMIT = 2
+DISTILL_EXISTING_CERTIFICATE_LIMIT = 3
+DISTILL_MATERIAL_LIMIT = 12
+DISTILL_FEATURE_TOKEN_STOPWORDS = frozenset(
+    {
+        "app",
+        "config",
+        "default",
+        "doc",
+        "docs",
+        "example",
+        "file",
+        "files",
+        "index",
+        "lib",
+        "main",
+        "readme",
+        "spec",
+        "src",
+        "test",
+        "tests",
+    }
+)
 RECOVERY_MAX_RETRIES_LIMIT = 5
 ORACLE_COMMAND_DEFAULT_TIMEOUT_SECONDS = 30
 REPLAY_STEP_DEFAULT_TIMEOUT_SECONDS = 120
@@ -5821,7 +5847,10 @@ def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
             "- Each capsule_updates entry must include field id copied from input.target_capsules[].id\n"
             "- Use repo-relative paths only\n"
             "- Use input.target_capsules[].changed_file_snapshots as the primary source of file context\n"
+            "- Use input.target_capsules[].changed_region_context to see which line ranges changed when large files are represented as diff hunks\n"
             "- When input.target_capsules[].supporting_file_snapshots is present, use it to retain unchanged scope context that still matters for the capsule\n"
+            "- Use input.target_capsules[].supporting_scope_paths, related_test_hints, and related_oracle_hints to connect the changed files to nearby feature evidence without assuming the whole repo is available\n"
+            "- Use input.target_capsules[].existing_capsule_summary and materials_context to preserve capsule continuity, replay scope, and evidence gaps from prior runs\n"
             "- input.target_capsules[].kind tells you whether the capsule is code, test, doc, config, or runtime; use it when choosing oracle strength and status\n"
             "- A snapshot with selection='diff_hunks' is an intentional changed-region view, not a simple file-prefix truncation\n"
             "- Use only the input payload below\n"
@@ -10673,6 +10702,375 @@ def _list_known_capsules(repo_root: str) -> list[str]:
     return sorted(capsules)
 
 
+def _merge_repo_relative_paths(*path_groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for group in path_groups:
+        for raw_path in group:
+            normalized = _normalize_repo_relative_path(str(raw_path))
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            merged.append(normalized)
+    return merged
+
+
+def _distill_feature_tokens(paths: list[str]) -> list[str]:
+    seen: set[str] = set()
+    tokens: list[str] = []
+    for raw_path in paths:
+        normalized = _normalize_repo_relative_path(str(raw_path)).lower()
+        if not normalized:
+            continue
+        for segment in normalized.split("/"):
+            stem, _ = os.path.splitext(segment)
+            for candidate in re.findall(r"[a-z0-9]+", stem):
+                if len(candidate) < 2 or candidate.isdigit() or candidate in DISTILL_FEATURE_TOKEN_STOPWORDS:
+                    continue
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                tokens.append(candidate)
+    return tokens
+
+
+def _should_skip_related_context_dir(relative_dir: str) -> bool:
+    normalized = _normalize_repo_relative_path(relative_dir)
+    if normalized in {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "node_modules",
+        OG_ROOT,
+    }:
+        return True
+    if normalized.startswith(f"{OG_ROOT}/"):
+        return True
+    return any(normalized.startswith(prefix.rstrip("/")) for prefix in RUNTIME_IGNORE_PREFIXES)
+
+
+def _iter_repo_context_candidate_paths(repo_root: str) -> list[str]:
+    candidates: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(repo_root):
+        relative_dir = os.path.relpath(dirpath, repo_root).replace("\\", "/")
+        if relative_dir == ".":
+            relative_dir = ""
+        dirnames[:] = [
+            dirname
+            for dirname in sorted(dirnames)
+            if not _should_skip_related_context_dir(f"{relative_dir}/{dirname}" if relative_dir else dirname)
+        ]
+        for filename in sorted(filenames):
+            relative_path = f"{relative_dir}/{filename}" if relative_dir else filename
+            normalized = _normalize_repo_relative_path(relative_path)
+            if (
+                not normalized
+                or normalized.startswith(".git/")
+                or normalized.startswith(f"{OG_ROOT}/")
+                or any(normalized.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES)
+            ):
+                continue
+            full_path = os.path.join(repo_root, normalized)
+            if os.path.isfile(full_path):
+                candidates.append(normalized)
+    return candidates
+
+
+def _discover_related_scope_paths(
+    repo_root: str,
+    seed_paths: list[str],
+    excluded_paths: set[str],
+    *,
+    prefer_kind: str | None = None,
+    candidate_paths: list[str] | None = None,
+    limit: int = DISTILL_RELATED_HINT_LIMIT,
+) -> list[str]:
+    if limit <= 0:
+        return []
+    seed_tokens = set(_distill_feature_tokens(seed_paths))
+    if not seed_tokens:
+        return []
+
+    seed_directories = {
+        os.path.dirname(_normalize_repo_relative_path(path)) or "."
+        for path in seed_paths
+        if _normalize_repo_relative_path(path)
+    }
+    seed_top_levels = {
+        _normalize_repo_relative_path(path).split("/", 1)[0]
+        for path in seed_paths
+        if _normalize_repo_relative_path(path)
+    }
+    ranked: list[tuple[int, str]] = []
+    for candidate in candidate_paths or _iter_repo_context_candidate_paths(repo_root):
+        if candidate in excluded_paths:
+            continue
+        candidate_kind = _classify_path_capsule_kind(candidate)
+        if candidate_kind is None:
+            continue
+        if prefer_kind is not None and candidate_kind != prefer_kind:
+            continue
+        candidate_tokens = set(_distill_feature_tokens([candidate]))
+        overlap = seed_tokens & candidate_tokens
+        if not overlap:
+            continue
+        score = len(overlap) * 10
+        candidate_directory = os.path.dirname(candidate) or "."
+        if candidate_directory in seed_directories:
+            score += 4
+        candidate_top_level = candidate.split("/", 1)[0]
+        if candidate_top_level in seed_top_levels:
+            score += 2
+        basename = os.path.splitext(os.path.basename(candidate))[0].lower()
+        if any(token == basename or token in basename for token in overlap):
+            score += 2
+        if prefer_kind is not None:
+            score += 3
+        ranked.append((-score, candidate))
+
+    ranked.sort(key=lambda item: (item[0], item[1]))
+    return [candidate for _, candidate in ranked[:limit]]
+
+
+def _truncate_context_text(raw: object, *, limit: int = 240) -> str:
+    text = " ".join(str(raw or "").split())
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(limit - 3, 1)].rstrip()}..."
+
+
+def _summarize_oracle_payloads(raw_oracles: list[dict[str, object]], *, limit: int = DISTILL_RELATED_HINT_LIMIT) -> list[dict[str, object]]:
+    summarized: list[dict[str, object]] = []
+    for raw_oracle in raw_oracles:
+        normalized_oracle = _normalize_oracle_entry(raw_oracle)
+        if normalized_oracle is None:
+            continue
+        summarized.append(
+            {
+                "name": str(normalized_oracle.get("name") or ""),
+                "command": normalized_oracle.get("command"),
+                "scope": _safe_string_list(normalized_oracle.get("scope")),
+            }
+        )
+        if len(summarized) >= limit:
+            break
+    return summarized
+
+
+def _build_changed_region_context(changed_file_snapshots: list[dict[str, object]]) -> list[dict[str, object]]:
+    context: list[dict[str, object]] = []
+    for snapshot in changed_file_snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        entry: dict[str, object] = {
+            "path": str(snapshot.get("path") or ""),
+            "selection": str(snapshot.get("selection") or "full"),
+            "partial": bool(snapshot.get("partial")),
+            "truncated": bool(snapshot.get("truncated")),
+        }
+        line_count = snapshot.get("line_count")
+        if isinstance(line_count, int) and line_count >= 0:
+            entry["line_count"] = line_count
+        raw_snippets = snapshot.get("snippets")
+        if isinstance(raw_snippets, list):
+            entry["snippets"] = [
+                {
+                    "start_line": int(raw_snippet.get("start_line") or 0),
+                    "end_line": int(raw_snippet.get("end_line") or 0),
+                }
+                for raw_snippet in raw_snippets
+                if isinstance(raw_snippet, dict)
+            ]
+            entry["snippets_truncated"] = bool(snapshot.get("snippets_truncated"))
+        context.append(entry)
+    return context
+
+
+def _collect_materials_for_scope(
+    repo_root: str,
+    scope_patterns: list[str],
+    changed_materials: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    material_records, _ = _read_material_lock_records(repo_root)
+    selected: dict[str, dict[str, object]] = {}
+    for path, record in material_records.items():
+        if _path_matches_capsule_scope(path, scope_patterns):
+            selected[path] = dict(record)
+    for raw_material in changed_materials:
+        if not isinstance(raw_material, dict):
+            continue
+        path = str(raw_material.get("path") or "").strip()
+        digest = str(raw_material.get("digest") or "").strip()
+        if not path or not digest:
+            continue
+        if _path_matches_capsule_scope(path, scope_patterns):
+            selected[path] = {"path": path, "digest": digest}
+            if isinstance(raw_material.get("kind"), str):
+                selected[path]["kind"] = str(raw_material.get("kind") or "file")
+            if isinstance(raw_material.get("size"), int) and int(raw_material.get("size")) >= 0:
+                selected[path]["size"] = int(raw_material.get("size"))
+    return [selected[path] for path in sorted(selected)]
+
+
+def _summarize_material_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    summarized: list[dict[str, object]] = []
+    for raw_record in records[:DISTILL_MATERIAL_LIMIT]:
+        if not isinstance(raw_record, dict):
+            continue
+        entry: dict[str, object] = {
+            "path": str(raw_record.get("path") or ""),
+            "digest": str(raw_record.get("digest") or ""),
+        }
+        if isinstance(raw_record.get("kind"), str):
+            entry["kind"] = str(raw_record.get("kind") or "file")
+        size = raw_record.get("size")
+        if isinstance(size, int) and size >= 0:
+            entry["size"] = size
+        summarized.append(entry)
+    return summarized
+
+
+def _build_materials_context(
+    scope_patterns: list[str],
+    changed_materials: list[dict[str, object]],
+    scope_materials: list[dict[str, object]],
+    *,
+    materials_lock_ref: str = f"{OG_ROOT}/materials.lock",
+) -> dict[str, object]:
+    return {
+        "materials_lock_ref": materials_lock_ref,
+        "scope_patterns": scope_patterns,
+        "changed_material_count": len(changed_materials),
+        "changed_materials_truncated": len(changed_materials) > DISTILL_MATERIAL_LIMIT,
+        "changed_materials": _summarize_material_records(changed_materials),
+        "scope_material_count": len(scope_materials),
+        "scope_materials_truncated": len(scope_materials) > DISTILL_MATERIAL_LIMIT,
+        "scope_materials": _summarize_material_records(scope_materials),
+    }
+
+
+def _build_existing_capsule_summary(
+    capsule_id: str,
+    capsule_kind: str,
+    existing_capsule: dict[str, object] | None,
+    claims_by_capsule: dict[str, list[dict[str, object]]],
+    decisions_by_capsule: dict[str, list[dict[str, object]]],
+    certificate_refs_by_capsule: dict[str, list[str]],
+) -> dict[str, object] | None:
+    if not isinstance(existing_capsule, dict):
+        return None
+    normalized_capsule_id = _safe_slug(capsule_id) or "default"
+    scope = _safe_string_list(existing_capsule.get("scope"))
+    return {
+        "id": str(existing_capsule.get("id") or normalized_capsule_id),
+        "kind": capsule_kind,
+        "status": str(existing_capsule.get("status") or ""),
+        "goal": str(existing_capsule.get("goal") or ""),
+        "scope": scope,
+        "constraints": _safe_string_list(existing_capsule.get("constraints")),
+        "oracles": _summarize_oracle_payloads(_safe_object_list(existing_capsule.get("oracles"))),
+        "lineage": existing_capsule.get("lineage") if isinstance(existing_capsule.get("lineage"), dict) else {},
+        "claim_highlights": [
+            {
+                "id": str(claim.get("id") or ""),
+                "category": str(claim.get("category") or "behavior"),
+                "text": _truncate_context_text(claim.get("text")),
+                "source_paths": _safe_string_list(claim.get("raw", {}).get("source_paths") if isinstance(claim.get("raw"), dict) else claim.get("source_paths")),
+            }
+            for claim in claims_by_capsule.get(normalized_capsule_id, [])[:DISTILL_EXISTING_CLAIM_LIMIT]
+        ],
+        "decision_highlights": [
+            {
+                "id": str(decision.get("id") or ""),
+                "status": str(decision.get("status") or ""),
+                "statement": _truncate_context_text(decision.get("statement")),
+                "claim_refs": _safe_string_list(decision.get("claim_refs")),
+                "evidence_refs": _safe_string_list(decision.get("evidence_refs")),
+            }
+            for decision in decisions_by_capsule.get(normalized_capsule_id, [])[:DISTILL_EXISTING_DECISION_LIMIT]
+        ],
+        "successful_certificate_refs": certificate_refs_by_capsule.get(normalized_capsule_id, [])[:DISTILL_EXISTING_CERTIFICATE_LIMIT],
+    }
+
+
+def _build_related_test_hints(
+    existing_scope: list[str],
+    supporting_scope_paths: list[str],
+    discovered_supporting_paths: list[str],
+) -> list[dict[str, object]]:
+    hints: list[dict[str, object]] = []
+    seen_paths: set[str] = set()
+    for path in supporting_scope_paths:
+        if _classify_path_capsule_kind(path) != CAPSULE_KIND_TEST or path in seen_paths:
+            continue
+        seen_paths.add(path)
+        reason = "existing capsule scope" if path in existing_scope else "discovered from changed-file feature tokens"
+        if path in discovered_supporting_paths:
+            reason = "discovered from changed-file feature tokens"
+        hints.append({"path": path, "reason": reason})
+        if len(hints) >= DISTILL_RELATED_HINT_LIMIT:
+            break
+    return hints
+
+
+def _build_related_oracle_hints(
+    capsule_id: str,
+    changed_files: list[str],
+    supporting_scope_paths: list[str],
+    capsule_payloads: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    normalized_capsule_id = _safe_slug(capsule_id) or "default"
+    relevant_paths = _merge_repo_relative_paths(changed_files, supporting_scope_paths)
+    hints: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for related_capsule_id in sorted(capsule_payloads):
+        payload = capsule_payloads[related_capsule_id]
+        raw_oracles = _safe_object_list(payload.get("oracles"))
+        if not raw_oracles:
+            continue
+        scope = _safe_string_list(payload.get("scope"))
+        related_kind = _classify_capsule_kind(related_capsule_id, [], scope, payload)
+        if related_capsule_id != normalized_capsule_id and not any(
+            _path_matches_capsule_scope(path, scope) for path in relevant_paths
+        ):
+            continue
+        for raw_oracle in raw_oracles:
+            normalized_oracle = _normalize_oracle_entry(raw_oracle)
+            if normalized_oracle is None:
+                continue
+            oracle_scope = _safe_string_list(normalized_oracle.get("scope"))
+            if related_capsule_id != normalized_capsule_id and oracle_scope and not any(
+                _path_matches_capsule_scope(path, oracle_scope) for path in relevant_paths
+            ):
+                continue
+            name = str(normalized_oracle.get("name") or "").strip()
+            command = str(normalized_oracle.get("command") or "").strip()
+            key = (related_capsule_id, name, command)
+            if key in seen:
+                continue
+            seen.add(key)
+            reason = "existing capsule oracle"
+            if related_capsule_id != normalized_capsule_id:
+                reason = "scope overlap with changed files"
+                if related_kind == CAPSULE_KIND_TEST:
+                    reason = "scope overlap with related test context"
+            hints.append(
+                {
+                    "capsule_id": related_capsule_id,
+                    "name": name,
+                    "command": normalized_oracle.get("command"),
+                    "scope": oracle_scope,
+                    "reason": reason,
+                }
+            )
+            if len(hints) >= DISTILL_RELATED_HINT_LIMIT:
+                return hints
+    return hints
+
+
 def _build_distill_target_capsules(
     repo_root: str,
     changed_capsules: list[str],
@@ -10680,11 +11078,35 @@ def _build_distill_target_capsules(
     *,
     diff_baseline: str | None = None,
     force_full_sync: bool = False,
+    changed_materials: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
+    resolved_changed_materials = (
+        [item for item in changed_materials if isinstance(item, dict)]
+        if isinstance(changed_materials, list)
+        else _collect_changed_materials(
+            repo_root,
+            sorted({path for paths in changed_files_by_capsule.values() for path in paths}),
+        )
+    )
+    claims_by_capsule: dict[str, list[dict[str, object]]] = {}
+    for claim in _collect_claim_records(repo_root):
+        normalized_capsule_id = _safe_slug(str(claim.get("capsule_id") or "default")) or "default"
+        claims_by_capsule.setdefault(normalized_capsule_id, []).append(claim)
+    decisions_by_capsule: dict[str, list[dict[str, object]]] = {}
+    for decision in _collect_decision_records(repo_root):
+        normalized_capsule_id = _safe_slug(str(decision.get("capsule_id") or "default")) or "default"
+        decisions_by_capsule.setdefault(normalized_capsule_id, []).append(decision)
+    certificate_refs_by_capsule = _collect_successful_certificate_refs_by_capsule(repo_root)
+    capsule_payloads: dict[str, dict[str, object]] = {}
+    for known_capsule_id in _list_known_capsules(repo_root):
+        payload = _load_capsule_payload(repo_root, known_capsule_id)
+        if payload:
+            capsule_payloads[_safe_slug(known_capsule_id) or "default"] = payload
+    context_candidate_paths = _iter_repo_context_candidate_paths(repo_root)
     targets: list[dict[str, object]] = []
     for capsule_id in changed_capsules:
         normalized_capsule_id = _safe_slug(capsule_id) or "default"
-        existing_capsule = _read_json_file_dict(os.path.join(repo_root, OG_ROOT, "capsules", f"{normalized_capsule_id}.json"))
+        existing_capsule = _load_capsule_payload(repo_root, normalized_capsule_id) or None
         changed_files = changed_files_by_capsule.get(normalized_capsule_id, [])
         existing_scope = _safe_string_list(existing_capsule.get("scope")) if existing_capsule else []
         capsule_kind = _classify_capsule_kind(
@@ -10698,24 +11120,60 @@ def _build_distill_target_capsules(
             existing_scope,
             changed_files,
         )
+        preferred_related_kind = (
+            CAPSULE_KIND_TEST
+            if capsule_kind == CAPSULE_KIND_CODE
+            else CAPSULE_KIND_CODE if capsule_kind == CAPSULE_KIND_TEST else None
+        )
+        discovered_supporting_paths = _discover_related_scope_paths(
+            repo_root,
+            _merge_repo_relative_paths(changed_files, existing_scope),
+            set(_merge_repo_relative_paths(changed_files, supporting_scope_paths)),
+            prefer_kind=preferred_related_kind,
+            candidate_paths=context_candidate_paths,
+            limit=max(DISTILL_SUPPORTING_SNAPSHOT_LIMIT - len(supporting_scope_paths), 0),
+        )
+        supporting_scope_paths = _merge_repo_relative_paths(
+            supporting_scope_paths,
+            discovered_supporting_paths,
+        )[:DISTILL_SUPPORTING_SNAPSHOT_LIMIT]
+        changed_file_snapshots = [
+            snapshot
+            for snapshot in (
+                _read_repo_file_snapshot(
+                    repo_root,
+                    path,
+                    diff_baseline=diff_baseline,
+                    force_full=force_full_sync,
+                )
+                for path in changed_files
+            )
+            if snapshot
+        ]
+        effective_scope_patterns = _merge_repo_relative_paths(
+            existing_scope,
+            changed_files,
+            supporting_scope_paths,
+        )
+        scope_materials = _collect_materials_for_scope(
+            repo_root,
+            effective_scope_patterns or changed_files,
+            resolved_changed_materials,
+        )
+        capsule_changed_materials = _collect_materials_for_scope(
+            repo_root,
+            changed_files,
+            resolved_changed_materials,
+        )
+        capsule_payloads.setdefault(normalized_capsule_id, existing_capsule or {})
         targets.append(
             {
                 "id": normalized_capsule_id,
                 "kind": capsule_kind,
                 "changed_files": changed_files,
-                "changed_file_snapshots": [
-                    snapshot
-                    for snapshot in (
-                        _read_repo_file_snapshot(
-                            repo_root,
-                            path,
-                            diff_baseline=diff_baseline,
-                            force_full=force_full_sync,
-                        )
-                        for path in changed_files
-                    )
-                    if snapshot
-                ],
+                "changed_file_snapshots": changed_file_snapshots,
+                "changed_region_context": _build_changed_region_context(changed_file_snapshots),
+                "supporting_scope_paths": supporting_scope_paths,
                 "supporting_file_snapshots": [
                     snapshot
                     for snapshot in (_read_repo_file_snapshot(repo_root, path) for path in supporting_scope_paths)
@@ -10733,6 +11191,30 @@ def _build_distill_target_capsules(
                     }
                     if existing_capsule
                     else None
+                ),
+                "existing_capsule_summary": _build_existing_capsule_summary(
+                    normalized_capsule_id,
+                    capsule_kind,
+                    existing_capsule,
+                    claims_by_capsule,
+                    decisions_by_capsule,
+                    certificate_refs_by_capsule,
+                ),
+                "related_test_hints": _build_related_test_hints(
+                    existing_scope,
+                    supporting_scope_paths,
+                    discovered_supporting_paths,
+                ),
+                "related_oracle_hints": _build_related_oracle_hints(
+                    normalized_capsule_id,
+                    changed_files,
+                    supporting_scope_paths,
+                    capsule_payloads,
+                ),
+                "materials_context": _build_materials_context(
+                    effective_scope_patterns or changed_files,
+                    capsule_changed_materials,
+                    scope_materials,
                 ),
             }
         )
@@ -10901,7 +11383,7 @@ def _collect_supporting_scope_paths(repo_root: str, scope: list[str], changed_fi
             continue
         supporting.append(candidate)
         seen.add(candidate)
-        if len(supporting) >= 4:
+        if len(supporting) >= DISTILL_SUPPORTING_SNAPSHOT_LIMIT:
             break
     return supporting
 
@@ -11431,6 +11913,7 @@ def _run_distill_stage(
     if not isinstance(changed, list):
         changed = []
     changed_files = [str(entry) for entry in changed]
+    changed_materials = _collect_changed_materials(repo_root, changed_files)
     changed_files_by_capsule = _group_changed_files_by_capsule(changed_files)
     try:
         worker_adapter = adapter_get("worker")
@@ -11460,6 +11943,7 @@ def _run_distill_stage(
         changed_files_by_capsule,
         diff_baseline=diff_baseline,
         force_full_sync=bool(snapshot.get("force_full_sync")) if isinstance(snapshot, dict) else False,
+        changed_materials=changed_materials,
     )
     try:
         deltas = []
