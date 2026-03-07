@@ -187,6 +187,7 @@ Core parsing rules:
   - `--output json|jsonl|human` (human-readable default, explicit JSON envelope, or JSONL stream mode).
   - `--fields <field>[,<field>...]` for top-level payload projection.
   - `--limit <n>` and `--offset <n>` for deterministic pagination of list-like fields.
+- `autopilot disable` and `daemon start|stop|status` accept `--session-id <id>` to resume or assert a known resumable session.
 - Agent-provided identifiers and optimization inputs are normalized and validated: `--capsule`, `--ref`, and `--certificate` use strict identifier allowlists (`[a-z0-9._-]`, max 128 chars), while `--dataset`, `--candidate`, and `--baseline` are validated as repository-relative paths and rejected when absolute, traversal-laden, control-character-bearing, or percent-encoded.
 - Unknown options or subcommands are treated as usage errors.
 
@@ -232,11 +233,13 @@ Structured output:
   - `command`
   - `status`
   - `run_id` (optional, `null` when unavailable)
+  - `session_id` (optional, `null` when unavailable)
   - `data`
   - `errors` (typed list of error objects with `error_class`, `error_code`, `message`, `retryable`, `hint`)
   - `warnings`
   - `metrics`
 - `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
+- `data.session` is present for lock, daemon, and autopilot lifecycles and includes `session_id`, `lifecycle`, `state`, `expires_at`, and resume metadata.
 - Command IDs are stable across help/usage, success, and failure envelopes.
 
 Example:
@@ -247,10 +250,12 @@ Example:
   "command": "sync",
   "status": "ok",
   "run_id": "sync-20260305T000000Z-abcdef1234",
+  "session_id": "sync-20260305t000000z-abcdef1234",
   "data": {
     "status": "ok",
     "command": "sync",
     "run_id": "sync-20260305T000000Z-abcdef1234",
+    "session_id": "sync-20260305t000000z-abcdef1234",
     "steps": []
   },
   "errors": [],
@@ -618,7 +623,25 @@ Locking:
 Contention:
 
 - New trigger marks `pending=true` in runtime state and exits.
+- Sync contention emits `SESSION_CONTENDED` plus the active lock `session_id`.
 - Next loop consumes pending state.
+
+Session policy:
+
+- `sync` lock sessions are `ephemeral`.
+  - emitted in command envelopes and sync summary events as `session_id`
+  - never resumable
+  - expire on lock release or when the lock exceeds `WORK_LOCK_STALE_SECONDS`
+- `daemon` sessions are `resumable`.
+  - persisted in `.outcomegraph/work/daemon/state.json`
+  - `install`, `start`, `status`, and `stop` emit the same `session_id` until the session expires or is replaced
+  - `--session-id <id>` asserts or resumes the known daemon session
+  - expiry returns `SESSION_EXPIRED`; mismatched resume attempts return `SESSION_RESUME_INVALID`
+- `autopilot` sessions are `resumable`.
+  - persisted in `.outcomegraph/autopilot/state.json`
+  - `autopilot init` emits the install `session_id`
+  - `autopilot disable --session-id <id>` asserts the expected installed session before teardown
+  - missing or mismatched resumes return `SESSION_RESUME_INVALID`
 
 Trigger sources:
 

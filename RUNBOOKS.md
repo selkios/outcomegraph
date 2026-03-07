@@ -51,7 +51,7 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 
 ### 2.1 Lock contention
 
-Symptom: `og sync` exits without running job and reports pending state.
+Symptom: `og sync` exits without running job, reports pending state, and emits `code: SESSION_CONTENDED` with the active `session_id`.
 
 Recovery:
 
@@ -59,7 +59,17 @@ Recovery:
 - Confirm `og status` no longer shows active sync.
 - Pending work will be picked up on next run.
 
-### 2.2 `POLICY_DENIED`
+### 2.2 Session expired or invalid resume
+
+Symptom: `daemon status|start|stop` or `autopilot disable` fails with `code: SESSION_EXPIRED` or `code: SESSION_RESUME_INVALID`.
+
+Recovery:
+
+- Read the emitted `session_id` and `data.session` metadata from the most recent successful lifecycle command.
+- If the session expired, start a fresh daemon/autopilot session and use the new `session_id`.
+- If the resume attempt was invalid, rerun the command with the currently recorded `session_id` from daemon/autopilot state.
+
+### 2.3 `POLICY_DENIED`
 
 Symptom: structured error with `code: POLICY_DENIED`.
 
@@ -70,7 +80,7 @@ Recovery:
 - Re-run using required autonomy mode if policy requires it.
 - Use `og doctor --json` to confirm whether policy, integrity, or export drift is the blocking surface.
 
-### 2.3 Autonomous writes blocked by degraded state
+### 2.4 Autonomous writes blocked by degraded state
 
 Symptom: command fails in `autonomous` mode with `code: AUTONOMOUS_WRITE_BLOCKED`.
 
@@ -82,7 +92,7 @@ Recovery:
 - Repair policy configuration or integrity index.
 - Re-run the write command in `autonomous` mode after remediation.
 
-### 2.4 Worker unavailable
+### 2.5 Worker unavailable
 
 Symptom: distill failures and no new claims/decisions.
 
@@ -92,7 +102,7 @@ Recovery:
 - Do not block local coding.
 - Continue with `og status` and rerun sync on next loop.
 
-### 2.5 Oracle unavailable or failing
+### 2.6 Oracle unavailable or failing
 
 Symptom: verification state becomes stale/unknown with failed certificates.
 
@@ -103,7 +113,7 @@ Recovery:
 - Re-run `og verify --changed --max-retries 1 --timeout 60` when the oracle failure is transient or timeout-related.
 - For persistent failures, run `og replay --changed` to confirm behavioral evidence separately.
 
-### 2.6 Adapter/interface mismatch
+### 2.7 Adapter/interface mismatch
 
 Symptom: startup error with `ADAPTER_INTERFACE_MISMATCH`.
 
@@ -113,7 +123,7 @@ Recovery:
 - Restart command entrypoint.
 - Validate diagnostics with the plugin list output.
 
-### 2.7 Storage/index corruption
+### 2.8 Storage/index corruption
 
 Symptom: inability to read existing objects or manifests.
 
@@ -129,7 +139,7 @@ Recovery:
 
 1. Capture current status: `og status`.
 2. Capture structured diagnostics: `og doctor --json`.
-3. Inspect pending marker and latest sync summary.
+3. Inspect pending marker, latest sync summary, and any emitted `session_id`.
 4. Fix underlying dependency (policy, runtime, oracle, adapter).
 5. Re-run `og sync --validate --json` before mutating if the cause was ambiguous.
 6. Re-run `og sync`.
@@ -144,6 +154,7 @@ Use changed-scope commands to isolate regressions:
 - `og replay --changed --dry-run`
 - `og replay --changed --max-retries 1 --timeout 120`
 - `og sync` after baseline cleanup.
+- `og daemon status --session-id <id> --json` when validating daemon continuity explicitly.
 
 ### 3.3 Escalation
 

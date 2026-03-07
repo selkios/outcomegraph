@@ -152,6 +152,7 @@ Common flags:
 - `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
 - `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
 - `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
+- `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session)
 
 Command help contracts also list output modes and exit semantics:
 
@@ -180,6 +181,7 @@ Return contract:
   "command": "<top-level command id>",
   "status": "ok|error|warn",
   "run_id": "<operation identifier or null>",
+  "session_id": "<session identifier or null>",
   "data": { "...": "..." },
   "errors": [],
   "warnings": [],
@@ -190,9 +192,11 @@ Return contract:
 - `command` is the command identifier (`init`, `sync`, `verify`, ...).
 - `status` is the command status.
 - `run_id` carries command correlation ids when available (e.g. sync/replay/verify/explain).
+- `session_id` carries lifecycle ids for explicit runtime sessions (`sync` lock sessions and resumable `daemon` / `autopilot` flows).
 - `data` contains command payload (canonical payload fields and step details).
+- `data.session` is present when the command owns an explicit session lifecycle and includes state, expiry, and resume metadata.
 - `errors` are typed records with:
-  - `error_class`: stable machine class (`usage`, `policy`, `integrity`, `adapter`, `runtime`)
+  - `error_class`: stable machine class (`usage`, `session`, `policy`, `integrity`, `adapter`, `runtime`)
   - `error_code`: stable code identifier
   - `message`: human-readable summary
   - `retryable`: boolean retryability hint
@@ -308,21 +312,30 @@ Either flag-based input or payload input is supported:
 ### `og autopilot`
 
 - `autopilot init` wires lifecycle hooks and tracks managed hook state.
+- `autopilot init` emits a resumable `session_id` persisted in `.outcomegraph/autopilot/state.json`.
 - managed `pre-commit` runs the local quality pass and blocks the commit if it fails.
 - `autopilot disable` restores core hook state and removes managed scripts.
+- `autopilot disable --session-id <id>` asserts the installed autopilot session before teardown.
 
 ### `og daemon`
 
 Long-running watcher process for autonomous execution:
 
-- `install`: writes wrapper script under `.outcomegraph/work/daemon/run-ogd.sh`
-- `start`: starts the daemon process
-- `stop`: stops daemon gracefully, escalates if needed
-- `status`: prints managed state and current sync trigger state
+- `install`: writes wrapper script under `.outcomegraph/work/daemon/run-ogd.sh` and emits a resumable `session_id`
+- `start`: starts the daemon process and keeps the same `session_id` unless the prior session expired
+- `stop`: stops daemon gracefully, escalates if needed, and accepts `--session-id <id>`
+- `status`: prints managed state, current sync trigger state, and accepts `--session-id <id>`
 - `run`: internal loop entrypoint (invoked by script)
 
 The daemon watches file changes and pending work; when triggered it invokes
 `og sync --json` as a child process and persists run results to a structured log.
+
+### Session model
+
+- `sync` emits an ephemeral lock `session_id`; it is never resumable and expires on release or stale-lock timeout.
+- Lock contention returns `status: "warn"` with `error_code: "SESSION_CONTENDED"` and the active sync `session_id`.
+- `daemon` and `autopilot` emit resumable session records with `data.session.state`, `data.session.expires_at`, and `data.session.resume_command`.
+- Explicit resume/assert failures return typed session errors: `SESSION_EXPIRED` and `SESSION_RESUME_INVALID`.
 
 ## Artifact model (short reference)
 
@@ -360,6 +373,7 @@ If you see unexpected status or stale diagnostics:
 
 - re-run with `--json` and inspect:
   - `status`
+  - `session_id`
   - `errors`
   - `message`
   - stage-level `steps` for `sync`
@@ -368,6 +382,7 @@ If you see unexpected status or stale diagnostics:
 - run `og doctor --json` to collect consolidated diagnostics and remediation hints.
 - use `og sync --validate --json`, `og verify --validate --json`, or `og replay --dry-run --json` before re-running mutating commands after a failure.
 - repair ledger state intentionally via sync repair flow if integrity is degraded (the CLI emits repair artifacts when possible).
+- If you receive `SESSION_CONTENDED`, wait for the active session or reuse the emitted `session_id` on resumable `daemon` / `autopilot disable` commands.
 
 ## Documentation index
 

@@ -1396,7 +1396,7 @@
       "id": "OG-AGENT-010",
       "title": "Define explicit session/state policy and emit `session_id`",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Make long-running or resumable behavior explicit so agents can reason about lifecycle, expiry, and conflict handling. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
@@ -1422,7 +1422,7 @@
         "tests/test_og_sync_verify_replay_hooks.py",
         "AGENT_FIRST_CLI_REVIEW.md"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-07T10:27:20Z"
     },
     {
       "id": "OG-AGENT-011",

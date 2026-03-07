@@ -453,6 +453,27 @@ class TestCommandIntrospectionContracts(TestCase):
             field["name"] for field in autopilot_init_signature["request"]["fields"] if isinstance(field, dict)
         }
         self.assertIn("--yes", autopilot_init_fields)
+        autopilot_disable_signature = signatures["autopilot disable"]
+        autopilot_disable_request_fields = {
+            field["name"] for field in autopilot_disable_signature["request"]["fields"] if isinstance(field, dict)
+        }
+        self.assertIn("--session-id", autopilot_disable_request_fields)
+        self.assertIn(og.SESSION_RESUME_INVALID_CODE, autopilot_disable_signature["known_error_codes"])
+        daemon_status_signature = signatures["daemon status"]
+        daemon_status_request_fields = {
+            field["name"] for field in daemon_status_signature["request"]["fields"] if isinstance(field, dict)
+        }
+        daemon_status_response_fields = {
+            field["name"] for field in daemon_status_signature["response"]["data_fields"] if isinstance(field, dict)
+        }
+        self.assertIn("--session-id", daemon_status_request_fields)
+        self.assertIn("session_id", daemon_status_response_fields)
+        sync_signature = signatures["sync"]
+        sync_response_fields = {
+            field["name"] for field in sync_signature["response"]["data_fields"] if isinstance(field, dict)
+        }
+        self.assertIn("session_id", sync_response_fields)
+        self.assertIn(og.SESSION_CONTENDED_CODE, sync_signature["known_error_codes"])
 
     def test_schema_command_renders_human_summary(self) -> None:
         buffer = io.StringIO()
@@ -620,6 +641,23 @@ class TestJsonEnvelopeContract(TestCase):
         self.assertGreater(len(validation_errors), 0)
         self.assertIn("status must be one of", str(validation_errors[0]))
 
+    def test_envelope_uses_session_id_from_session_payload(self) -> None:
+        envelope = og._build_command_result_envelope(
+            "daemon",
+            {
+                "status": "ok",
+                "command": "daemon",
+                "session": og._build_session_record(
+                    og.SESSION_KIND_DAEMON,
+                    og.SESSION_LIFECYCLE_RESUMABLE,
+                    og.SESSION_STATE_INSTALLED,
+                    session_id="daemon-20260307t000000z-abcdef1234",
+                ),
+            },
+        )
+
+        self.assertEqual(envelope["session_id"], "daemon-20260307t000000z-abcdef1234")
+
 
 class TestHookLifecycle(_RepoTestCase):
     def test_autopilot_init_installs_and_disables_hooks(self) -> None:
@@ -657,6 +695,30 @@ class TestHookLifecycle(_RepoTestCase):
             for raw_hook in state["installed_hooks"]:
                 hook_path = Path(raw_hook["path"])
                 self.assertFalse(hook_path.exists())
+
+    def test_autopilot_session_id_persists_across_init_and_disable(self) -> None:
+        self._write_quality_pass_script(0)
+        with self.git_root_patch():
+            init = og._init_autopilot(False)
+            session_id = init["session_id"]
+            self.assertIsInstance(session_id, str)
+            disable = og._disable_autopilot(session_id)
+
+        self.assertEqual(disable["status"], "ok")
+        self.assertEqual(disable["session_id"], session_id)
+        self.assertEqual(disable["session"]["state"], og.SESSION_STATE_DISABLED)
+
+    def test_autopilot_disable_rejects_invalid_session_resume(self) -> None:
+        self._write_quality_pass_script(0)
+        with self.git_root_patch():
+            init = og._init_autopilot(False)
+            bad_session_id = "autopilot-20260307t000000z-deadbeef00"
+            disable = og._disable_autopilot(bad_session_id)
+
+        self.assertEqual(disable["status"], "error")
+        self.assertEqual(disable["code"], og.SESSION_RESUME_INVALID_CODE)
+        self.assertEqual(disable["requested_session_id"], bad_session_id)
+        self.assertTrue((self.repo / ".outcomegraph" / "autopilot" / "state.json").exists())
 
     def test_autopilot_init_restores_existing_managed_hook_from_backup(self) -> None:
         hooks_dir = self.repo / og.AUTOPILOT_MANAGED_HOOK_DIR
@@ -848,6 +910,58 @@ class TestDaemonLifecycle(_RepoTestCase):
             finally:
                 og._daemon_stop()
 
+    def test_daemon_session_id_persists_across_install_start_status_stop(self) -> None:
+        with self.git_root_patch(), patch.object(
+            og,
+            "_daemon_build_script",
+            return_value="#!/usr/bin/env bash\nexec sleep 30\n",
+        ):
+            og._init_outcomegraph()
+            install_payload = og._daemon_install()
+            session_id = install_payload["session_id"]
+            self.assertIsInstance(session_id, str)
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", ResourceWarning)
+                start_payload = og._daemon_start(session_id)
+            self.assertEqual(start_payload["session_id"], session_id)
+            try:
+                status_payload = og._daemon_status(session_id)
+                self.assertEqual(status_payload["session_id"], session_id)
+                self.assertEqual(status_payload["session"]["state"], og.SESSION_STATE_ACTIVE)
+
+                stop_payload = og._daemon_stop(session_id)
+                self.assertEqual(stop_payload["session_id"], session_id)
+                self.assertEqual(stop_payload["session"]["state"], og.SESSION_STATE_STOPPED)
+            finally:
+                og._daemon_stop()
+
+    def test_daemon_status_rejects_invalid_session_resume(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            og._daemon_install()
+            payload = og._daemon_status("daemon-20260307t000000z-deadbeef00")
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.SESSION_RESUME_INVALID_CODE)
+
+    def test_daemon_status_rejects_expired_session_resume(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            install_payload = og._daemon_install()
+            session_id = install_payload["session_id"]
+            state_path = self.repo / ".outcomegraph" / "work" / "daemon" / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["session"]["expires_at"] = "2000-01-01T00:00:00Z"
+            state["session"]["state"] = og.SESSION_STATE_ACTIVE
+            state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+            payload = og._daemon_status(session_id)
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.SESSION_EXPIRED_CODE)
+        self.assertEqual(payload["session"]["state"], og.SESSION_STATE_EXPIRED)
+
     def test_daemon_run_sync_rejects_invalid_status_payload(self) -> None:
         completed = subprocess.CompletedProcess(
             args=[sys.executable, "-m", "og", "sync", "--json"],
@@ -863,6 +977,29 @@ class TestDaemonLifecycle(_RepoTestCase):
         self.assertEqual(payload["message"], "sync subprocess returned invalid status payload")
         self.assertNotIn("{\"status\"", payload["message"])
         self.assertEqual(payload["runtime"]["daemon_sync_exit_code"], 0)
+
+    def test_sync_lock_contention_emits_session_id(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            acquired, lock_payload = og._acquire_work_lock(
+                str(self.repo),
+                {"pid": 12345, "host": "test-host", "command": "og sync"},
+            )
+            self.assertTrue(acquired)
+            session_id = lock_payload["session"]["session_id"]
+            try:
+                buffer = io.StringIO()
+                with redirect_stdout(buffer):
+                    code = og.main(["--json", "sync"])
+                payload = json.loads(buffer.getvalue())
+            finally:
+                og._release_work_lock(str(self.repo), {"pid": 12345, "host": "test-host", "command": "og sync"})
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(payload["session_id"], session_id)
+        self.assertEqual(payload["errors"][0]["error_code"], og.SESSION_CONTENDED_CODE)
+        self.assertEqual(payload["data"]["lock"]["session"]["session_id"], session_id)
 
 
 class TestSyncWorkflows(_RepoTestCase):

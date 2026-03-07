@@ -69,6 +69,9 @@ EXIT_USAGE = 64
 EXIT_RUNTIME = 1
 USAGE_ERROR_CODE = "USAGE_ERROR"
 RUNTIME_ERROR_CODE = "RUNTIME_ERROR"
+SESSION_CONTENDED_CODE = "SESSION_CONTENDED"
+SESSION_EXPIRED_CODE = "SESSION_EXPIRED"
+SESSION_RESUME_INVALID_CODE = "SESSION_RESUME_INVALID"
 WORKER_RUNTIME_UNAVAILABLE_CODE = "WORKER_RUNTIME_UNAVAILABLE"
 INTEGRITY_CHECK_FAILED_CODE = "INTEGRITY_CHECK_FAILED"
 ADAPTER_MANIFEST_INVALID_CODE = "ADAPTER_MANIFEST_INVALID"
@@ -82,6 +85,7 @@ POLICY_CONFIG_ERROR_CODE = "POLICY_CONFIG_ERROR"
 AUTONOMOUS_WRITE_BLOCKED_CODE = "AUTONOMOUS_WRITE_BLOCKED"
 CONTROL_SURFACE_MISMATCH_CODE = "CONTROL_SURFACE_MISMATCH"
 ERROR_CLASS_USAGE = "usage"
+ERROR_CLASS_SESSION = "session"
 ERROR_CLASS_POLICY = "policy"
 ERROR_CLASS_INTEGRITY = "integrity"
 ERROR_CLASS_ADAPTER = "adapter"
@@ -96,6 +100,21 @@ ERROR_CLASS_BY_CODE: dict[str, dict[str, object]] = {
         "error_class": ERROR_CLASS_USAGE,
         "retryable": False,
         "hint": "Adjust command arguments/options to satisfy validation.",
+    },
+    SESSION_CONTENDED_CODE: {
+        "error_class": ERROR_CLASS_SESSION,
+        "retryable": True,
+        "hint": "Wait for the active session to finish or resume the recorded session explicitly.",
+    },
+    SESSION_EXPIRED_CODE: {
+        "error_class": ERROR_CLASS_SESSION,
+        "retryable": True,
+        "hint": "Start a fresh session after confirming the previous session has expired.",
+    },
+    SESSION_RESUME_INVALID_CODE: {
+        "error_class": ERROR_CLASS_SESSION,
+        "retryable": False,
+        "hint": "Use the current emitted session_id when resuming a resumable command.",
     },
     POLICY_DENIED_CODE: {
         "error_class": ERROR_CLASS_POLICY,
@@ -166,6 +185,17 @@ MODE_VALUES = {"observe", "autonomous"}
 OUTPUT_MODE_HUMAN = "human"
 OUTPUT_MODE_JSON = "json"
 OUTPUT_MODE_JSONL = "jsonl"
+SESSION_LIFECYCLE_EPHEMERAL = "ephemeral"
+SESSION_LIFECYCLE_RESUMABLE = "resumable"
+SESSION_STATE_ACTIVE = "active"
+SESSION_STATE_DISABLED = "disabled"
+SESSION_STATE_EXPIRED = "expired"
+SESSION_STATE_INSTALLED = "installed"
+SESSION_STATE_RELEASED = "released"
+SESSION_STATE_STOPPED = "stopped"
+SESSION_KIND_AUTOPILOT = "autopilot"
+SESSION_KIND_DAEMON = "daemon"
+SESSION_KIND_SYNC = "sync"
 AUTOPILOT_HOOKS = ("pre-commit", "post-commit", "post-merge", "post-checkout", "post-rewrite", "pre-push")
 AUTOPILOT_STATE_FILE = ".outcomegraph/autopilot/state.json"
 AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
@@ -467,6 +497,7 @@ DAEMON_SERVICE_STATE = f"{DAEMON_SERVICE_DIR}/state.json"
 DAEMON_SERVICE_LOG = f"{DAEMON_SERVICE_DIR}/daemon.log"
 DAEMON_SYNC_TIMEOUT_SECONDS = 300
 DAEMON_WATCH_INTERVAL_SECONDS = 2
+DAEMON_SESSION_STALE_SECONDS = 15
 DAEMON_WATCH_IGNORE_PREFIXES = (
     ".git/",
     ".outcomegraph/work/",
@@ -1109,6 +1140,7 @@ class _CommandResultEnvelopeModel(BaseModel):
     command: str
     status: str
     run_id: str | None = None
+    session_id: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
     errors: list[_CommandResultErrorModel] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
@@ -1141,7 +1173,7 @@ class _CommandResultEnvelopeModel(BaseModel):
             raise ValueError(f"status must be one of: {allowed}")
         return normalized
 
-    @field_validator("run_id", "subcommand")
+    @field_validator("run_id", "session_id", "subcommand")
     @classmethod
     def _normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -1444,10 +1476,11 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "autopilot disable":
         return _command_help(
-            "og autopilot disable",
+            "og autopilot disable [--session-id <id>]",
             "Remove outcomegraph-managed hooks and restore prior hook state where available.",
-            ["--json"],
-            ["og autopilot disable", "og autopilot disable --json"],
+            ["--session-id <id>", "--json"],
+            ["og autopilot disable", "og autopilot disable --session-id autopilot-20260307T000000Z-abcdef1234 --json"],
+            ["`autopilot init` emits a resumable session_id that can be asserted on disable."],
         )
     if normalized == "daemon":
         return _command_help(
@@ -1465,24 +1498,25 @@ def _help_for_command(command: str) -> str:
         )
     if normalized == "daemon start":
         return _command_help(
-            "og daemon start",
+            "og daemon start [--session-id <id>]",
             "Start the managed watcher process and persist runtime status.",
-            ["--json"],
-            ["og daemon start", "og daemon start --json"],
+            ["--session-id <id>", "--json"],
+            ["og daemon start", "og daemon start --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            ["`daemon install` and `daemon status` emit a resumable daemon session_id."],
         )
     if normalized == "daemon stop":
         return _command_help(
-            "og daemon stop",
+            "og daemon stop [--session-id <id>]",
             "Stop the managed watcher process.",
-            ["--json"],
-            ["og daemon stop", "og daemon stop --json"],
+            ["--session-id <id>", "--json"],
+            ["og daemon stop", "og daemon stop --session-id daemon-20260307T000000Z-abcdef1234 --json"],
         )
     if normalized == "daemon status":
         return _command_help(
-            "og daemon status",
+            "og daemon status [--session-id <id>]",
             "Read watcher install/runtime and last-sync status.",
-            ["--json"],
-            ["og daemon status", "og daemon status --json"],
+            ["--session-id <id>", "--json"],
+            ["og daemon status", "og daemon status --session-id daemon-20260307T000000Z-abcdef1234 --json"],
         )
     if normalized == "daemon run":
         return _command_help(
@@ -1735,6 +1769,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [
                 _command_schema_field("status", "string", "Command status (`ok`, `error`, or `warn`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Ephemeral sync lock session identifier."),
+                _command_schema_field("session", "object", "Ephemeral sync lock session metadata."),
                 _command_schema_field("options", "object", "Parsed command options."),
                 _command_schema_field("steps", "array", "Pipeline stage results."),
                 _command_schema_field("summary_event", "string", "Summary event path."),
@@ -1744,6 +1780,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [
                 USAGE_ERROR_CODE,
                 RUNTIME_ERROR_CODE,
+                SESSION_CONTENDED_CODE,
                 INTEGRITY_CHECK_FAILED_CODE,
                 WORKER_RUNTIME_UNAVAILABLE_CODE,
                 TIMEOUT_EXPIRED_CODE,
@@ -2037,6 +2074,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable autopilot session identifier."),
+                _command_schema_field("session", "object", "Current autopilot session metadata."),
                 _command_schema_field("installed_hooks", "array", "Hooks managed during install."),
             ],
             [USAGE_ERROR_CODE, POLICY_DENIED_CODE, RUNTIME_ERROR_CODE],
@@ -2044,16 +2083,21 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
         ),
         _command_signature_entry(
             "autopilot disable",
-            "og autopilot disable",
+            "og autopilot disable [--session-id <id>]",
             "Remove outcomegraph-managed hooks and restore prior hook state.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--session-id", "string", "Assert the autopilot session being disabled."),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable autopilot session identifier."),
+                _command_schema_field("session", "object", "Disabled autopilot session metadata."),
                 _command_schema_field("state_present", "boolean", "Whether disable state was found."),
             ],
-            [USAGE_ERROR_CODE, POLICY_DENIED_CODE, RUNTIME_ERROR_CODE],
-            examples=["og autopilot disable", "og autopilot disable --json"],
+            [USAGE_ERROR_CODE, POLICY_DENIED_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
+            examples=["og autopilot disable", "og autopilot disable --session-id autopilot-20260307T000000Z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon",
@@ -2076,49 +2120,66 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable daemon session identifier."),
+                _command_schema_field("session", "object", "Current daemon session metadata."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og daemon install", "og daemon install --json"],
         ),
         _command_signature_entry(
             "daemon start",
-            "og daemon start",
+            "og daemon start [--session-id <id>]",
             "Start the managed watcher process and persist runtime status.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--session-id", "string", "Resume the known daemon session instead of creating a new one."),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable daemon session identifier."),
+                _command_schema_field("session", "object", "Current daemon session metadata."),
                 _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon start", "og daemon start --json"],
+            [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon start", "og daemon start --session-id daemon-20260307T000000Z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon stop",
-            "og daemon stop",
+            "og daemon stop [--session-id <id>]",
             "Stop the managed watcher process.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--session-id", "string", "Resume the known daemon session before stopping it."),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable daemon session identifier."),
+                _command_schema_field("session", "object", "Stopped daemon session metadata."),
                 _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon stop", "og daemon stop --json"],
+            [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon stop", "og daemon stop --session-id daemon-20260307T000000Z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon status",
-            "og daemon status",
+            "og daemon status [--session-id <id>]",
             "Read watcher install/runtime and last-sync status.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field("--session-id", "string", "Resume the known daemon session for explicit lifecycle checks."),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
+                _command_schema_field("session_id", "string", "Resumable daemon session identifier."),
+                _command_schema_field("session", "object", "Current daemon session metadata."),
                 _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
                 _command_schema_field("install", "object", "Installation details for daemon wrapper."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon status", "og daemon status --json"],
+            [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
+            examples=["og daemon status", "og daemon status --session-id daemon-20260307T000000Z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon run",
@@ -2130,7 +2191,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("message", "string", "Human-facing lifecycle output."),
             ],
-            [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
+            [USAGE_ERROR_CODE, SESSION_CONTENDED_CODE, RUNTIME_ERROR_CODE],
             examples=["og daemon run"],
         ),
         _command_signature_entry(
@@ -2500,6 +2561,14 @@ def _build_command_result_envelope(
     run_id = payload.get("run_id")
     if not isinstance(run_id, str) or not run_id.strip():
         run_id = None
+    session = _session_from_payload(payload.get("session"))
+    session_id = payload.get("session_id")
+    if not isinstance(session_id, str) or not session_id.strip():
+        session_id = None
+    if session_id is None and isinstance(session, dict):
+        raw_session_id = session.get("session_id")
+        if isinstance(raw_session_id, str) and raw_session_id.strip():
+            session_id = raw_session_id
 
     errors = payload.get("errors")
     status_message = str(payload.get("message") or "")
@@ -2528,6 +2597,7 @@ def _build_command_result_envelope(
         "command": command_id,
         "status": status,
         "run_id": run_id,
+        "session_id": session_id,
         "data": payload,
         "errors": errors,
         "warnings": warnings,
@@ -2873,6 +2943,173 @@ def _parse_utc_timestamp(raw: str) -> datetime.datetime | None:
         return None
 
 
+def _session_expiry_timestamp(started_at: str, ttl_seconds: int | None) -> str | None:
+    if ttl_seconds is None:
+        return None
+    started = _parse_utc_timestamp(started_at)
+    if started is None:
+        return None
+    expires = started + datetime.timedelta(seconds=ttl_seconds)
+    return expires.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _build_session_id(kind: str, *parts: object) -> str:
+    created_at = _utc_timestamp().replace(":", "").replace("-", "").lower()
+    seed = "|".join([str(kind), created_at, *(str(part) for part in parts if part is not None)])
+    return f"{kind}-{created_at}-{_short_hash(seed, 10)}"
+
+
+def _build_session_record(
+    kind: str,
+    lifecycle: str,
+    state: str,
+    *,
+    session_id: str | None = None,
+    created_at: str | None = None,
+    updated_at: str | None = None,
+    ttl_seconds: int | None = None,
+    resume_command: str | None = None,
+) -> dict[str, object]:
+    created = created_at or _utc_timestamp()
+    updated = updated_at or created
+    payload: dict[str, object] = {
+        "session_id": session_id or _build_session_id(kind, state, created),
+        "kind": kind,
+        "lifecycle": lifecycle,
+        "state": state,
+        "resume_supported": lifecycle == SESSION_LIFECYCLE_RESUMABLE,
+        "created_at": created,
+        "updated_at": updated,
+        "expires_at": _session_expiry_timestamp(updated, ttl_seconds),
+    }
+    if resume_command:
+        payload["resume_command"] = resume_command
+    return payload
+
+
+def _session_from_payload(raw: object, *, now: datetime.datetime | None = None) -> dict[str, object] | None:
+    if not isinstance(raw, dict):
+        return None
+    session_id = str(raw.get("session_id") or "").strip()
+    if not session_id:
+        return None
+    session: dict[str, object] = {
+        "session_id": session_id,
+        "kind": str(raw.get("kind") or "").strip() or "runtime",
+        "lifecycle": str(raw.get("lifecycle") or SESSION_LIFECYCLE_EPHEMERAL).strip() or SESSION_LIFECYCLE_EPHEMERAL,
+        "state": str(raw.get("state") or SESSION_STATE_ACTIVE).strip() or SESSION_STATE_ACTIVE,
+        "resume_supported": bool(raw.get("resume_supported"))
+        or str(raw.get("lifecycle") or SESSION_LIFECYCLE_EPHEMERAL).strip() == SESSION_LIFECYCLE_RESUMABLE,
+        "created_at": raw.get("created_at"),
+        "updated_at": raw.get("updated_at"),
+        "expires_at": raw.get("expires_at"),
+    }
+    resume_command = raw.get("resume_command")
+    if isinstance(resume_command, str) and resume_command.strip():
+        session["resume_command"] = resume_command.strip()
+    if _session_is_expired(session, now=now):
+        session["state"] = SESSION_STATE_EXPIRED
+    return session
+
+
+def _session_is_expired(session: object, *, now: datetime.datetime | None = None) -> bool:
+    if not isinstance(session, dict):
+        return False
+    expires_at = session.get("expires_at")
+    if not isinstance(expires_at, str) or not expires_at.strip():
+        return False
+    parsed = _parse_utc_timestamp(expires_at)
+    if parsed is None:
+        return False
+    reference = now or datetime.datetime.now(tz=datetime.timezone.utc)
+    return parsed <= reference
+
+
+def _set_session_state(
+    session: dict[str, object] | None,
+    state: str,
+    *,
+    updated_at: str | None = None,
+    ttl_seconds: int | None = None,
+    refresh_expiry: bool = False,
+) -> dict[str, object] | None:
+    if not isinstance(session, dict):
+        return None
+    next_session = dict(session)
+    next_session["state"] = state
+    next_session["updated_at"] = updated_at or _utc_timestamp()
+    if refresh_expiry:
+        next_session["expires_at"] = _session_expiry_timestamp(str(next_session["updated_at"]), ttl_seconds)
+    return next_session
+
+
+def _normalize_session_id(value: object, field: str = "session_id") -> str:
+    return _normalize_agent_identifier(str(value or ""), field)
+
+
+def _build_session_error(
+    code: str,
+    message: str,
+    *,
+    command: str,
+    session: dict[str, object] | None = None,
+    requested_session_id: str | None = None,
+    actual_session_id: str | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "status": "error",
+        "code": code,
+        "command": command,
+        "message": message,
+    }
+    if isinstance(session, dict):
+        payload["session"] = session
+        session_id = session.get("session_id")
+        if isinstance(session_id, str) and session_id.strip():
+            payload["session_id"] = session_id
+    if requested_session_id:
+        payload["requested_session_id"] = requested_session_id
+    if actual_session_id:
+        payload["actual_session_id"] = actual_session_id
+    return payload
+
+
+def _validate_resumed_session(
+    command: str,
+    requested_session_id: str | None,
+    session: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if not requested_session_id:
+        return None
+    if not isinstance(session, dict):
+        return _build_session_error(
+            SESSION_RESUME_INVALID_CODE,
+            f"{command} cannot resume session '{requested_session_id}'; no resumable session is recorded.",
+            command=command,
+            requested_session_id=requested_session_id,
+        )
+    actual_session_id = str(session.get("session_id") or "").strip()
+    if actual_session_id != requested_session_id:
+        return _build_session_error(
+            SESSION_RESUME_INVALID_CODE,
+            f"{command} cannot resume session '{requested_session_id}'; active session is '{actual_session_id or 'none'}'.",
+            command=command,
+            session=session,
+            requested_session_id=requested_session_id,
+            actual_session_id=actual_session_id or None,
+        )
+    if _session_is_expired(session):
+        return _build_session_error(
+            SESSION_EXPIRED_CODE,
+            f"{command} session '{requested_session_id}' expired at {session.get('expires_at')}.",
+            command=command,
+            session=_set_session_state(session, SESSION_STATE_EXPIRED) or session,
+            requested_session_id=requested_session_id,
+            actual_session_id=requested_session_id,
+        )
+    return None
+
+
 def _humanize_duration(seconds: int | None) -> str:
     if seconds is None:
         return "unknown"
@@ -3099,6 +3336,7 @@ def _read_lock_status(repo_root: str, now: datetime.datetime) -> dict[str, objec
         return {
             "status": LOCK_STATUS_UNLOCKED,
             "holder": None,
+            "session": None,
             "is_stale": False,
             "age_seconds": None,
             "created_at": None,
@@ -3120,6 +3358,7 @@ def _read_lock_status(repo_root: str, now: datetime.datetime) -> dict[str, objec
     return {
         "status": status,
         "holder": payload.get("holder") if isinstance(payload.get("holder"), dict) else None,
+        "session": _session_from_payload(payload.get("session"), now=now),
         "is_stale": is_stale,
         "age_seconds": age_seconds,
         "created_at": _iso_from_dt(created_at),
@@ -4018,6 +4257,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
             "host": holder.get("host"),
             "command": holder.get("command"),
         }
+    lock_session = _session_from_payload(lock.get("session"), now=now)
 
     payload: dict[str, object] = {
         "status_schema_version": STATUS_SCHEMA_VERSION,
@@ -4053,6 +4293,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
                 "status": lock["status"],
                 "age_human": _humanize_duration(lock["age_seconds"]),
                 "holder": lock_holder,
+                "session": lock_session,
             },
             "message": runtime_message,
         },
@@ -7498,12 +7739,25 @@ def _build_lock_record(
     created_at: str,
     status: str = LOCK_STATUS_UNLOCKED,
     holder: dict | None = None,
+    session: dict[str, object] | None = None,
 ) -> dict:
-    return {"schema_version": 2, "status": status, "created_at": created_at, "updated_at": created_at, "holder": holder}
+    return {
+        "schema_version": 2,
+        "status": status,
+        "created_at": created_at,
+        "updated_at": created_at,
+        "holder": holder,
+        "session": session,
+    }
 
 
-def _build_lock_payload(created_at: str, status: str = LOCK_STATUS_UNLOCKED, holder: dict | None = None) -> str:
-    return json.dumps(_build_lock_record(created_at, status, holder), indent=2, sort_keys=True) + "\n"
+def _build_lock_payload(
+    created_at: str,
+    status: str = LOCK_STATUS_UNLOCKED,
+    holder: dict | None = None,
+    session: dict[str, object] | None = None,
+) -> str:
+    return json.dumps(_build_lock_record(created_at, status, holder, session), indent=2, sort_keys=True) + "\n"
 
 def _build_state_record(created_at: str) -> dict:
     return {
@@ -7583,7 +7837,19 @@ def _acquire_work_lock(repo_root: str, holder: dict) -> tuple[bool, dict | None]
         if not has_lock_file or lock_payload is None:
             holder_payload = {"pid": holder.get("pid"), "host": holder.get("host"), "command": holder.get("command")}
             created_at = _utc_timestamp()
-            payload = _build_lock_record(created_at, LOCK_STATUS_LOCKED, holder_payload)
+            payload = _build_lock_record(
+                created_at,
+                LOCK_STATUS_LOCKED,
+                holder_payload,
+                _build_session_record(
+                    SESSION_KIND_SYNC,
+                    SESSION_LIFECYCLE_EPHEMERAL,
+                    SESSION_STATE_ACTIVE,
+                    created_at=created_at,
+                    updated_at=created_at,
+                    ttl_seconds=WORK_LOCK_STALE_SECONDS,
+                ),
+            )
             try:
                 with open(lock_path, "x", encoding="utf-8", newline="\n") as handle:
                     json.dump(payload, handle, indent=2, sort_keys=True)
@@ -7603,7 +7869,10 @@ def _release_work_lock(repo_root: str, holder: dict) -> None:
     if isinstance(holder_payload, dict):
         if holder_payload.get("pid") != holder.get("pid") or holder_payload.get("host") != holder.get("host"):
             return
-    payload = _build_lock_record(_utc_timestamp(), LOCK_STATUS_UNLOCKED, None)
+    released_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
+    if isinstance(released_session, dict):
+        released_session = _set_session_state(released_session, SESSION_STATE_RELEASED, refresh_expiry=True)
+    payload = _build_lock_record(_utc_timestamp(), LOCK_STATUS_UNLOCKED, None, released_session)
     _write_json_file(lock_path, payload)
 
 
@@ -7870,17 +8139,27 @@ def _cleanup_directory_if_empty(path: str) -> None:
         return
 
 
-def _disable_autopilot() -> dict[str, object]:
+def _disable_autopilot(session_id: str | None = None) -> dict[str, object]:
     repo_root = _git_root()
     state_path = _autopilot_state_path(repo_root)
     state = _read_json_file(state_path)
+    session = _session_from_payload(state.get("session")) if isinstance(state, dict) else None
+    resume_error = _validate_resumed_session("autopilot disable", session_id, session)
+    if resume_error is not None:
+        return {
+            **resume_error,
+            "options": {"session_id": session_id},
+            "subcommand": "disable",
+            "installed_hooks": [],
+            "state_present": isinstance(state, dict),
+        }
 
     if not isinstance(state, dict):
         return {
             "status": "ok",
             "command": "autopilot",
             "subcommand": "disable",
-            "options": {},
+            "options": {"session_id": session_id},
             "installed_hooks": [],
             "state_present": False,
             "restored_core_hooks_path": _hooks_path(repo_root),
@@ -7950,15 +8229,18 @@ def _disable_autopilot() -> dict[str, object]:
 
     _cleanup_directory_if_empty(os.path.join(repo_root, AUTOPILOT_BACKUP_DIR))
     _cleanup_directory_if_empty(os.path.join(repo_root, AUTOPILOT_MANAGED_HOOK_DIR))
+    disabled_session = _set_session_state(session, SESSION_STATE_DISABLED, refresh_expiry=True)
 
     return {
         "status": "ok",
         "command": "autopilot",
         "subcommand": "disable",
-        "options": {},
+        "options": {"session_id": session_id},
         "installed_hooks": disabled_hooks,
         "state_present": True,
         "restored_core_hooks_path": hooks_path,
+        "session": disabled_session,
+        "session_id": disabled_session.get("session_id") if isinstance(disabled_session, dict) else None,
         "message": "autopilot disable command executed.",
     }
 
@@ -7986,6 +8268,9 @@ def _init_autopilot(
     output_json: bool = False,
 ) -> dict[str, object]:
     repo_root = _git_root()
+    state_path = os.path.join(repo_root, AUTOPILOT_STATE_FILE)
+    existing_state = _read_json_file(state_path)
+    existing_session = _session_from_payload(existing_state.get("session")) if isinstance(existing_state, dict) else None
 
     existing_path = _hooks_path(repo_root)
     mode = "bridge-existing"
@@ -8031,9 +8316,16 @@ def _init_autopilot(
         "force_hooks_path": force_hooks_path,
         "hooks_dir": target,
         "installed_hooks": installed,
+        "session": _set_session_state(existing_session, SESSION_STATE_INSTALLED)
+        if isinstance(existing_session, dict)
+        else _build_session_record(
+            SESSION_KIND_AUTOPILOT,
+            SESSION_LIFECYCLE_RESUMABLE,
+            SESSION_STATE_INSTALLED,
+            resume_command="og autopilot disable --session-id <session_id>",
+        ),
     }
 
-    state_path = os.path.join(repo_root, AUTOPILOT_STATE_FILE)
     os.makedirs(os.path.dirname(state_path), exist_ok=True)
     with open(state_path, "w", encoding="utf-8") as handle:
         json.dump(state, handle, indent=2)
@@ -8044,6 +8336,8 @@ def _init_autopilot(
         "subcommand": "init",
         "options": {"force_hooks_path": force_hooks_path},
         "state": state,
+        "session": state.get("session"),
+        "session_id": state.get("session", {}).get("session_id") if isinstance(state.get("session"), dict) else None,
         "message": "autopilot init complete",
     }
 
@@ -8125,6 +8419,16 @@ def _daemon_install() -> dict[str, object]:
     os.chmod(script_path, 0o755)
 
     state = _daemon_read_state(repo_root)
+    session = _session_from_payload(state.get("session"))
+    if not isinstance(session, dict) or _session_is_expired(session):
+        session = _build_session_record(
+            SESSION_KIND_DAEMON,
+            SESSION_LIFECYCLE_RESUMABLE,
+            SESSION_STATE_INSTALLED,
+            resume_command="og daemon status --session-id <session_id>",
+        )
+    elif not bool(state.get("running")):
+        session = _set_session_state(session, SESSION_STATE_INSTALLED, refresh_expiry=True)
     state.update(
         {
             "status": "installed",
@@ -8138,6 +8442,7 @@ def _daemon_install() -> dict[str, object]:
             "runtime": {
                 "watch_interval_seconds": DAEMON_WATCH_INTERVAL_SECONDS,
             },
+            "session": session,
         }
     )
     _daemon_write_state(repo_root, state)
@@ -8146,6 +8451,8 @@ def _daemon_install() -> dict[str, object]:
         "command": "daemon",
         "subcommand": "install",
         "options": {},
+        "session": session,
+        "session_id": session.get("session_id") if isinstance(session, dict) else None,
         "runtime": {
             "watch_interval_seconds": DAEMON_WATCH_INTERVAL_SECONDS,
             "script": script_path,
@@ -8249,6 +8556,8 @@ def _daemon_status_payload(repo_root: str, running: bool, state: dict[str, objec
     if not installed:
         state.setdefault("installed", False)
         state.setdefault("status", "not_installed")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    session = _session_from_payload(state.get("session"), now=now)
     runtime = {
         "installed": installed,
         "running": running,
@@ -8256,19 +8565,25 @@ def _daemon_status_payload(repo_root: str, running: bool, state: dict[str, objec
         "script_path": _daemon_script_path(repo_root),
         "log_path": _daemon_log_path(repo_root),
         "watch_interval_seconds": DAEMON_WATCH_INTERVAL_SECONDS,
+        "session": session,
         "state": state,
     }
     message = "daemon not installed."
+    status = "ok" if installed else "warn"
     if installed and running:
         message = f"daemon running (pid={runtime['pid']})."
+    elif installed and isinstance(session, dict) and str(session.get("state") or "") == SESSION_STATE_EXPIRED:
+        message = f"daemon session '{session.get('session_id')}' expired."
+        status = "warn"
     elif installed:
         message = "daemon installed but not running."
-    status = "ok" if installed else "warn"
     return {
         "status": status,
         "command": "daemon",
         "subcommand": "status",
         "options": {},
+        "session": session,
+        "session_id": session.get("session_id") if isinstance(session, dict) else None,
         "runtime": runtime,
         "message": message,
     }
@@ -8369,15 +8684,41 @@ def _daemon_run_sync(repo_root: str) -> dict[str, object]:
     return parsed
 
 
-def _daemon_start() -> dict[str, object]:
+def _daemon_start(session_id: str | None = None) -> dict[str, object]:
     repo_root = _git_root()
     running, state = _daemon_running_state(repo_root)
+    session = _session_from_payload(state.get("session"))
+    resume_error = _validate_resumed_session("daemon start", session_id, session)
+    if resume_error is not None:
+        return {
+            **resume_error,
+            "options": {"session_id": session_id},
+            "subcommand": "start",
+            "runtime": {"installed": _daemon_is_installed(repo_root), "running": running, "pid": state.get("pid")},
+        }
     if not _daemon_is_installed(repo_root):
         _daemon_install()
         running, state = _daemon_running_state(repo_root)
+        session = _session_from_payload(state.get("session"))
     if running:
+        if not isinstance(session, dict):
+            session = _build_session_record(
+                SESSION_KIND_DAEMON,
+                SESSION_LIFECYCLE_RESUMABLE,
+                SESSION_STATE_ACTIVE,
+                ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+                resume_command="og daemon status --session-id <session_id>",
+            )
+        else:
+            session = _set_session_state(
+                session,
+                SESSION_STATE_ACTIVE,
+                ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+                refresh_expiry=True,
+            )
         state["status"] = "running"
         state["running"] = True
+        state["session"] = session
         _daemon_write_state(repo_root, state)
         return _daemon_status_payload(repo_root, True, state)
 
@@ -8401,6 +8742,21 @@ def _daemon_start() -> dict[str, object]:
     if process is None:
         raise RuntimeError("failed to start daemon process")
 
+    if not isinstance(session, dict) or _session_is_expired(session):
+        session = _build_session_record(
+            SESSION_KIND_DAEMON,
+            SESSION_LIFECYCLE_RESUMABLE,
+            SESSION_STATE_ACTIVE,
+            ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+            resume_command="og daemon status --session-id <session_id>",
+        )
+    else:
+        session = _set_session_state(
+            session,
+            SESSION_STATE_ACTIVE,
+            ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+            refresh_expiry=True,
+        )
     state.update(
         {
             "status": "running",
@@ -8409,6 +8765,7 @@ def _daemon_start() -> dict[str, object]:
             "started_at": _utc_timestamp(),
             "last_started_at": _utc_timestamp(),
             "last_restart_at": _utc_timestamp(),
+            "session": session,
         }
     )
     _daemon_write_state(repo_root, state)
@@ -8416,7 +8773,9 @@ def _daemon_start() -> dict[str, object]:
         "status": "ok",
         "command": "daemon",
         "subcommand": "start",
-        "options": {},
+        "options": {"session_id": session_id},
+        "session": session,
+        "session_id": session.get("session_id") if isinstance(session, dict) else None,
         "runtime": {
             "installed": True,
             "running": True,
@@ -8428,9 +8787,18 @@ def _daemon_start() -> dict[str, object]:
     }
 
 
-def _daemon_stop() -> dict[str, object]:
+def _daemon_stop(session_id: str | None = None) -> dict[str, object]:
     repo_root = _git_root()
     running, state = _daemon_running_state(repo_root)
+    session = _session_from_payload(state.get("session"))
+    resume_error = _validate_resumed_session("daemon stop", session_id, session)
+    if resume_error is not None:
+        return {
+            **resume_error,
+            "options": {"session_id": session_id},
+            "subcommand": "stop",
+            "runtime": {"installed": _daemon_is_installed(repo_root), "running": running, "pid": state.get("pid")},
+        }
     pid = state.get("pid")
     stopped = True
     if running and isinstance(pid, int):
@@ -8447,6 +8815,7 @@ def _daemon_stop() -> dict[str, object]:
             "running": False,
             "last_stopped_at": _utc_timestamp(),
             "stopped": stopped,
+            "session": _set_session_state(session, SESSION_STATE_STOPPED, refresh_expiry=True),
         }
     )
     state.pop("pid", None)
@@ -8456,7 +8825,9 @@ def _daemon_stop() -> dict[str, object]:
         "status": "ok" if stopped else "error",
         "command": "daemon",
         "subcommand": "stop",
-        "options": {},
+        "options": {"session_id": session_id},
+        "session": state.get("session"),
+        "session_id": state.get("session", {}).get("session_id") if isinstance(state.get("session"), dict) else None,
         "runtime": {
             "installed": _daemon_is_installed(repo_root),
             "running": False,
@@ -8466,9 +8837,37 @@ def _daemon_stop() -> dict[str, object]:
     }
 
 
-def _daemon_status() -> dict[str, object]:
+def _daemon_status(session_id: str | None = None) -> dict[str, object]:
     repo_root = _git_root()
     running, state = _daemon_running_state(repo_root)
+    session = _session_from_payload(state.get("session"))
+    resume_error = _validate_resumed_session("daemon status", session_id, session)
+    if resume_error is not None:
+        return {
+            **resume_error,
+            "options": {"session_id": session_id},
+            "subcommand": "status",
+            "runtime": {"installed": _daemon_is_installed(repo_root), "running": running, "pid": state.get("pid")},
+        }
+    if running:
+        if not isinstance(session, dict):
+            session = _build_session_record(
+                SESSION_KIND_DAEMON,
+                SESSION_LIFECYCLE_RESUMABLE,
+                SESSION_STATE_ACTIVE,
+                ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+                resume_command="og daemon status --session-id <session_id>",
+            )
+        else:
+            session = _set_session_state(
+                session,
+                SESSION_STATE_ACTIVE,
+                ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+                refresh_expiry=True,
+            )
+        state["session"] = session
+    elif isinstance(session, dict) and _session_is_expired(session):
+        state["session"] = _set_session_state(session, SESSION_STATE_EXPIRED)
     if running:
         state["status"] = "running"
     elif _daemon_is_installed(repo_root):
@@ -8479,7 +8878,9 @@ def _daemon_status() -> dict[str, object]:
         state["running"] = True
         state["last_check_at"] = _utc_timestamp()
     _daemon_write_state(repo_root, state)
-    return _daemon_status_payload(repo_root, running, state)
+    payload = _daemon_status_payload(repo_root, running, state)
+    payload["options"] = {"session_id": session_id}
+    return payload
 
 
 def _daemon_run() -> int:
@@ -8488,7 +8889,30 @@ def _daemon_run() -> int:
     running, state = _daemon_running_state(repo_root)
     state_pid = state.get("pid")
     if running and state_pid != os.getpid():
-        emit_error("daemon run cannot start while daemon process is already managed", "daemon", EXIT_RUNTIME, False)
+        emit_error(
+            "daemon run cannot start while daemon process is already managed",
+            "daemon",
+            EXIT_RUNTIME,
+            False,
+            error_code=SESSION_CONTENDED_CODE,
+        )
+
+    session = _session_from_payload(state.get("session"))
+    if not isinstance(session, dict) or _session_is_expired(session):
+        session = _build_session_record(
+            SESSION_KIND_DAEMON,
+            SESSION_LIFECYCLE_RESUMABLE,
+            SESSION_STATE_ACTIVE,
+            ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+            resume_command="og daemon status --session-id <session_id>",
+        )
+    else:
+        session = _set_session_state(
+            session,
+            SESSION_STATE_ACTIVE,
+            ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+            refresh_expiry=True,
+        )
 
     state.update(
         {
@@ -8497,6 +8921,7 @@ def _daemon_run() -> int:
             "last_started_at": _utc_timestamp(),
             "pid": os.getpid(),
             "last_poll_at": _utc_timestamp(),
+            "session": session,
         }
     )
     _daemon_write_state(repo_root, state)
@@ -8529,6 +8954,7 @@ def _daemon_run() -> int:
                 "reason": sorted(set(trigger)),
                 "status": sync_payload.get("status"),
                 "run_id": sync_payload.get("run_id"),
+                "session_id": sync_payload.get("session_id"),
             }
             state["last_sync_status"] = sync_payload.get("status")
         else:
@@ -8545,6 +8971,12 @@ def _daemon_run() -> int:
                 "last_pending": bool(work_state.get("pending")),
                 "last_trigger": trigger,
                 "last_sync": state.get("last_sync"),
+                "session": _set_session_state(
+                    _session_from_payload(state.get("session")) or session,
+                    SESSION_STATE_ACTIVE,
+                    ttl_seconds=DAEMON_SESSION_STALE_SECONDS,
+                    refresh_expiry=True,
+                ),
             }
         )
         _daemon_write_state(repo_root, state)
@@ -8556,6 +8988,7 @@ def _daemon_run() -> int:
     state["status"] = "stopped"
     state["running"] = False
     state["last_stopped_at"] = _utc_timestamp()
+    state["session"] = _set_session_state(_session_from_payload(state.get("session")) or session, SESSION_STATE_STOPPED, refresh_expiry=True)
     state.pop("pid", None)
     _daemon_write_state(repo_root, state)
     return EXIT_SUCCESS
@@ -8575,6 +9008,7 @@ def parse_command_flags(
     allow_certificate_filter: bool = False,
     allow_output_controls: bool = False,
     allow_yes: bool = False,
+    allow_session_id: bool = False,
     allow_validate: bool = False,
     allow_dry_run: bool = False,
     allow_recovery_controls: bool = False,
@@ -8593,6 +9027,7 @@ def parse_command_flags(
     fields: list[str] | None = None
     limit: int | None = None
     confirmed = False
+    session_id: str | None = None
     offset = 0
     validate_only = False
     dry_run = False
@@ -8784,6 +9219,26 @@ def parse_command_flags(
                 confirmed = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
                 emit_error(f"invalid --yes value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--session-id":
+            if not allow_session_id:
+                emit_error(f"{command} does not accept --session-id", command, EXIT_USAGE, output_json)
+            if i + 1 >= len(args):
+                emit_error(f"{command} requires a value for --session-id", command, EXIT_USAGE, output_json)
+            try:
+                session_id = _normalize_session_id(args[i + 1], "--session-id")
+            except ValueError as exc:
+                emit_error(str(exc), command, EXIT_USAGE, output_json)
+            i += 2
+            continue
+        if arg.startswith("--session-id="):
+            if not allow_session_id:
+                emit_error(f"{command} does not accept --session-id", command, EXIT_USAGE, output_json)
+            try:
+                session_id = _normalize_session_id(arg.split("=", 1)[1], "--session-id")
+            except ValueError as exc:
+                emit_error(str(exc), command, EXIT_USAGE, output_json)
             i += 1
             continue
         if arg == "--validate":
@@ -9014,6 +9469,8 @@ def parse_command_flags(
         options["offset"] = offset
     if confirmed:
         options["yes"] = confirmed
+    if session_id:
+        options["session_id"] = session_id
     return options, []
 
 
@@ -14568,6 +15025,7 @@ def _run_export_stage(
 
 def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
+    session_id = payload.get("session_id")
     event_payload = {
         "schema_version": 2,
         "artifact_type": "sync_summary",
@@ -14582,6 +15040,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
         "steps": payload["steps"],
         "recovery": payload.get("recovery", {}),
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
+        **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -14589,6 +15048,7 @@ def _record_sync_summary_event(repo_root: str, payload: dict[str, object], total
 
 def _record_replay_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
+    session_id = payload.get("session_id")
     event_payload = {
         "schema_version": 2,
         "artifact_type": "replay_summary",
@@ -14602,6 +15062,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
+        **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -14609,6 +15070,7 @@ def _record_replay_summary_event(repo_root: str, payload: dict[str, object], tot
 
 def _record_verify_summary_event(repo_root: str, payload: dict[str, object], total_ms: int, snapshot: dict[str, object]) -> str:
     prompt_provenance = _collect_prompt_provenance_records(payload.get("steps"))
+    session_id = payload.get("session_id")
     event_payload = {
         "schema_version": 2,
         "artifact_type": "verify_summary",
@@ -14622,6 +15084,7 @@ def _record_verify_summary_event(repo_root: str, payload: dict[str, object], tot
         "steps": payload.get("steps", []),
         "recovery": payload.get("recovery", {}),
         **({"worker_prompt_provenance": prompt_provenance} if prompt_provenance else {}),
+        **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
@@ -14646,6 +15109,7 @@ def _build_drift_payload(repo_root: str, options: dict[str, object]) -> dict[str
 
 def _record_drift_report_event(repo_root: str, payload: dict[str, object], total_ms: int) -> str:
     run_id = _build_run_id("drift", _short_hash(f"drift:{total_ms}:{len(payload.get('checks', []))}", 10))
+    session_id = payload.get("session_id")
     event_payload = {
         "schema_version": 2,
         "artifact_type": "drift_report",
@@ -14657,18 +15121,21 @@ def _record_drift_report_event(repo_root: str, payload: dict[str, object], total
         "checks": payload.get("checks", []),
         "drift": payload.get("drift", {}),
         "remediation": payload.get("drift", {}).get("remediation", []),
+        **({"session_id": session_id} if isinstance(session_id, str) and session_id.strip() else {}),
     }
     path, event_payload = _append_ledger_event(repo_root, event_payload)
     return path
 
 
-def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, object]:
+def _run_sync_job(repo_root: str, options: dict[str, object], session: dict[str, object] | None = None) -> dict[str, object]:
     profile = str(options.get("profile") or "analyze")
     mode = str(options.get("mode") or "observe")
     force_full_sync = bool(options.get("force_full_sync", False))
     snapshot = _collect_sync_snapshot(repo_root, profile, mode, force_full_sync=force_full_sync)
     idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
     run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
+    session = _session_from_payload(session)
+    session_id = session.get("session_id") if isinstance(session, dict) else None
     sync_options: dict[str, object] = {
         "changed": options.get("changed", False),
         "profile": profile,
@@ -14685,6 +15152,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             "command": "sync",
             "subcommand": None,
             "run_id": run_id,
+            "session_id": session_id,
+            "session": session,
             "idempotency_key": idempotency_key,
             "snapshot": snapshot,
             "pending": False,
@@ -14726,6 +15195,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             "command": "sync",
             "subcommand": None,
             "run_id": run_id,
+            "session_id": session_id,
+            "session": session,
             "idempotency_key": idempotency_key,
             "snapshot": snapshot,
             "pending": False,
@@ -14758,6 +15229,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             "command": "sync",
             "subcommand": None,
             "run_id": run_id,
+            "session_id": session_id,
+            "session": session,
             "idempotency_key": idempotency_key,
             "snapshot": snapshot,
             "pending": False,
@@ -14805,6 +15278,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
             "command": "sync",
             "subcommand": None,
             "run_id": run_id,
+            "session_id": session_id,
+            "session": session,
             "idempotency_key": idempotency_key,
             "snapshot": snapshot,
             "pending": False,
@@ -14921,6 +15396,8 @@ def _run_sync_job(repo_root: str, options: dict[str, object]) -> dict[str, objec
         ),
         "subcommand": None,
         "run_id": run_id,
+        "session_id": session_id,
+        "session": session,
         "idempotency_key": idempotency_key,
         "snapshot": snapshot,
         "pending": False,
@@ -15165,22 +15642,40 @@ def run_command(
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
-            _set_pending_state(repo_root, f"lock contented by {lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}")
-            emit_command_result(
-                {
-                    "status": "ok",
-                    "command": "sync",
-                    "options": options,
-                    "lock": {"status": "contended", "holder": lock_payload.get("holder") if isinstance(lock_payload, dict) else None},
-                    "pending": True,
-                    "message": "sync is already running; pending work recorded.",
+            active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
+            active_session_id = active_session.get("session_id") if isinstance(active_session, dict) else None
+            contended_payload = {
+                "status": "warn",
+                "command": "sync",
+                "options": options,
+                "lock": {
+                    "status": "contended",
+                    "holder": lock_payload.get("holder") if isinstance(lock_payload, dict) else None,
+                    "session": active_session,
                 },
-                output_json,
+                "session": active_session,
+                "session_id": active_session_id,
+                "pending": True,
+                "errors": [
+                    _build_session_error(
+                        SESSION_CONTENDED_CODE,
+                        f"sync session '{active_session_id or 'unknown'}' is already active; pending work recorded.",
+                        command="sync",
+                        session=active_session,
+                    )
+                ],
+                "message": "sync session is already running; pending work recorded.",
+            }
+            _set_pending_state(
+                repo_root,
+                f"lock contended by {active_session_id or lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}",
             )
-            return EXIT_SUCCESS
+            emit_command_result(contended_payload, output_json)
+            return _command_exit_code(contended_payload)
         try:
-            payload = _run_sync_job(repo_root, options)
-            payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload}
+            active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
+            payload = _run_sync_job(repo_root, options, active_session)
+            payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload, "session": active_session}
             emit_command_result(payload, output_json)
             return _command_exit_code(payload)
         finally:
@@ -15452,6 +15947,7 @@ def run_command(
             output_json,
             allow_force_hooks_path=sub == "init",
             allow_yes=sub == "init",
+            allow_session_id=sub == "disable",
             default_strict=strict,
         )
         if sub == "init":
@@ -15465,9 +15961,9 @@ def run_command(
             emit_command_result(state, output_json)
             return EXIT_SUCCESS
         if sub == "disable":
-            state = _disable_autopilot()
+            state = _disable_autopilot(cast(str | None, options.get("session_id")))
             emit_command_result(state, output_json)
-            return EXIT_SUCCESS
+            return _command_exit_code(state)
         emit_command_result(build_payload("autopilot", sub, **options), output_json)
         return EXIT_SUCCESS
 
@@ -15503,19 +15999,46 @@ def run_command(
             emit_command_result(payload, output_json)
             return EXIT_RUNTIME if str(payload.get("status") or "").lower() == "error" else EXIT_SUCCESS
         if sub == "start":
-            options, _ = parse_command_flags(rest[1:], "daemon start", False, False, False, output_json, default_strict=strict)
-            payload = _daemon_start()
+            options, _ = parse_command_flags(
+                rest[1:],
+                "daemon start",
+                False,
+                False,
+                False,
+                output_json,
+                allow_session_id=True,
+                default_strict=strict,
+            )
+            payload = _daemon_start(cast(str | None, options.get("session_id")))
             payload["options"] = options
             emit_command_result(payload, output_json)
             return _command_exit_code(payload)
         if sub == "stop":
-            options, _ = parse_command_flags(rest[1:], "daemon stop", False, False, False, output_json, default_strict=strict)
-            payload = _daemon_stop()
+            options, _ = parse_command_flags(
+                rest[1:],
+                "daemon stop",
+                False,
+                False,
+                False,
+                output_json,
+                allow_session_id=True,
+                default_strict=strict,
+            )
+            payload = _daemon_stop(cast(str | None, options.get("session_id")))
             payload["options"] = options
             emit_command_result(payload, output_json)
             return _command_exit_code(payload)
-        options, _ = parse_command_flags(rest[1:], "daemon status", False, False, False, output_json, default_strict=strict)
-        payload = _daemon_status()
+        options, _ = parse_command_flags(
+            rest[1:],
+            "daemon status",
+            False,
+            False,
+            False,
+            output_json,
+            allow_session_id=True,
+            default_strict=strict,
+        )
+        payload = _daemon_status(cast(str | None, options.get("session_id")))
         payload["options"] = options
         emit_command_result(payload, output_json)
         return _command_exit_code(payload)
