@@ -3,9 +3,9 @@
 Status: done
 
 Summary:
-- Removed apply-stage heuristics that inferred `pytest -q` or upgraded `warn` capsules to `success` without stronger distill evidence.
-- Tightened capsule payload building so weak apply inputs overwrite previously strong brief fields instead of silently backfilling behavior claims, dependencies, invariants, unknowns, or stronger oracles.
-- Added regression coverage proving thin Python capsules stay transparently weak until distill or replay provides stronger evidence.
+- Tightened apply-stage artifact writing so weak capsules no longer receive misleading success certificates.
+- Stopped apply from synthesizing placeholder claim text/category when distill claim payloads are incomplete.
+- Added regressions proving weak code capsules stay weak and malformed claims are rejected instead of normalized into stronger artifacts.
 
 Read:
 - `/home/agent/outcomegraph/to-do.json`
@@ -20,8 +20,8 @@ Read:
 - `/home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py`
 - `/home/agent/outcomegraph/tasks/og-distill-002/TASK.md`
 - `/home/agent/outcomegraph/tasks/og-distill-002/task-plan.json`
-- `/home/agent/selkios/selkios-os/skills/selkios-task-implement/SKILL.md`
 - `/home/agent/.codex/skills/todo-json-manager/SKILL.md`
+- `/home/agent/selkios/selkios-os/skills/selkios-task-implement/SKILL.md`
 - `/home/agent/.codex/skills/git-conventional-commit/SKILL.md`
 
 Wrote:

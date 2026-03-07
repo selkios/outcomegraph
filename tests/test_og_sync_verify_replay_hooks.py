@@ -3275,6 +3275,30 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(oracle_commands, [None])
         self.assertTrue(any("explicit executable oracle evidence" in warning for warning in payload["warnings"]))
 
+    def test_run_apply_stage_records_warn_certificate_for_weak_code_capsule(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [
+                        _distill_update("og", ["og.py"], status="success"),
+                    ],
+                    "affected_capsules": ["og"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        certificate_payload = json.loads((self.repo / payload["applied_certificates"][0]).read_text(encoding="utf-8"))
+        success_refs = og._collect_successful_certificate_refs_by_capsule(str(self.repo))
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(certificate_payload["status"], "warn")
+        self.assertNotIn("og", success_refs)
+
     def test_run_apply_stage_does_not_promote_warn_python_capsule_with_executable_oracle(self) -> None:
         with self.git_root_patch():
             og._init_outcomegraph()
@@ -3399,6 +3423,39 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
             capsule_payload["oracles"][0]["reason"],
             "Distill did not recover an executable oracle from the bounded evidence.",
         )
+
+    def test_run_apply_stage_rejects_incomplete_claims_instead_of_synthesizing_them(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            delta = _distill_update("default", ["README.md"], status="success")
+            delta["claims"] = [
+                {
+                    "id": None,
+                    "capsule_id": "default",
+                    "category": "",
+                    "text": "",
+                    "receipt_pointers": [],
+                    "source_paths": ["README.md"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["default"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("distill claims for capsule default could not be normalized", payload["errors"])
+        self.assertTrue(any("incomplete claim data" in warning for warning in payload["warnings"]))
+        self.assertEqual(sorted((self.repo / ".outcomegraph" / "claims").glob("*.json")), [])
+        self.assertFalse((self.repo / ".outcomegraph" / "capsules" / "default.json").exists())
 
     def test_run_apply_stage_persists_recreation_brief_for_og_capsule(self) -> None:
         with self.git_root_patch():

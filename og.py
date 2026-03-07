@@ -13218,9 +13218,18 @@ def _run_apply_stage(
             generated_claims = []
             for claim in raw_claims:
                 if not isinstance(claim, dict):
+                    warnings.append(f"distill produced malformed claim payload for capsule {capsule_id}")
                     continue
                 claim_capsule = _safe_slug(str(claim.get("capsule_id") or capsule_id))
                 if claim.get("capsule_id") and claim_capsule != capsule_id:
+                    warnings.append(
+                        f"distill produced claim for capsule {claim_capsule or '<unknown>'} while applying {capsule_id}"
+                    )
+                    continue
+                claim_category = str(claim.get("category") or "").strip()
+                claim_text = str(claim.get("text") or "").strip()
+                if not claim_category or not claim_text:
+                    warnings.append(f"distill produced incomplete claim data for capsule {capsule_id}")
                     continue
                 claim_receipts = claim.get("receipt_pointers") if isinstance(claim.get("receipt_pointers"), list) else []
                 if not claim_receipts:
@@ -13232,8 +13241,8 @@ def _run_apply_stage(
                             or f"cl-{_safe_slug(capsule_id)}-{_short_hash(f'{run_id}:{capsule_id}:{len(generated_claims)}')}"
                         ),
                         "capsule_id": claim_capsule,
-                        "category": str(claim.get("category") or "behavior"),
-                        "text": str(claim.get("text") or f"Distill claim for {capsule_id}."),
+                        "category": claim_category,
+                        "text": claim_text,
                         "receipt_pointers": claim_receipts,
                     }
                 )
@@ -13349,6 +13358,7 @@ def _run_apply_stage(
                 str(distill_result.get("profile") or "analyze"),
                 mode,
                 cert_receipts,
+                status=delta_status,
                 adapter_name=str(distill_result.get("adapter_name") or WORKER_ADAPTER_NAME),
                 prompt_provenance=delta_prompt_provenance,
             )

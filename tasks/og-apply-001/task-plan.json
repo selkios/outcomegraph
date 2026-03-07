@@ -25,15 +25,15 @@
   ],
   "steps": [
     {
-      "step": "Remove apply-side oracle and status heuristics that overstate thin capsule evidence",
+      "step": "Audit apply-stage heuristics that could strengthen weak distill output",
       "status": "done"
     },
     {
-      "step": "Preserve evidence gaps in written capsule payloads instead of backfilling stronger prior brief fields",
+      "step": "Keep weak capsules honest by preserving non-success certificate status and rejecting incomplete synthesized claims",
       "status": "done"
     },
     {
-      "step": "Add focused regressions for thin Python capsules and run the apply-stage unittest suite",
+      "step": "Add focused regressions and run the full apply/verify/replay unittest file",
       "status": "done"
     }
   ],
