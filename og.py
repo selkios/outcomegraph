@@ -365,6 +365,7 @@ SANDBOX_ADAPTER_NAME = "local-worktree"
 EXPORTER_ADAPTER_NAME = "canonical"
 WORKER_INTERFACE_VERSION = 1
 WORKER_SCHEMA_VERSION = 2
+WORKER_PROMPT_ASSET_SCHEMA_VERSION = 1
 WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS = 120
 WORKER_ADAPTER_COMPLEX_TIMEOUT_FILE_COUNT = 6
 WORKER_ADAPTER_COMPLEX_TIMEOUT_BYTES = 12_000
@@ -374,6 +375,13 @@ WORKER_ADAPTER_COMPLEX_TIMEOUT_EXTENSIONS = frozenset(
 WORKER_ADAPTER_DISTILL_BATCH_SIZE = 1
 WORKER_ADAPTER_DISTILL_MAX_WORKERS = 4
 WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
+WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "workers")
+WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
+WORKER_PROMPT_BINDINGS: dict[str, dict[str, str]] = {
+    "distill": {"id": "worker-distill", "version": "1.0.0"},
+    "replay": {"id": "worker-replay", "version": "1.0.0"},
+}
+WORKER_PROMPT_VARIABLE_PATTERN = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
 TRACE_SEGMENT_MAX_LENGTH = 72
 SNAPSHOT_DIFF_CONTEXT_LINES = 40
 SNAPSHOT_DIFF_MAX_SNIPPETS = 8
@@ -5844,75 +5852,151 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
     raise WorkerAdapterError(f"unsupported worker role '{role}'")
 
 
+def _normalize_worker_prompt_manifest_entry(
+    raw: object,
+    *,
+    index: int,
+    manifest_dir: str,
+) -> dict[str, object]:
+    field = f"worker prompt manifest prompts[{index}]"
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object")
+    prompt_id = _required_str(raw.get("id"), f"{field}.id")
+    version = _required_str(raw.get("version"), f"{field}.version")
+    role = _required_str(raw.get("role"), f"{field}.role")
+    if role not in WORKER_PROMPT_BINDINGS:
+        expected_roles = ", ".join(sorted(WORKER_PROMPT_BINDINGS))
+        raise WorkerAdapterError(f"{field}.role must be one of: {expected_roles}")
+    try:
+        relative_path = _normalize_repo_relative_user_path(raw.get("path"), f"{field}.path")
+    except ValueError as exc:
+        raise WorkerAdapterError(str(exc)) from exc
+    required_variables = _string_list(raw.get("required_variables"), f"{field}.required_variables", required=True)
+    return {
+        "id": prompt_id,
+        "version": version,
+        "role": role,
+        "path": relative_path,
+        "source_path": os.path.normpath(os.path.join(manifest_dir, relative_path)),
+        "required_variables": required_variables,
+    }
+
+
+def _read_worker_prompt_template(entry: dict[str, object]) -> str:
+    prompt_label = f"{entry.get('id')}@{entry.get('version')}"
+    source_path = str(entry.get("source_path") or "")
+    asset_path = str(entry.get("path") or source_path)
+    try:
+        with open(source_path, "r", encoding="utf-8") as handle:
+            template = handle.read()
+    except FileNotFoundError:
+        raise WorkerAdapterError(f"worker prompt asset {prompt_label} is missing: {asset_path}") from None
+    except OSError as exc:
+        raise WorkerAdapterError(f"worker prompt asset {prompt_label} could not be read: {exc}") from exc
+    if not template.strip():
+        raise WorkerAdapterError(f"worker prompt asset {prompt_label} is empty")
+    return template
+
+
+def _validate_worker_prompt_template(entry: dict[str, object]) -> str:
+    prompt_label = f"{entry.get('id')}@{entry.get('version')}"
+    template = _read_worker_prompt_template(entry)
+    placeholders = set(WORKER_PROMPT_VARIABLE_PATTERN.findall(template))
+    required_variables = set(str(item) for item in entry.get("required_variables", []))
+    missing = sorted(required_variables - placeholders)
+    if missing:
+        raise WorkerAdapterError(
+            f"worker prompt asset {prompt_label} does not reference required variables: {', '.join(missing)}"
+        )
+    undeclared = sorted(placeholders - required_variables)
+    if undeclared:
+        raise WorkerAdapterError(f"worker prompt asset {prompt_label} uses undeclared variables: {', '.join(undeclared)}")
+    return template
+
+
+def _load_worker_prompt_manifest() -> dict[str, dict[str, object]]:
+    try:
+        with open(WORKER_PROMPT_MANIFEST_PATH, "r", encoding="utf-8") as handle:
+            raw_manifest = json.load(handle)
+    except FileNotFoundError:
+        raise WorkerAdapterError(f"worker prompt manifest is missing: {WORKER_PROMPT_MANIFEST_PATH}") from None
+    except json.JSONDecodeError as exc:
+        raise WorkerAdapterError(f"worker prompt manifest is invalid JSON: {exc.msg}") from exc
+    except OSError as exc:
+        raise WorkerAdapterError(f"worker prompt manifest could not be read: {exc}") from exc
+
+    if not isinstance(raw_manifest, dict):
+        raise WorkerAdapterError("worker prompt manifest must be an object")
+    if raw_manifest.get("schema_version") != WORKER_PROMPT_ASSET_SCHEMA_VERSION:
+        raise WorkerAdapterError("worker prompt manifest schema_version mismatch")
+
+    raw_prompts = raw_manifest.get("prompts")
+    if not isinstance(raw_prompts, list) or not raw_prompts:
+        raise WorkerAdapterError("worker prompt manifest prompts must be a non-empty list")
+
+    manifest_dir = os.path.dirname(WORKER_PROMPT_MANIFEST_PATH)
+    entries_by_role: dict[str, dict[str, object]] = {}
+    seen_prompt_keys: set[tuple[str, str]] = set()
+    for index, raw_entry in enumerate(raw_prompts):
+        entry = _normalize_worker_prompt_manifest_entry(raw_entry, index=index, manifest_dir=manifest_dir)
+        prompt_key = (str(entry["id"]), str(entry["version"]))
+        if prompt_key in seen_prompt_keys:
+            raise WorkerAdapterError(f"worker prompt manifest duplicates prompt id/version: {prompt_key[0]}@{prompt_key[1]}")
+        seen_prompt_keys.add(prompt_key)
+        role = str(entry["role"])
+        if role in entries_by_role:
+            raise WorkerAdapterError(f"worker prompt manifest duplicates role '{role}'")
+        entry["template"] = _validate_worker_prompt_template(entry)
+        entries_by_role[role] = entry
+
+    expected_roles = set(WORKER_PROMPT_BINDINGS)
+    observed_roles = set(entries_by_role)
+    if observed_roles != expected_roles:
+        issues: list[str] = []
+        missing_roles = sorted(expected_roles - observed_roles)
+        unexpected_roles = sorted(observed_roles - expected_roles)
+        if missing_roles:
+            issues.append(f"missing roles: {', '.join(missing_roles)}")
+        if unexpected_roles:
+            issues.append(f"unexpected roles: {', '.join(unexpected_roles)}")
+        raise WorkerAdapterError(f"worker prompt manifest roles mismatch ({'; '.join(issues)})")
+
+    for role, binding in WORKER_PROMPT_BINDINGS.items():
+        entry = entries_by_role[role]
+        if str(entry.get("id")) != binding["id"]:
+            raise WorkerAdapterError(f"worker prompt manifest role '{role}' must use id '{binding['id']}'")
+        if str(entry.get("version")) != binding["version"]:
+            raise WorkerAdapterError(f"worker prompt manifest role '{role}' must use version '{binding['version']}'")
+    return entries_by_role
+
+
+def _render_worker_prompt_template(entry: dict[str, object], variables: dict[str, str]) -> str:
+    prompt_label = f"{entry.get('id')}@{entry.get('version')}"
+    required_variables = [str(item) for item in entry.get("required_variables", [])]
+    missing_variables = sorted(name for name in required_variables if name not in variables)
+    if missing_variables:
+        raise WorkerAdapterError(
+            f"worker prompt asset {prompt_label} is missing required variables: {', '.join(missing_variables)}"
+        )
+
+    template = str(entry.get("template") or "")
+
+    def replace_variable(match: re.Match[str]) -> str:
+        variable_name = match.group(1)
+        value = variables.get(variable_name)
+        if not isinstance(value, str):
+            raise WorkerAdapterError(f"worker prompt asset {prompt_label} variable '{variable_name}' must be a string")
+        return value
+
+    return WORKER_PROMPT_VARIABLE_PATTERN.sub(replace_variable, template)
+
+
 def _build_worker_prompt(role: str, payload: dict[str, object]) -> str:
+    if role not in WORKER_PROMPT_BINDINGS:
+        raise WorkerAdapterError(f"unsupported worker role '{role}'")
     payload_json = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True)
-    if role == "distill":
-        return (
-            "You are the OutcomeGraph distill worker adapter.\n"
-            "Do not run shell commands.\n"
-            "Return exactly one JSON object and nothing else.\n"
-            "Produce a compact recreation brief that would let another agent recreate the same capability without reading the full repository.\n"
-            "Rules:\n"
-            "- schema_version must be 2\n"
-            "- interface_version must be 1\n"
-            "- run_id must exactly match input.run_id\n"
-            "- Emit one capsule_updates entry per input.target_capsules[].id\n"
-            "- Each capsule_updates entry must include field id copied from input.target_capsules[].id\n"
-            "- Use repo-relative paths only\n"
-            "- Use input.target_capsules[].changed_file_snapshots as the primary source of file context\n"
-            "- Use input.target_capsules[].changed_region_context to see which line ranges changed when large files are represented as diff hunks\n"
-            "- When input.target_capsules[].supporting_file_snapshots is present, use it to retain unchanged scope context that still matters for the capsule\n"
-            "- Use input.target_capsules[].supporting_scope_paths, related_test_hints, and related_oracle_hints to connect the changed files to nearby feature evidence without assuming the whole repo is available\n"
-            "- Use input.target_capsules[].existing_capsule_summary and materials_context to preserve capsule continuity, replay scope, and evidence gaps from prior runs\n"
-            "- input.target_capsules[].kind tells you whether the capsule is code, test, doc, config, or runtime; use it when choosing oracle strength and status\n"
-            "- A snapshot with selection='diff_hunks' is an intentional changed-region view, not a simple file-prefix truncation\n"
-            "- Use only the input payload below\n"
-            "- Treat goal as the feature/capability statement and scope as the capsule boundary; do not write a file-by-file summary\n"
-            "- behavior_claims must be a short list of recreatable behaviors another agent must preserve\n"
-            "- claims must be evidence-backed records; include at least one claim with category='behavior' for every capsule update\n"
-            "- invariants must capture behaviors or contracts that must remain true after recreation\n"
-            "- dependencies must name the files, modules, tests, configs, or runtime contracts that materially support the capsule\n"
-            "- unknowns must explicitly call out evidence gaps, bounded-input limits, or follow-up questions; never imply certainty you do not have\n"
-            "- constraints are hard limits or policy restrictions, not a substitute for invariants or unknowns\n"
-            "- oracles are the acceptance contract; when no honest executable oracle exists, set command=null and provide a non-empty reason explaining the gap\n"
-            "- Fill goal, scope, behavior_claims, constraints, invariants, dependencies, oracles, claims, decision, unknowns, receipts, and changed_files from actual repository evidence\n"
-            "- Set lineage.parent_capsule_ids to an array, using [] when there is no parent lineage\n"
-            "- Each claim must include id, capsule_id, category, text, receipt_pointers, and source_paths; use null for id/capsule_id only when unknown, and [] for empty lists\n"
-            "- Each receipt pointer must include schema_version, type, target, hash, media_type, and size; use null for hash/media_type/size when unknown\n"
-            "- Every successful update must be materially reusable: specific goal/boundary, explicit behavior_claims, invariants, dependencies, unknowns, and an acceptance oracle or explicit oracle gap reason\n"
-            "- Prefer concrete validation commands already used in this repository when they fit the capsule, including repo-native wrappers such as `uv run ...` when the repository uses them\n"
-            "- Do not turn documentation examples, allowlists, or generic command catalogs into live oracle commands unless repository evidence shows they are the capsule's actual verification contract\n"
-            "- When a command is only mentioned as an example or policy allowance, emit command=null and explain the gap instead of inventing an executable oracle\n"
-            "- For code or test capsules, use status='success' only when repository evidence supports at least one executable oracle command for the capsule; snapshot-only or doc-like evidence should stay at warn\n"
-            "- For doc, config, or runtime capsules, advisory or command=null oracles are acceptable only when they are the strongest honest evidence and the oracle reason is explicit\n"
-            "- Use status='warn' when the capsule is materially useful but still missing important supporting context\n"
-            "- Use status='pending' only when repository evidence is too thin to produce a reusable capsule record\n"
-            "\n"
-            "Input payload JSON:\n"
-            f"{payload_json}\n"
-        )
-    if role == "replay":
-        return (
-            "You are the OutcomeGraph replay worker adapter.\n"
-            "Do not run shell commands.\n"
-            "Return exactly one JSON object and nothing else.\n"
-            "Produce a replay plan that can run inside an isolated sandbox for the capsule.\n"
-            "Rules:\n"
-            "- schema_version must be 2\n"
-            "- interface_version must be 1\n"
-            "- run_id must exactly match input.run_id\n"
-            "- capsule_id must exactly match input.capsule_id\n"
-            "- Use only the input payload below\n"
-            "- When status is 'ok', return one or more concrete shell steps that rebuild or validate the capsule in the sandbox\n"
-            "- Each step must include command, expected_exit_code, timeout_s, and cwd; use null for optional fields and '.' for the sandbox root\n"
-            "- Prefer commands from capsule oracles when they are usable for replay\n"
-            "- Do not use destructive commands or network access\n"
-            "- If no safe replay plan exists, return status='pending', steps=[], and explain the gap in failures\n"
-            "\n"
-            "Input payload JSON:\n"
-            f"{payload_json}\n"
-        )
-    raise WorkerAdapterError(f"unsupported worker role '{role}'")
+    prompt_entry = _load_worker_prompt_manifest()[role]
+    return _render_worker_prompt_template(prompt_entry, {"payload_json": payload_json})
 
 
 def _extract_json_object(raw: str) -> dict[str, object] | None:

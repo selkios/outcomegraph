@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "prompts": [
+    {
+      "id": "worker-distill",
+      "version": "1.0.0",
+      "role": "distill",
+      "path": "distill-v1.txt",
+      "required_variables": [
+        "payload_json"
+      ]
+    },
+    {
+      "id": "worker-replay",
+      "version": "1.0.0",
+      "role": "replay",
+      "path": "replay-v1.txt",
+      "required_variables": [
+        "payload_json"
+      ]
+    }
+  ]
+}

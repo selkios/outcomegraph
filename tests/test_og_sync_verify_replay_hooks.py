@@ -2722,6 +2722,91 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertIn("unknowns", prompt)
         self.assertIn("do not write a file-by-file summary", prompt.lower())
         self.assertIn("command=null and provide a non-empty reason", prompt)
+        self.assertEqual(
+            prompt,
+            og._build_worker_prompt(
+                "distill",
+                {
+                    "schema_version": 2,
+                    "interface_version": 1,
+                    "run_id": "run-1",
+                    "target_capsules": [{"id": "og", "kind": "code"}],
+                },
+            ),
+        )
+
+    def test_build_worker_prompt_fails_fast_when_prompt_asset_is_missing(self) -> None:
+        prompt_dir = self.repo / "prompts" / "workers"
+        prompt_dir.mkdir(parents=True, exist_ok=True)
+        (prompt_dir / "distill-v1.txt").write_text("distill\n{{payload_json}}\n", encoding="utf-8")
+        (prompt_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": og.WORKER_PROMPT_ASSET_SCHEMA_VERSION,
+                    "prompts": [
+                        {
+                            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+                            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+                            "role": "distill",
+                            "path": "distill-v1.txt",
+                            "required_variables": ["payload_json"],
+                        },
+                        {
+                            "id": og.WORKER_PROMPT_BINDINGS["replay"]["id"],
+                            "version": og.WORKER_PROMPT_BINDINGS["replay"]["version"],
+                            "role": "replay",
+                            "path": "replay-v1.txt",
+                            "required_variables": ["payload_json"],
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.object(og, "WORKER_PROMPT_MANIFEST_PATH", str(prompt_dir / "manifest.json")):
+            with self.assertRaises(og.WorkerAdapterError) as context:
+                og._build_worker_prompt("distill", {"schema_version": 2, "interface_version": 1, "run_id": "run-1"})
+
+        self.assertIn("worker-replay@1.0.0", str(context.exception))
+        self.assertIn("is missing", str(context.exception))
+
+    def test_build_worker_prompt_fails_fast_when_prompt_template_is_malformed(self) -> None:
+        prompt_dir = self.repo / "prompts" / "workers"
+        prompt_dir.mkdir(parents=True, exist_ok=True)
+        (prompt_dir / "distill-v1.txt").write_text("distill\n{{payload_json}}\n", encoding="utf-8")
+        (prompt_dir / "replay-v1.txt").write_text("replay without payload placeholder\n", encoding="utf-8")
+        (prompt_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": og.WORKER_PROMPT_ASSET_SCHEMA_VERSION,
+                    "prompts": [
+                        {
+                            "id": og.WORKER_PROMPT_BINDINGS["distill"]["id"],
+                            "version": og.WORKER_PROMPT_BINDINGS["distill"]["version"],
+                            "role": "distill",
+                            "path": "distill-v1.txt",
+                            "required_variables": ["payload_json"],
+                        },
+                        {
+                            "id": og.WORKER_PROMPT_BINDINGS["replay"]["id"],
+                            "version": og.WORKER_PROMPT_BINDINGS["replay"]["version"],
+                            "role": "replay",
+                            "path": "replay-v1.txt",
+                            "required_variables": ["payload_json"],
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.object(og, "WORKER_PROMPT_MANIFEST_PATH", str(prompt_dir / "manifest.json")):
+            with self.assertRaises(og.WorkerAdapterError) as context:
+                og._build_worker_prompt("distill", {"schema_version": 2, "interface_version": 1, "run_id": "run-1"})
+
+        self.assertIn("worker-replay@1.0.0", str(context.exception))
+        self.assertIn("does not reference required variables", str(context.exception))
 
     def test_normalize_distill_delta_requires_oracle_reason_when_command_missing(self) -> None:
         update = _distill_update("default", ["capsules/default.yaml"])
@@ -2763,6 +2848,7 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
             self.assertTrue(capture_output)
             self.assertEqual(cwd, str(self.repo))
             self.assertTrue(timeout > 0)
+            self.assertEqual(input, og._build_worker_prompt("distill", input_payload))
             if "--output-last-message" in command:
                 path = command[command.index("--output-last-message") + 1]
                 Path(path).write_text(json.dumps(output_payload), encoding="utf-8")
@@ -2780,6 +2866,8 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(parsed["capsule_updates"][0]["id"], "default")
         self.assertEqual(len(receipts), 6)
         self.assertTrue((self.repo / "trace.json").exists())
+        trace_input = json.loads((self.repo / "trace-input.json").read_text(encoding="utf-8"))
+        self.assertEqual(trace_input["prompt"], og._build_worker_prompt("distill", input_payload))
 
     def test_collect_policy_checks_flags_schema_errors(self) -> None:
         (self.repo / ".outcomegraph").mkdir()

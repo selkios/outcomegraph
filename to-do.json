@@ -1739,7 +1739,7 @@
       "id": "OG-PROMPT-001",
       "title": "Externalize Codex worker prompts into repo-managed prompt assets",
       "priority": 1,
-      "status": "todo",
+      "status": "done",
       "details": "Phase 1 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: move distill and replay worker prompts out of `og.py` into a human-readable prompt asset directory with manifest-driven loading and validation.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 1 and create a top-level prompt asset directory with repo-owned worker prompt files and a manifest",
@@ -1759,10 +1759,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "prompts/workers/manifest.json",
+        "prompts/workers/distill-v1.txt",
+        "prompts/workers/replay-v1.txt"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T09:56:01Z"
     },
     {
       "id": "OG-PROMPT-002",
@@ -1815,14 +1818,14 @@
         "OG-WORKER-001"
       ],
       "files": [
+        "SPEC-v2.md",
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "SPEC-v2.md",
         "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T09:07:36Z"
+      "updated_at": "2026-03-07T09:08:59Z"
     },
     {
       "id": "OG-DISTILL-001",
@@ -1854,7 +1857,7 @@
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T09:21:23Z"
+      "updated_at": "2026-03-07T09:23:41Z"
     },
     {
       "id": "OG-DISTILL-002",
@@ -1882,13 +1885,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py",
         "tasks/og-distill-002/TASK.md",
         "tasks/og-distill-002/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T09:44:50Z",
+      "updated_at": "2026-03-07T09:46:22Z",
       "blockers": []
     },
     {
