@@ -1467,8 +1467,8 @@
       "id": "OG-AGENT-012",
       "title": "Add environment-variable defaults for headless machine usage",
       "priority": 3,
-      "status": "todo",
-      "details": "Support non-flag configuration for CI/agent environments (default output mode, profile/mode, and credential/config paths). Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Implemented OG-AGENT-012: added `.outcomegraph/config.yaml` + env-driven defaults for output/profile/mode, config/policy paths, and the Codex home directory, surfaced resolved sources in command metadata, and updated docs/tests for the new precedence contract.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Define and implement env vars for default output format, profile, mode, and optional config file locations",
@@ -1485,14 +1485,17 @@
         "OG-AGENT-002"
       ],
       "files": [
-        "og.py",
-        "README.md",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "QUICKSTART.md",
+        "README.md",
         "SPEC-v2.md",
+        "og.py",
+        "tasks/og-agent-012/TASK.md",
+        "tasks/og-agent-012/task-plan.json",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-07T12:09:18Z"
     },
     {
       "id": "OG-AGENT-013",

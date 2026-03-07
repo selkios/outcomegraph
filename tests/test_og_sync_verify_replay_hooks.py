@@ -1773,6 +1773,116 @@ class TestSyncWorkflows(_RepoTestCase):
             with self.subTest(args=args):
                 parse_error(args, fragment)
 
+    def test_load_runtime_defaults_prefers_env_over_config_and_resolves_paths(self) -> None:
+        og_root = self.repo / og.OG_ROOT
+        og_root.mkdir(parents=True, exist_ok=True)
+        config_path = og_root / "config.yaml"
+        config_path.write_text(
+            """schema_version: 2
+profile: propose
+mode: autonomous
+output: human
+safety:
+  policy_file: policy-from-config.yaml
+""",
+            encoding="utf-8",
+        )
+        (og_root / "policy-from-config.yaml").write_text(
+            "schema_version: 2\nmode: observe\n",
+            encoding="utf-8",
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                og.DEFAULT_OUTPUT_ENV: og.OUTPUT_MODE_JSON,
+                og.DEFAULT_MODE_ENV: "observe",
+                og.POLICY_FILE_ENV: "ops/policy-override.yaml",
+            },
+            clear=False,
+        ):
+            defaults = og._load_runtime_defaults(str(self.repo))
+
+        self.assertEqual(defaults["profile"], "propose")
+        self.assertEqual(defaults["mode"], "observe")
+        self.assertEqual(defaults["output_mode"], og.OUTPUT_MODE_JSON)
+        self.assertEqual(defaults["config_file"], f"{og.OG_ROOT}/config.yaml")
+        self.assertEqual(defaults["policy_file"], "ops/policy-override.yaml")
+        self.assertEqual(defaults["config_source"], "built-in")
+        self.assertEqual(defaults["policy_source"], f"env:{og.POLICY_FILE_ENV}")
+        self.assertEqual(defaults["resolved_from"]["profile"], f"config:{og.OG_ROOT}/config.yaml")
+        self.assertEqual(defaults["resolved_from"]["mode"], f"env:{og.DEFAULT_MODE_ENV}")
+        self.assertEqual(defaults["resolved_from"]["output_mode"], f"env:{og.DEFAULT_OUTPUT_ENV}")
+
+    def test_status_uses_env_default_output_and_configuration_metadata(self) -> None:
+        buffer = io.StringIO()
+        with self.git_root_patch(), patch.dict(os.environ, {og.DEFAULT_OUTPUT_ENV: og.OUTPUT_MODE_JSON}, clear=False):
+            with redirect_stdout(buffer):
+                code = og.main(["status"])
+
+        self.assertEqual(code, og.EXIT_SUCCESS)
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(payload["command"], "status")
+        self.assertEqual(payload["status"], "warn")
+        options = payload["data"]["options"]
+        self.assertEqual(options["output_mode"], og.OUTPUT_MODE_JSON)
+        self.assertEqual(options["configuration"]["resolved_from"]["output_mode"], f"env:{og.DEFAULT_OUTPUT_ENV}")
+
+    def test_verify_env_defaults_match_explicit_flags_and_cli_overrides_config(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+        config_path = self.repo / og.OG_ROOT / "config.yaml"
+        config_path.write_text(
+            """schema_version: 2
+profile: propose
+mode: observe
+output: human
+safety:
+  policy_file: policy.yaml
+  max_writes_per_run: 64
+""",
+            encoding="utf-8",
+        )
+
+        env_buffer = io.StringIO()
+        with self.git_root_patch(), patch.dict(
+            os.environ,
+            {
+                og.DEFAULT_OUTPUT_ENV: og.OUTPUT_MODE_JSON,
+                og.DEFAULT_PROFILE_ENV: "apply",
+            },
+            clear=False,
+        ):
+            with redirect_stdout(env_buffer):
+                env_code = og.main(["verify", "--validate", "--mode", "autonomous"])
+
+        explicit_buffer = io.StringIO()
+        with self.git_root_patch():
+            with redirect_stdout(explicit_buffer):
+                explicit_code = og.main(
+                    ["verify", "--validate", "--json", "--profile", "apply", "--mode", "autonomous"]
+                )
+
+        self.assertEqual(env_code, og.EXIT_SUCCESS)
+        self.assertEqual(explicit_code, og.EXIT_SUCCESS)
+        env_payload = json.loads(env_buffer.getvalue())
+        explicit_payload = json.loads(explicit_buffer.getvalue())
+        env_options = env_payload["data"]["options"]
+        explicit_options = explicit_payload["data"]["options"]
+
+        self.assertEqual(env_options["profile"], "apply")
+        self.assertEqual(env_options["mode"], "autonomous")
+        self.assertEqual(env_options["output_mode"], og.OUTPUT_MODE_JSON)
+        self.assertEqual(env_options["profile"], explicit_options["profile"])
+        self.assertEqual(env_options["mode"], explicit_options["mode"])
+        self.assertEqual(env_options["output_mode"], explicit_options["output_mode"])
+        self.assertEqual(env_options["configuration"]["resolved_from"]["profile"], f"env:{og.DEFAULT_PROFILE_ENV}")
+        self.assertEqual(env_options["configuration"]["resolved_from"]["mode"], "flag:--mode")
+        self.assertEqual(env_options["configuration"]["resolved_from"]["output_mode"], f"env:{og.DEFAULT_OUTPUT_ENV}")
+        self.assertEqual(explicit_options["configuration"]["resolved_from"]["profile"], "flag:--profile")
+        self.assertEqual(explicit_options["configuration"]["resolved_from"]["mode"], "flag:--mode")
+        self.assertEqual(explicit_options["configuration"]["resolved_from"]["output_mode"], "flag:--json")
+
     def test_apply_output_controls_supports_field_filtering_and_pagination(self) -> None:
         payload = {"status": "ok", "claims": [{"id": "b"}, {"id": "a"}], "message": "full"}
         shaped = og._apply_output_controls(

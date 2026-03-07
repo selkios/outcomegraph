@@ -177,6 +177,20 @@ Core parsing rules:
 - `--strict` is supported globally and can be set per-run to enforce strictness (`--strict=true` or `--strict=false`).
 - `--changed` is allowed only for commands that operate on incremental scope (`verify`, `replay`, and daemon subcommands when delegated).
 - `--profile` and `--mode` are validated against finite enumerations.
+- Runtime defaults use this precedence order:
+  - explicit CLI flags (`--json`, `--output`, `--profile`, `--mode`)
+  - environment variables (`OG_DEFAULT_OUTPUT`, `OG_DEFAULT_PROFILE`, `OG_DEFAULT_MODE`, `OG_CONFIG_PATH`, `OG_POLICY_PATH`, `OG_CODEX_HOME`)
+  - repo config defaults from `.outcomegraph/config.yaml`
+- `.outcomegraph/config.yaml` schema version `2` may define:
+  - `defaults.output: human|json|jsonl`
+  - `defaults.profile: analyze|propose|apply`
+  - `defaults.mode: observe|autonomous`
+  - `worker.codex_home: <relative-or-absolute-path>`
+  - `safety.policy_file: <relative-or-absolute-path>`
+- `OG_CONFIG_FILE` and `OG_POLICY_FILE` remain accepted legacy aliases for the preferred `*_PATH` variables.
+- `CODEX_HOME` remains a fallback alias for `OG_CODEX_HOME`.
+- Relative `OG_CONFIG_PATH` / `OG_POLICY_PATH` values resolve from the repository root.
+- `safety.policy_file` resolves relative to the config file that declares it.
 - `sync`, `verify`, `replay`, and `export` accept explicit no-write recovery modes:
   - `--validate` performs contract/policy/integrity preflight without mutating artifacts.
   - `--dry-run` returns a no-write execution plan (targets, write intent, and staged work) without mutating artifacts.
@@ -239,6 +253,7 @@ Structured output:
   - `warnings`
   - `metrics`
 - `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
+- `data.options.configuration` records resolved config/policy paths plus the source for `output_mode`, `profile`, and `mode`.
 - `data.session` is present for lock, daemon, and autopilot lifecycles and includes `session_id`, `lifecycle`, `state`, `expires_at`, and resume metadata.
 - Session lifecycle failures are mirrored into top-level `errors` even when the full session payload remains under `data`.
 - Command IDs are stable across help/usage, success, and failure envelopes.

@@ -1,0 +1,50 @@
+{
+  "task_id": "OG-AGENT-012",
+  "title": "Add environment-variable defaults for headless machine usage",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py"
+  ],
+  "write_files": [
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "og.py",
+    "tasks/og-agent-012/TASK.md",
+    "tasks/og-agent-012/task-plan.json",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Implement repo-config and environment default resolution for output mode, profile, mode, and policy/config file paths",
+      "status": "done"
+    },
+    {
+      "step": "Propagate resolved defaults into command parsing, policy loading, and command metadata with CLI-over-env-over-config precedence",
+      "status": "done"
+    },
+    {
+      "step": "Document the new headless defaults contract in README, QUICKSTART, SPEC, and the agent-first review",
+      "status": "done"
+    },
+    {
+      "step": "Add focused regression coverage for precedence, parity, and configuration path resolution",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m py_compile /home/agent/outcomegraph/og.py /home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py",
+    "uv run pytest /home/agent/outcomegraph/tests/test_og_sync_verify_replay_hooks.py -q"
+  ]
+}

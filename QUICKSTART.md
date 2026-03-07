@@ -46,6 +46,24 @@ og schema
 og describe sync
 ```
 
+Headless defaults for CI/agents:
+
+```bash
+export OG_DEFAULT_OUTPUT=json
+export OG_DEFAULT_PROFILE=analyze
+export OG_DEFAULT_MODE=observe
+```
+
+Optional path overrides:
+
+```bash
+export OG_CONFIG_PATH=.outcomegraph/config.yaml
+export OG_POLICY_PATH=.outcomegraph/policy.yaml
+export OG_CODEX_HOME="$HOME/.codex"
+```
+
+Precedence is `CLI flags > env vars > .outcomegraph/config.yaml`.
+
 ## 2b) Experimental prompt optimization
 
 `og optimize prompts` compares two prompt files using an evaluation dataset and writes an optimization result under `.outcomegraph/datasets/`.

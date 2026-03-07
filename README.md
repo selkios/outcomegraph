@@ -104,6 +104,20 @@ og replay --changed --json  # optional stronger confirmation; also refreshes exp
 og drift --json             # should stay clean after the standalone flows above
 ```
 
+Headless defaults for CI/agents:
+
+```bash
+export OG_DEFAULT_OUTPUT=json
+export OG_DEFAULT_PROFILE=analyze
+export OG_DEFAULT_MODE=observe
+export OG_CONFIG_PATH=.outcomegraph/config.yaml   # optional, legacy: OG_CONFIG_FILE
+export OG_POLICY_PATH=.outcomegraph/policy.yaml   # optional, legacy: OG_POLICY_FILE
+export OG_CODEX_HOME="$HOME/.codex"               # optional, legacy fallback: CODEX_HOME
+```
+
+Precedence is `CLI flags > env vars > .outcomegraph/config.yaml`.
+Resolved sources and config/policy paths are echoed back in command `options.configuration`.
+
 ## Agent guidance contract
 
 `og init` seeds a root [`CONTEXT.md`](./CONTEXT.md). This is the canonical, versioned
@@ -166,6 +180,17 @@ Common flags:
 - `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
 - `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
 - `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session using the emitted lowercase `<kind>-<timestamp>-<hash>` id)
+
+Environment defaults:
+
+- `OG_DEFAULT_OUTPUT={human|json|jsonl}` sets the default output mode before command parsing.
+- `OG_DEFAULT_PROFILE={analyze|propose|apply}` sets the default worker profile for commands that accept `--profile`.
+- `OG_DEFAULT_MODE={observe|autonomous}` sets the default operating mode for commands that accept `--mode`.
+- `OG_CONFIG_PATH=<path>` overrides the config defaults file location (YAML or JSON). `OG_CONFIG_FILE` is accepted as a legacy alias.
+- `OG_POLICY_PATH=<path>` overrides the policy file location (YAML or JSON). `OG_POLICY_FILE` is accepted as a legacy alias.
+- `OG_CODEX_HOME=<path>` overrides the Codex home/config directory for worker execution. `CODEX_HOME` remains a fallback alias.
+- Relative config/policy paths resolve from the repository root; `safety.policy_file` inside the config file resolves relative to that config file.
+- CLI flags still win: `--json`, `--output`, `--profile`, and `--mode` override env and config defaults.
 
 Command help contracts also list output modes and exit semantics:
 

@@ -188,6 +188,9 @@ MODE_VALUES = {"observe", "autonomous"}
 OUTPUT_MODE_HUMAN = "human"
 OUTPUT_MODE_JSON = "json"
 OUTPUT_MODE_JSONL = "jsonl"
+DEFAULT_PROFILE = "analyze"
+DEFAULT_MODE = "observe"
+DEFAULT_OUTPUT_MODE = OUTPUT_MODE_HUMAN
 SESSION_LIFECYCLE_EPHEMERAL = "ephemeral"
 SESSION_LIFECYCLE_RESUMABLE = "resumable"
 SESSION_STATE_ACTIVE = "active"
@@ -205,6 +208,8 @@ AUTOPILOT_MANAGED_HOOK_DIR = ".outcomegraph/hooks"
 AUTOPILOT_BACKUP_DIR = ".outcomegraph/autopilot/backups"
 AUTOPILOT_PRE_COMMIT_QUALITY_PASS = "skills/og-quality-pass/scripts/run_quality_pass.sh"
 OG_ROOT = ".outcomegraph"
+DEFAULT_CONFIG_FILE = f"{OG_ROOT}/config.yaml"
+DEFAULT_POLICY_FILE = f"{OG_ROOT}/policy.yaml"
 OUTCOME_GITIGNORE = f"{OG_ROOT}/.gitignore"
 WORK_STATE_FILE = ".outcomegraph/work/state.json"
 WORK_LOCK_FILE = ".outcomegraph/work/lock"
@@ -214,6 +219,15 @@ INTEGRITY_CHECKPOINT_DIR = f"{EVENTS_DIR}/checkpoints"
 INTEGRITY_STATE_FILE = f"{EVENTS_DIR}/integrity_state.json"
 INTEGRITY_CHECKPOINT_INTERVAL = 32
 INTEGRITY_SIGNER_ENV = "OG_INTEGRITY_CHECKPOINT_SIGNER"
+DEFAULT_OUTPUT_ENV = "OG_DEFAULT_OUTPUT"
+DEFAULT_PROFILE_ENV = "OG_DEFAULT_PROFILE"
+DEFAULT_MODE_ENV = "OG_DEFAULT_MODE"
+CONFIG_FILE_ENV = "OG_CONFIG_PATH"
+LEGACY_CONFIG_FILE_ENV = "OG_CONFIG_FILE"
+POLICY_FILE_ENV = "OG_POLICY_PATH"
+LEGACY_POLICY_FILE_ENV = "OG_POLICY_FILE"
+CODEX_HOME_OVERRIDE_ENV = "OG_CODEX_HOME"
+CODEX_HOME_ENV = "CODEX_HOME"
 CAS_DIR = f"{OG_ROOT}/objects"
 RUNTIME_IGNORE_PREFIXES = (
     ".outcomegraph/work/",
@@ -1213,7 +1227,7 @@ def _current_typer_command_context() -> _TyperCommandContext:
 
 
 def emit_usage() -> str:
-    return """Usage: og [--json] [--strict] [--non-interactive] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
+    return f"""Usage: og [--json] [--strict] [--non-interactive] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
 
 Core commands:
   og init
@@ -1234,6 +1248,7 @@ Core commands:
   og daemon install|start|stop|status|run
 
 Use: og <command> --help for command-specific contracts.
+Defaults: CLI flags override {DEFAULT_OUTPUT_ENV}, {DEFAULT_PROFILE_ENV}, and {DEFAULT_MODE_ENV}; env defaults override {CONFIG_FILE_ENV}; worker state can use {CODEX_HOME_OVERRIDE_ENV} or {CODEX_HOME_ENV}.
 """
 
 
@@ -1243,6 +1258,11 @@ def _command_contract_help() -> str:
   --json    machine-readable JSON payload output
   --output json|jsonl|human
             json output mode control; jsonl streams list-like payload entries as JSON lines
+
+Default precedence:
+  CLI flags  -> --json / --output / --profile / --mode
+  env vars   -> OG_DEFAULT_OUTPUT / OG_DEFAULT_PROFILE / OG_DEFAULT_MODE / OG_CONFIG_PATH / OG_POLICY_PATH / OG_CODEX_HOME
+  config     -> .outcomegraph/config.yaml
 
 Exit codes:
   0        success
@@ -2959,6 +2979,37 @@ def _git_root() -> str:
     return result.stdout.strip()
 
 
+def _maybe_git_root() -> str | None:
+    result = _run_git(".", ["rev-parse", "--show-toplevel"])
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def _metadata_path(base_dir: str, absolute_path: str) -> str:
+    normalized_base = os.path.abspath(base_dir)
+    normalized_path = os.path.abspath(absolute_path)
+    try:
+        relative = os.path.relpath(normalized_path, normalized_base)
+    except ValueError:
+        return normalized_path.replace("\\", "/")
+    if relative == ".":
+        return "."
+    if relative.startswith(".."):
+        return normalized_path.replace("\\", "/")
+    return relative.replace("\\", "/")
+
+
+def _resolve_path_reference(base_dir: str, raw_value: str, *, field_name: str) -> str:
+    value = str(raw_value or "").strip()
+    if not value:
+        raise ValueError(f"{field_name} cannot be empty")
+    if os.path.isabs(value):
+        return os.path.abspath(value)
+    return os.path.abspath(os.path.join(base_dir, value))
+
+
 def _utc_timestamp() -> str:
     return datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -3719,6 +3770,221 @@ def _read_structured_mapping_file(path: str) -> dict[str, object]:
     raise ValueError(f"unsupported structured file type: {extension}")
 
 
+def _env_override(*names: str) -> tuple[str | None, str | None]:
+    for name in names:
+        raw_value = os.environ.get(name, "").strip()
+        if raw_value:
+            return raw_value, name
+    return None, None
+
+
+def _load_runtime_defaults(repo_root: str | None) -> dict[str, object]:
+    base_dir = os.path.abspath(repo_root or os.getcwd())
+    config_path = os.path.abspath(os.path.join(base_dir, DEFAULT_CONFIG_FILE))
+    config_display = DEFAULT_CONFIG_FILE
+    config_source = "built-in"
+    config_explicit = False
+
+    defaults: dict[str, object] = {
+        "profile": DEFAULT_PROFILE,
+        "mode": DEFAULT_MODE,
+        "output_mode": DEFAULT_OUTPUT_MODE,
+        "config_file": config_display,
+        "config_source": config_source,
+        "config_file_path": config_path,
+        "config_explicit": config_explicit,
+        "policy_file": DEFAULT_POLICY_FILE,
+        "policy_source": "built-in",
+        "policy_file_path": os.path.abspath(os.path.join(base_dir, DEFAULT_POLICY_FILE)),
+        "policy_explicit": False,
+        "codex_home": None,
+        "codex_home_path": None,
+        "codex_home_explicit": False,
+        "resolved_from": {
+            "profile": "built-in",
+            "mode": "built-in",
+            "output_mode": "built-in",
+            "codex_home": "unset",
+        },
+    }
+
+    raw_config_override, config_env_name = _env_override(CONFIG_FILE_ENV, LEGACY_CONFIG_FILE_ENV)
+    if raw_config_override and config_env_name:
+        config_path = _resolve_path_reference(base_dir, raw_config_override, field_name=config_env_name)
+        config_display = _metadata_path(base_dir, config_path)
+        config_source = f"env:{config_env_name}"
+        config_explicit = True
+        defaults["config_file"] = config_display
+        defaults["config_source"] = config_source
+        defaults["config_file_path"] = config_path
+        defaults["config_explicit"] = True
+
+    raw_output_override = os.environ.get(DEFAULT_OUTPUT_ENV, "").strip()
+    if raw_output_override:
+        output_mode = raw_output_override.lower()
+        if output_mode not in {OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL}:
+            raise ValueError(
+                f"{DEFAULT_OUTPUT_ENV} must be one of: {OUTPUT_MODE_HUMAN}, {OUTPUT_MODE_JSON}, {OUTPUT_MODE_JSONL}"
+            )
+        defaults["output_mode"] = output_mode
+        cast(dict[str, str], defaults["resolved_from"])["output_mode"] = f"env:{DEFAULT_OUTPUT_ENV}"
+
+    raw_profile_override = os.environ.get(DEFAULT_PROFILE_ENV, "").strip()
+    if raw_profile_override:
+        profile = raw_profile_override.lower()
+        if profile not in PROFILE_VALUES:
+            raise ValueError(f"{DEFAULT_PROFILE_ENV} must be one of: {', '.join(sorted(PROFILE_VALUES))}")
+        defaults["profile"] = profile
+        cast(dict[str, str], defaults["resolved_from"])["profile"] = f"env:{DEFAULT_PROFILE_ENV}"
+
+    raw_mode_override = os.environ.get(DEFAULT_MODE_ENV, "").strip()
+    if raw_mode_override:
+        mode = raw_mode_override.lower()
+        if mode not in MODE_VALUES:
+            raise ValueError(f"{DEFAULT_MODE_ENV} must be one of: {', '.join(sorted(MODE_VALUES))}")
+        defaults["mode"] = mode
+        cast(dict[str, str], defaults["resolved_from"])["mode"] = f"env:{DEFAULT_MODE_ENV}"
+
+    raw_policy_override, policy_env_name = _env_override(POLICY_FILE_ENV, LEGACY_POLICY_FILE_ENV)
+    if raw_policy_override and policy_env_name:
+        policy_path = _resolve_path_reference(base_dir, raw_policy_override, field_name=policy_env_name)
+        defaults["policy_file_path"] = policy_path
+        defaults["policy_file"] = _metadata_path(base_dir, policy_path)
+        defaults["policy_source"] = f"env:{policy_env_name}"
+        defaults["policy_explicit"] = True
+
+    raw_codex_home_override, codex_home_env_name = _env_override(CODEX_HOME_OVERRIDE_ENV, CODEX_HOME_ENV)
+    if raw_codex_home_override and codex_home_env_name:
+        codex_home_path = _resolve_path_reference(base_dir, raw_codex_home_override, field_name=codex_home_env_name)
+        defaults["codex_home"] = _metadata_path(base_dir, codex_home_path)
+        defaults["codex_home_path"] = codex_home_path
+        defaults["codex_home_explicit"] = True
+        cast(dict[str, str], defaults["resolved_from"])["codex_home"] = f"env:{codex_home_env_name}"
+
+    config_exists = os.path.exists(config_path)
+    if config_explicit and not config_exists:
+        raise ValueError(f"{config_env_name or CONFIG_FILE_ENV} points to missing file '{config_display}'")
+
+    if not config_exists:
+        return defaults
+
+    try:
+        parsed = _read_structured_mapping_file(config_path)
+    except FileNotFoundError:
+        raise ValueError(f"{config_env_name or CONFIG_FILE_ENV} points to missing file '{config_display}'") from None
+    except ValueError as exc:
+        raise ValueError(f"invalid config file '{config_display}': {exc}") from exc
+
+    schema_version_raw = parsed.get("schema_version")
+    if schema_version_raw is None:
+        raise ValueError(f"config file '{config_display}' is missing schema_version")
+    try:
+        schema_version = int(str(schema_version_raw))
+    except ValueError as exc:
+        raise ValueError(f"config file '{config_display}' has a non-integer schema_version") from exc
+    if schema_version != 2:
+        raise ValueError(f"config file '{config_display}' uses unsupported schema_version {schema_version}")
+
+    config_defaults = parsed.get("defaults")
+    if config_defaults is not None and not isinstance(config_defaults, dict):
+        raise ValueError(f"config file '{config_display}' field `defaults` must be an object")
+    if not isinstance(config_defaults, dict):
+        config_defaults = {}
+
+    if cast(dict[str, str], defaults["resolved_from"]).get("output_mode") == "built-in":
+        raw_output = config_defaults.get("output")
+        if raw_output is None:
+            raw_output = config_defaults.get("output_mode")
+        if raw_output is None:
+            raw_output = parsed.get("output")
+        if raw_output is not None:
+            if not isinstance(raw_output, str):
+                raise ValueError(f"config file '{config_display}' field `defaults.output` must be a string")
+            output_mode = raw_output.strip().lower()
+            if output_mode not in {OUTPUT_MODE_HUMAN, OUTPUT_MODE_JSON, OUTPUT_MODE_JSONL}:
+                raise ValueError(
+                    f"config file '{config_display}' field `defaults.output` must be one of: "
+                    f"{OUTPUT_MODE_HUMAN}, {OUTPUT_MODE_JSON}, {OUTPUT_MODE_JSONL}"
+                )
+            defaults["output_mode"] = output_mode
+            cast(dict[str, str], defaults["resolved_from"])["output_mode"] = f"config:{config_display}"
+
+    if cast(dict[str, str], defaults["resolved_from"]).get("profile") == "built-in":
+        raw_profile = config_defaults.get("profile")
+        if raw_profile is None:
+            raw_profile = parsed.get("profile")
+        if raw_profile is not None:
+            if not isinstance(raw_profile, str):
+                raise ValueError(f"config file '{config_display}' field `defaults.profile` must be a string")
+            profile = raw_profile.strip().lower()
+            if profile not in PROFILE_VALUES:
+                raise ValueError(
+                    f"config file '{config_display}' field `defaults.profile` must be one of: {', '.join(sorted(PROFILE_VALUES))}"
+                )
+            defaults["profile"] = profile
+            cast(dict[str, str], defaults["resolved_from"])["profile"] = f"config:{config_display}"
+
+    if cast(dict[str, str], defaults["resolved_from"]).get("mode") == "built-in":
+        raw_mode = config_defaults.get("mode")
+        if raw_mode is None:
+            raw_mode = parsed.get("mode")
+        if raw_mode is not None:
+            if not isinstance(raw_mode, str):
+                raise ValueError(f"config file '{config_display}' field `defaults.mode` must be a string")
+            mode = raw_mode.strip().lower()
+            if mode not in MODE_VALUES:
+                raise ValueError(
+                    f"config file '{config_display}' field `defaults.mode` must be one of: {', '.join(sorted(MODE_VALUES))}"
+                )
+            defaults["mode"] = mode
+            cast(dict[str, str], defaults["resolved_from"])["mode"] = f"config:{config_display}"
+
+    safety = parsed.get("safety")
+    if safety is not None and not isinstance(safety, dict):
+        raise ValueError(f"config file '{config_display}' field `safety` must be an object")
+
+    if not defaults.get("policy_explicit") and isinstance(safety, dict) and "policy_file" in safety:
+        raw_policy = safety.get("policy_file")
+        if not isinstance(raw_policy, str):
+            raise ValueError(f"config file '{config_display}' field `safety.policy_file` must be a string")
+        policy_path = _resolve_path_reference(
+            os.path.dirname(config_path),
+            raw_policy,
+            field_name="safety.policy_file",
+        )
+        defaults["policy_file_path"] = policy_path
+        defaults["policy_file"] = _metadata_path(base_dir, policy_path)
+        defaults["policy_source"] = f"config:{config_display}"
+        defaults["policy_explicit"] = True
+
+    worker = parsed.get("worker")
+    if worker is not None and not isinstance(worker, dict):
+        raise ValueError(f"config file '{config_display}' field `worker` must be an object")
+    if not defaults.get("codex_home_explicit") and isinstance(worker, dict) and "codex_home" in worker:
+        raw_codex_home = worker.get("codex_home")
+        if not isinstance(raw_codex_home, str):
+            raise ValueError(f"config file '{config_display}' field `worker.codex_home` must be a string")
+        codex_home_value = raw_codex_home.strip()
+        if codex_home_value:
+            codex_home_path = _resolve_path_reference(base_dir, codex_home_value, field_name="worker.codex_home")
+            defaults["codex_home"] = _metadata_path(base_dir, codex_home_path)
+            defaults["codex_home_path"] = codex_home_path
+            cast(dict[str, str], defaults["resolved_from"])["codex_home"] = f"config:{config_display}"
+
+    return defaults
+
+
+def _apply_output_json_override(runtime_defaults: dict[str, object], output_json_override: bool | None) -> dict[str, object]:
+    resolved = dict(runtime_defaults)
+    resolved_sources = dict(cast(dict[str, str], runtime_defaults.get("resolved_from") or {}))
+    resolved["resolved_from"] = resolved_sources
+    if output_json_override is None:
+        return resolved
+    resolved["output_mode"] = OUTPUT_MODE_JSON if output_json_override else OUTPUT_MODE_HUMAN
+    resolved_sources["output_mode"] = "flag:--json" if output_json_override else "flag:--json=false"
+    return resolved
+
+
 def _command_write_targets(command: str, *, include_exports: bool = False) -> list[str]:
     normalized = str(command).strip()
     targets: list[str] = []
@@ -3787,9 +4053,34 @@ def _append_export_refresh_step(
 
 
 def _collect_policy_checks(repo_root: str) -> dict[str, object]:
-    policy_path = os.path.join(repo_root, OG_ROOT, "policy.yaml")
+    try:
+        runtime_defaults = _load_runtime_defaults(repo_root)
+    except ValueError as exc:
+        return {
+            "path": DEFAULT_POLICY_FILE,
+            "present": False,
+            "status": "error",
+            "message": f"cannot resolve policy file: {exc}",
+            "checks": [
+                {
+                    "type": "policy_config",
+                    "status": "error",
+                    "message": f"cannot resolve policy file: {exc}",
+                    "remediation": [
+                        "Repair runtime defaults in environment variables or config files before rerunning the command."
+                    ],
+                }
+            ],
+            "policy": _default_policy(),
+            "status_counts": {"error": 1, "warn": 0},
+            "parsed": {},
+        }
+
+    policy_path = str(runtime_defaults.get("policy_file_path") or os.path.join(repo_root, DEFAULT_POLICY_FILE))
+    policy_display = str(runtime_defaults.get("policy_file") or DEFAULT_POLICY_FILE)
+    policy_explicit = bool(runtime_defaults.get("policy_explicit"))
     payload: dict[str, object] = {
-        "path": f"{OG_ROOT}/policy.yaml",
+        "path": policy_display,
         "present": False,
         "status": "ok",
         "message": "policy file is not explicit; built-in defaults apply",
@@ -3799,29 +4090,38 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
         "parsed": {},
     }
     if not os.path.exists(policy_path):
+        if policy_explicit:
+            payload["status"] = "error"
+            payload["message"] = f"configured policy file is missing: {policy_display}"
+            payload["checks"] = [
+                {
+                    "type": "policy_file_read",
+                    "status": "error",
+                    "message": payload["message"],
+                    "remediation": [f"Create or repoint the configured policy file at '{policy_display}'."],
+                }
+            ]
+            payload["status_counts"] = {"error": 1, "warn": 0}
         return payload
 
     try:
-        with open(policy_path, "r", encoding="utf-8") as handle:
-            raw = handle.read()
-    except OSError as exc:
+        parsed = _read_structured_mapping_file(policy_path)
+    except FileNotFoundError:
         payload["present"] = True
         payload["status"] = "error"
-        payload["message"] = f"cannot read policy file: {exc}"
+        payload["message"] = f"configured policy file is missing: {policy_display}"
         payload["checks"] = [
             {
                 "type": "policy_file_read",
                 "status": "error",
                 "message": payload["message"],
-                "remediation": ["Fix permissions on `.outcomegraph/policy.yaml` to readable state."],
+                "remediation": [f"Create or repoint the configured policy file at '{policy_display}'."],
             }
         ]
+        payload["status_counts"] = {"error": 1, "warn": 0}
         return payload
-
-    payload["present"] = True
-    try:
-        parsed = _parse_yaml_style_fields(raw)
     except ValueError as exc:
+        payload["present"] = True
         payload["status"] = "error"
         payload["message"] = f"cannot parse policy file: {exc}"
         payload["checks"] = [
@@ -3829,11 +4129,13 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                 "type": "policy_parse",
                 "status": "error",
                 "message": payload["message"],
-                "remediation": ["Repair YAML syntax in `.outcomegraph/policy.yaml` and rerun the command."],
+                "remediation": [f"Repair structured syntax in '{policy_display}' and rerun the command."],
             }
         ]
         payload["parsed"] = {}
+        payload["status_counts"] = {"error": 1, "warn": 0}
         return payload
+    payload["present"] = True
     payload["parsed"] = parsed
 
     policy: dict[str, object] = _default_policy()
@@ -3849,7 +4151,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                 "type": "policy_schema_version",
                 "status": "error",
                 "message": "missing `schema_version` in policy file",
-                "remediation": ["Add `schema_version: 2` to `.outcomegraph/policy.yaml`."],
+                "remediation": [f"Add `schema_version: 2` to '{policy_display}'."],
             }
         )
     else:
@@ -3862,7 +4164,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                     "type": "policy_schema_version",
                     "status": "error",
                     "message": "policy schema_version is not an integer",
-                    "remediation": ["Add `schema_version: 2` to `.outcomegraph/policy.yaml`."],
+                    "remediation": [f"Add `schema_version: 2` to '{policy_display}'."],
                 }
             )
         else:
@@ -3900,7 +4202,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                 "type": "policy_allow",
                 "status": "error",
                 "message": "policy field `allow` must be an object",
-                "remediation": ["Use YAML map syntax for `allow` in `.outcomegraph/policy.yaml`."],
+                "remediation": [f"Use YAML/JSON object syntax for `allow` in '{policy_display}'."],
             }
         )
 
@@ -3911,7 +4213,7 @@ def _collect_policy_checks(repo_root: str) -> dict[str, object]:
                 "type": "policy_deny",
                 "status": "error",
                 "message": "policy field `deny` must be an object",
-                "remediation": ["Use YAML map syntax for `deny` in `.outcomegraph/policy.yaml`."],
+                "remediation": [f"Use YAML/JSON object syntax for `deny` in '{policy_display}'."],
             }
         )
 
@@ -4290,11 +4592,7 @@ def _build_status_payload(repo_root: str, options: dict[str, object]) -> dict[st
         "status_schema_version": STATUS_SCHEMA_VERSION,
         "status": overall_status,
         "command": "status",
-        "options": {
-            "changed": options.get("changed", False),
-            "profile": options.get("profile"),
-            "mode": options.get("mode"),
-        },
+        "options": dict(options),
         "generated_at": _utc_timestamp(),
         "message": "status dashboard computed",
         "issues": issues,
@@ -6571,6 +6869,14 @@ def _run_codex_worker(
     parsed: dict[str, object] | None = None
     selected_command: list[str] = []
     duration_ms = 0
+    try:
+        runtime_defaults = _load_runtime_defaults(repo_root)
+    except ValueError as exc:
+        raise WorkerAdapterError(f"invalid runtime defaults: {exc}") from exc
+    worker_env = os.environ.copy()
+    codex_home = runtime_defaults.get("codex_home_path")
+    if isinstance(codex_home, str) and codex_home.strip():
+        worker_env[CODEX_HOME_ENV] = codex_home
 
     with tempfile.TemporaryDirectory(prefix="og-worker-") as temp_dir:
         schema_path = os.path.join(temp_dir, f"{role}-schema.json")
@@ -6591,6 +6897,7 @@ def _run_codex_worker(
                 capture_output=True,
                 cwd=repo_root,
                 timeout=timeout_seconds,
+                env=worker_env,
             )
         except FileNotFoundError:
             raise WorkerAdapterError("codex executable was not found") from None
@@ -6624,6 +6931,10 @@ def _run_codex_worker(
             "command": command,
             "duration_ms": duration_ms,
             "prompt_provenance": prompt_provenance,
+            "configuration": {
+                "codex_home": runtime_defaults.get("codex_home"),
+                "resolved_from": cast(dict[str, str], runtime_defaults.get("resolved_from") or {}).get("codex_home"),
+            },
             "output": parsed_output,
         }
         parsed = {
@@ -6641,6 +6952,10 @@ def _run_codex_worker(
         "adapter": manifest.get("name"),
         "command": selected_command,
         "duration_ms": duration_ms,
+        "configuration": {
+            "codex_home": runtime_defaults.get("codex_home"),
+            "resolved_from": cast(dict[str, str], runtime_defaults.get("resolved_from") or {}).get("codex_home"),
+        },
         "input": payload,
         "prompt": worker_prompt,
         "prompt_provenance": prompt_provenance,
@@ -8032,8 +8347,12 @@ deny:
 def _build_config_payload(created_at: str) -> str:
     return f"""schema_version: 2
 created_at: "{created_at}"
-mode: observe
-profile: analyze
+defaults:
+  output: human
+  profile: analyze
+  mode: observe
+worker:
+  codex_home: ""
 safety:
   policy_file: policy.yaml
   max_writes_per_run: 64
@@ -9330,18 +9649,25 @@ def parse_command_flags(
     allow_validate: bool = False,
     allow_dry_run: bool = False,
     allow_recovery_controls: bool = False,
+    runtime_defaults: dict[str, object] | None = None,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
     changed = False
-    profile = None
-    mode = None
+    resolved_defaults = runtime_defaults or {}
+    resolved_sources = dict(cast(dict[str, str], resolved_defaults.get("resolved_from") or {}))
+    profile = str(resolved_defaults.get("profile")).strip() if allow_profile and resolved_defaults.get("profile") else None
+    profile_source = resolved_sources.get("profile", "built-in") if allow_profile else None
+    mode = str(resolved_defaults.get("mode")).strip() if allow_mode and resolved_defaults.get("mode") else None
+    mode_source = resolved_sources.get("mode", "built-in") if allow_mode else None
     force_hooks_path = False
     force_full_sync = False
     capsule_filters: list[str] = []
     ref_filters: list[str] = []
     certificate_filters: list[str] = []
     strict = bool(default_strict)
-    output_mode = OUTPUT_MODE_JSON if output_json else OUTPUT_MODE_HUMAN
+    output_mode = str(resolved_defaults.get("output_mode") or (OUTPUT_MODE_JSON if output_json else OUTPUT_MODE_HUMAN))
+    output_source = resolved_sources.get("output_mode", "flag:--json" if output_json else "built-in")
+    output_json = output_mode != OUTPUT_MODE_HUMAN
     fields: list[str] | None = None
     limit: int | None = None
     confirmed = False
@@ -9438,6 +9764,16 @@ def parse_command_flags(
         if arg == "--json":
             output_json = True
             output_mode = OUTPUT_MODE_JSON
+            output_source = "flag:--json"
+            i += 1
+            continue
+        if arg.startswith("--json="):
+            try:
+                output_json = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --json value: {exc}", command, EXIT_USAGE, output_json)
+            output_mode = OUTPUT_MODE_JSON if output_json else OUTPUT_MODE_HUMAN
+            output_source = "flag:--json" if output_json else "flag:--json=false"
             i += 1
             continue
         if arg == "--output":
@@ -9447,6 +9783,7 @@ def parse_command_flags(
                 emit_error(f"{command} requires a value for --output", command, EXIT_USAGE, output_json)
             output_mode = parse_output_mode(args[i + 1])
             output_json = output_mode != OUTPUT_MODE_HUMAN
+            output_source = "flag:--output"
             i += 2
             continue
         if arg.startswith("--output="):
@@ -9454,6 +9791,7 @@ def parse_command_flags(
                 emit_error(f"{command} does not accept --output", command, EXIT_USAGE, output_json)
             output_mode = parse_output_mode(arg.split("=", 1)[1])
             output_json = output_mode != OUTPUT_MODE_HUMAN
+            output_source = "flag:--output"
             i += 1
             continue
         if arg == "--fields":
@@ -9631,6 +9969,7 @@ def parse_command_flags(
                     output_json,
                 )
             profile = value
+            profile_source = "flag:--profile"
             i += 2
             continue
         if arg.startswith("--profile="):
@@ -9645,6 +9984,7 @@ def parse_command_flags(
                     output_json,
                 )
             profile = value
+            profile_source = "flag:--profile"
             i += 1
             continue
         if arg == "--mode":
@@ -9661,6 +10001,7 @@ def parse_command_flags(
                     output_json,
                 )
             mode = value
+            mode_source = "flag:--mode"
             i += 2
             continue
         if arg.startswith("--mode="):
@@ -9675,6 +10016,7 @@ def parse_command_flags(
                     output_json,
                 )
             mode = value
+            mode_source = "flag:--mode"
             i += 1
             continue
         if arg == "--capsule":
@@ -9759,6 +10101,9 @@ def parse_command_flags(
             emit_error(f"unknown option '{arg}' for {command}", command, EXIT_USAGE, output_json)
         emit_error(f"unexpected argument '{arg}' for {command}", command, EXIT_USAGE, output_json)
 
+    if output_mode == OUTPUT_MODE_JSONL and not allow_output_controls:
+        emit_error(f"{command} does not support output mode '{OUTPUT_MODE_JSONL}'", command, EXIT_USAGE, output_json)
+
     options: dict[str, object] = {
         "changed": changed,
         "profile": profile,
@@ -9772,6 +10117,21 @@ def parse_command_flags(
         "dry_run": dry_run,
         "max_retries": max_retries,
         "timeout": timeout_seconds,
+    }
+    resolved_from: dict[str, object] = {"output_mode": output_source}
+    if allow_profile:
+        resolved_from["profile"] = profile_source or "built-in"
+    if allow_mode:
+        resolved_from["mode"] = mode_source or "built-in"
+    if resolved_defaults.get("codex_home") is not None:
+        resolved_from["codex_home"] = resolved_sources.get("codex_home", "unset")
+    options["configuration"] = {
+        "config_file": resolved_defaults.get("config_file"),
+        "config_source": resolved_defaults.get("config_source"),
+        "policy_file": resolved_defaults.get("policy_file"),
+        "policy_source": resolved_defaults.get("policy_source"),
+        "codex_home": resolved_defaults.get("codex_home"),
+        "resolved_from": resolved_from,
     }
     if capsule_filters:
         options["capsule"] = capsule_filters
@@ -16114,14 +16474,17 @@ def _run_sync_job(repo_root: str, options: dict[str, object], session: dict[str,
     run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
     session = _session_from_payload(session)
     session_id = session.get("session_id") if isinstance(session, dict) else None
-    sync_options: dict[str, object] = {
-        "changed": options.get("changed", False),
-        "profile": profile,
-        "mode": mode,
-        "force_full_sync": force_full_sync,
-        "max_retries": int(options.get("max_retries") or 0),
-        "timeout": options.get("timeout"),
-    }
+    sync_options: dict[str, object] = dict(options)
+    sync_options.update(
+        {
+            "changed": options.get("changed", False),
+            "profile": profile,
+            "mode": mode,
+            "force_full_sync": force_full_sync,
+            "max_retries": int(options.get("max_retries") or 0),
+            "timeout": options.get("timeout"),
+        }
+    )
     policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
     if policy_error:
         payload = {
@@ -16558,15 +16921,22 @@ def _invoke_typer_command(command_path: list[str], *, output_json: bool) -> int:
 
 def run_command(
     args: list[str],
-    output_json: bool,
+    output_json_override: bool | None,
     strict: bool = False,
     non_interactive: bool = False,
 ) -> int:
+    try:
+        command_runtime_defaults = _apply_output_json_override(_load_runtime_defaults(_maybe_git_root()), output_json_override)
+    except ValueError as exc:
+        emit_error(f"invalid runtime defaults: {exc}", None, EXIT_USAGE, bool(output_json_override))
+    output_json = str(command_runtime_defaults.get("output_mode") or OUTPUT_MODE_HUMAN) != OUTPUT_MODE_HUMAN
+
     if not args:
         emit_error("missing command\n\n" + emit_usage(), None, EXIT_USAGE, output_json)
 
     command = args[0]
     rest = args[1:]
+    output_json = str(command_runtime_defaults.get("output_mode") or OUTPUT_MODE_HUMAN) != OUTPUT_MODE_HUMAN
     for arg in rest:
         if arg == "--json":
             output_json = True
@@ -16578,7 +16948,16 @@ def run_command(
                 emit_error(f"invalid --json value: {exc}", command, EXIT_USAGE, output_json)
 
     if command == "init":
-        options, _ = parse_command_flags(rest, "init", False, False, False, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "init",
+            False,
+            False,
+            False,
+            output_json,
+            runtime_defaults=command_runtime_defaults,
+            default_strict=strict,
+        )
         emit_command_result(_init_outcomegraph(), output_json)
         return EXIT_SUCCESS
 
@@ -16594,6 +16973,7 @@ def run_command(
             allow_validate=True,
             allow_dry_run=True,
             allow_recovery_controls=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16678,6 +17058,7 @@ def run_command(
             allow_validate=True,
             allow_dry_run=True,
             allow_recovery_controls=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16712,6 +17093,7 @@ def run_command(
             allow_validate=True,
             allow_dry_run=True,
             allow_recovery_controls=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16729,7 +17111,16 @@ def run_command(
         return _command_exit_code(payload)
 
     if command == "status":
-        options, _ = parse_command_flags(rest, "status", False, False, False, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "status",
+            False,
+            False,
+            False,
+            output_json,
+            runtime_defaults=command_runtime_defaults,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         payload = _build_status_payload(repo_root, options)
         if not output_json:
@@ -16738,7 +17129,16 @@ def run_command(
         return _command_exit_code(payload)
 
     if command == "doctor":
-        options, _ = parse_command_flags(rest, "doctor", False, False, False, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "doctor",
+            False,
+            False,
+            False,
+            output_json,
+            runtime_defaults=command_runtime_defaults,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         payload = _build_doctor_payload(repo_root, options)
         if not output_json:
@@ -16756,6 +17156,7 @@ def run_command(
             output_json,
             allow_validate=True,
             allow_dry_run=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16792,6 +17193,7 @@ def run_command(
             allow_capsule_filter=True,
             allow_ref_filter=True,
             allow_certificate_filter=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16832,7 +17234,16 @@ def run_command(
         return _command_exit_code(payload)
 
     if command == "drift":
-        options, _ = parse_command_flags(rest, "drift", False, False, False, output_json, default_strict=strict)
+        options, _ = parse_command_flags(
+            rest,
+            "drift",
+            False,
+            False,
+            False,
+            output_json,
+            runtime_defaults=command_runtime_defaults,
+            default_strict=strict,
+        )
         repo_root = _git_root()
         start = time.perf_counter()
         payload = _build_drift_payload(repo_root, options)
@@ -16854,6 +17265,7 @@ def run_command(
             False,
             output_json,
             allow_output_controls=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         repo_root = _git_root()
@@ -16932,6 +17344,7 @@ def run_command(
             allow_force_hooks_path=sub == "init",
             allow_yes=sub == "init",
             allow_session_id=sub == "disable",
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         if sub == "init":
@@ -16974,10 +17387,28 @@ def run_command(
                 output_json,
             )
         if sub == "run":
-            parse_command_flags(rest[1:], "daemon run", False, False, False, output_json, default_strict=strict)
+            parse_command_flags(
+                rest[1:],
+                "daemon run",
+                False,
+                False,
+                False,
+                output_json,
+                runtime_defaults=command_runtime_defaults,
+                default_strict=strict,
+            )
             return _daemon_run()
         if sub == "install":
-            options, _ = parse_command_flags(rest[1:], "daemon install", False, False, False, output_json, default_strict=strict)
+            options, _ = parse_command_flags(
+                rest[1:],
+                "daemon install",
+                False,
+                False,
+                False,
+                output_json,
+                runtime_defaults=command_runtime_defaults,
+                default_strict=strict,
+            )
             payload = _daemon_install()
             payload["options"] = options
             emit_command_result(payload, output_json)
@@ -16991,6 +17422,7 @@ def run_command(
                 False,
                 output_json,
                 allow_session_id=True,
+                runtime_defaults=command_runtime_defaults,
                 default_strict=strict,
             )
             payload = _daemon_start(cast(str | None, options.get("session_id")))
@@ -17006,6 +17438,7 @@ def run_command(
                 False,
                 output_json,
                 allow_session_id=True,
+                runtime_defaults=command_runtime_defaults,
                 default_strict=strict,
             )
             payload = _daemon_stop(cast(str | None, options.get("session_id")))
@@ -17020,6 +17453,7 @@ def run_command(
             False,
             output_json,
             allow_session_id=True,
+            runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
         payload = _daemon_status(cast(str | None, options.get("session_id")))
@@ -17028,7 +17462,16 @@ def run_command(
         return _command_exit_code(payload)
 
     if command == "schema":
-        parse_command_flags(rest, "schema", False, False, False, output_json, default_strict=strict)
+        parse_command_flags(
+            rest,
+            "schema",
+            False,
+            False,
+            False,
+            output_json,
+            runtime_defaults=command_runtime_defaults,
+            default_strict=strict,
+        )
         return _invoke_typer_command(["schema"], output_json=output_json)
 
     if command == "describe":
@@ -17121,21 +17564,28 @@ def run_command(
 
 
 def main(argv: list[str]) -> int:
-    output_json = False
+    output_json_override: bool | None = None
     strict = False
     non_interactive = False
+    try:
+        runtime_defaults = _load_runtime_defaults(_maybe_git_root())
+    except ValueError as exc:
+        emit_error(f"invalid runtime defaults: {exc}", None, EXIT_USAGE, False)
+    output_json = str(runtime_defaults.get("output_mode") or OUTPUT_MODE_HUMAN) != OUTPUT_MODE_HUMAN
     i = 0
     while i < len(argv):
         arg = argv[i]
         if arg == "--json":
+            output_json_override = True
             output_json = True
             i += 1
             continue
         if arg.startswith("--json="):
             try:
-                output_json = parse_bool_option(arg.split("=", 1)[1])
+                output_json_override = parse_bool_option(arg.split("=", 1)[1])
             except ValueError as exc:
-                emit_error(f"invalid --json value: {exc}", None, EXIT_USAGE, output_json)
+                emit_error(f"invalid --json value: {exc}", None, EXIT_USAGE, bool(output_json_override))
+            output_json = bool(output_json_override)
             i += 1
             continue
         if arg == "--strict":
@@ -17171,7 +17621,7 @@ def main(argv: list[str]) -> int:
                         "status": "ok",
                         "version": VERSION,
                     },
-                    output_json,
+                    True,
                     "version",
                 )
             else:
@@ -17182,7 +17632,7 @@ def main(argv: list[str]) -> int:
         break
 
     command_args = argv[i:]
-    return run_command(command_args, output_json, strict, non_interactive)
+    return run_command(command_args, output_json_override, strict, non_interactive)
 
 
 def og_cli() -> None:
