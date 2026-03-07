@@ -115,6 +115,17 @@ Recovery:
 - Re-run `og verify --changed --max-retries 1 --timeout 60` when the oracle failure is transient or timeout-related.
 - For persistent failures, run `og replay --changed` to confirm behavioral evidence separately.
 
+### 2.6b Replay lacks regeneration proof inputs
+
+Symptom: `og replay --changed` fails with messages about missing capsule scope, scoped materials, acceptance checks, or executable acceptance oracles.
+
+Recovery:
+
+- Add or repair the capsule `scope` so replay has a bounded boundary to materialize.
+- Ensure `.outcomegraph/materials.lock` or the current repo tree covers the files inside that capsule scope.
+- Record at least one executable capsule oracle; advisory-only oracles are not enough for replay certification.
+- Re-run `og replay --changed --dry-run` first, then `og replay --changed` once the regeneration inputs are complete.
+
 ### 2.7 Adapter/interface mismatch
 
 Symptom: startup error with `ADAPTER_INTERFACE_MISMATCH`.

@@ -795,6 +795,13 @@ interface_version: 1
 schema_version: 2
 run_id: "run-001"
 capsule_id: cap-frontend
+capsule_scope:
+  - "src/frontend/**"
+material_inputs:
+  - path: "src/frontend/main.ts"
+    digest: "sha256:..."
+    kind: "file"
+    size: 4821
 steps:
   - command: "npm test"
     expected_exit_code: 0
@@ -802,6 +809,20 @@ steps:
   - command: "pytest -q"
     expected_exit_code: 0
     timeout_s: 120
+acceptance_checks:
+  - name: "frontend-unit"
+    oracle_name: "frontend-unit"
+    command: "npm test -- frontend"
+    expected_signal: "exit_code=0"
+    reason: null
+equivalence_inputs:
+  baseline_hash: "sha256:..."
+  oracle_names:
+    - "frontend-unit"
+  material_paths:
+    - "src/frontend/main.ts"
+  notes:
+    - "Compare replay oracle output against the latest successful replay certificate when available."
 ```
 
 ```yaml
@@ -817,6 +838,21 @@ materials_lock_ref: ".outcomegraph/materials.lock"
 changed_materials:
   - path: "src/frontend/main.ts"
     digest: "sha256:..."
+scope_materials:
+  - path: "src/frontend/main.ts"
+    digest: "sha256:..."
+capsule:
+  id: cap-frontend
+  scope:
+    - "src/frontend/**"
+  oracles:
+    - name: "frontend-unit"
+      command: "npm test -- frontend"
+      scope:
+        - "src/frontend/**"
+baseline_equivalence:
+  baseline_hash: "sha256:..."
+  oracle_digest: "sha256:..."
 ```
 
 ```yaml
@@ -1073,11 +1109,12 @@ Replay loop (changed capsules only):
 - Rebuilds changed capsules only.
 - For each replay unit:
   - Creates an isolated clean sandbox/worktree at `.outcomegraph/work/replay/<run_id>/<capsule_id>/`.
-  - Materializes only the capsule-scoped files from `.outcomegraph/materials.lock` plus runtime toolchain metadata.
+  - Materializes the capsule-scoped files from `.outcomegraph/materials.lock` and scope-discovered repo files, plus runtime toolchain metadata.
+  - Requires the replay plan to declare capsule scope, scoped material inputs, executable acceptance checks, and explicit equivalence inputs before execution.
   - Executes the capsule’s replay plan in the fresh environment.
-  - Compares oracle outputs against last-good evidence hash (`equivalence_hash`) for behavior equivalence.
+  - Compares acceptance-oracle outputs against last-good evidence hash (`equivalence_hash`) for behavior equivalence.
   - Writes replay certificates only when execution and oracle behavior are stable enough to certify.
-- Writes failure diagnostics when equivalence diverges or a sandbox/runtime error occurs.
+- Writes failure diagnostics when equivalence diverges, scoped regeneration inputs are missing, or a sandbox/runtime error occurs.
 
 Resilience loop:
 

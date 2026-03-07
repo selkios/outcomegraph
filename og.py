@@ -420,7 +420,7 @@ WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "wo
 WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
 WORKER_PROMPT_BINDINGS: dict[str, dict[str, str]] = {
     "distill": {"id": "worker-distill", "version": "1.0.1"},
-    "replay": {"id": "worker-replay", "version": "1.0.0"},
+    "replay": {"id": "worker-replay", "version": "1.0.1"},
 }
 WORKER_PROMPT_VARIABLE_PATTERN = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
 TRACE_SEGMENT_MAX_LENGTH = 72
@@ -5991,6 +5991,72 @@ def _worker_lineage_schema() -> dict[str, object]:
     }
 
 
+def _worker_replay_material_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["path", "digest", "kind", "size"],
+        "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "digest": {"type": "string", "minLength": 1},
+            "kind": {"type": ["string", "null"]},
+            "size": {"type": ["integer", "null"], "minimum": 0},
+        },
+    }
+
+
+def _worker_replay_acceptance_check_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["name", "oracle_name", "command", "expected_signal", "reason"],
+        "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "oracle_name": {"type": ["string", "null"]},
+            "command": {"type": ["string", "null"]},
+            "expected_signal": {"type": "string", "minLength": 1},
+            "reason": {"type": ["string", "null"]},
+        },
+    }
+
+
+def _worker_replay_equivalence_inputs_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["baseline_hash", "oracle_names", "material_paths", "notes"],
+        "properties": {
+            "baseline_hash": {"type": ["string", "null"]},
+            "oracle_names": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "material_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "notes": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        },
+    }
+
+
+def _worker_replay_parity_results_schema() -> dict[str, object]:
+    return {
+        "type": ["object", "null"],
+        "additionalProperties": False,
+        "required": [
+            "match",
+            "details",
+            "baseline_hash",
+            "observed_hash",
+            "oracle_digest",
+            "trace_count",
+        ],
+        "properties": {
+            "match": {"type": ["boolean", "null"]},
+            "details": {"type": ["string", "null"]},
+            "baseline_hash": {"type": ["string", "null"]},
+            "observed_hash": {"type": ["string", "null"]},
+            "oracle_digest": {"type": ["string", "null"]},
+            "trace_count": {"type": ["integer", "null"], "minimum": 0},
+        },
+    }
+
+
 def _build_worker_output_schema(role: str) -> dict[str, object]:
     if role == "distill":
         return {
@@ -6084,7 +6150,11 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                 "interface_version",
                 "run_id",
                 "capsule_id",
+                "capsule_scope",
+                "material_inputs",
                 "steps",
+                "acceptance_checks",
+                "equivalence_inputs",
                 "status",
                 "message",
                 "failures",
@@ -6095,6 +6165,11 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                 "interface_version": {"type": "integer", "const": WORKER_INTERFACE_VERSION},
                 "run_id": {"type": "string", "minLength": 1},
                 "capsule_id": {"type": "string", "minLength": 1},
+                "capsule_scope": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                "material_inputs": {
+                    "type": "array",
+                    "items": _worker_replay_material_schema(),
+                },
                 "steps": {
                     "type": "array",
                     "items": {
@@ -6109,29 +6184,15 @@ def _build_worker_output_schema(role: str) -> dict[str, object]:
                         },
                     },
                 },
+                "acceptance_checks": {
+                    "type": "array",
+                    "items": _worker_replay_acceptance_check_schema(),
+                },
+                "equivalence_inputs": _worker_replay_equivalence_inputs_schema(),
                 "status": {"type": "string", "minLength": 1},
                 "message": {"type": "string"},
                 "failures": {"type": "array", "items": {"type": "string", "minLength": 1}},
-                "parity_results": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": [
-                        "match",
-                        "details",
-                        "baseline_hash",
-                        "observed_hash",
-                        "oracle_digest",
-                        "trace_count",
-                    ],
-                    "properties": {
-                        "match": {"type": ["boolean", "null"]},
-                        "details": {"type": ["string", "null"]},
-                        "baseline_hash": {"type": ["string", "null"]},
-                        "observed_hash": {"type": ["string", "null"]},
-                        "oracle_digest": {"type": ["string", "null"]},
-                        "trace_count": {"type": ["integer", "null"], "minimum": 0},
-                    },
-                },
+                "parity_results": _worker_replay_parity_results_schema(),
             },
         }
     raise WorkerAdapterError(f"unsupported worker role '{role}'")
@@ -6904,6 +6965,146 @@ def _normalize_distill_delta(raw: object) -> dict[str, object]:
     }
 
 
+def _normalize_replay_material_inputs(raw: object, *, field: str) -> list[dict[str, object]]:
+    if raw is None:
+        raise WorkerAdapterError(f"{field} must be present and be a list")
+    if not isinstance(raw, list):
+        raise WorkerAdapterError(f"{field} must be a list")
+
+    materials: list[dict[str, object]] = []
+    for index, raw_material in enumerate(raw):
+        if not isinstance(raw_material, dict):
+            raise WorkerAdapterError(f"{field}[{index}] must be an object")
+        path = _normalize_repo_relative_path(_required_str(raw_material.get("path"), f"{field}[{index}].path"))
+        if not path:
+            raise WorkerAdapterError(f"{field}[{index}].path must be a non-empty repository-relative path")
+        digest = _required_str(raw_material.get("digest"), f"{field}[{index}].digest")
+        material: dict[str, object] = {
+            "path": path,
+            "digest": digest,
+        }
+        kind = raw_material.get("kind")
+        if kind is None:
+            material["kind"] = None
+        elif isinstance(kind, str):
+            material["kind"] = kind.strip() or None
+        else:
+            raise WorkerAdapterError(f"{field}[{index}].kind must be a string or null")
+        size = raw_material.get("size")
+        if size is None:
+            material["size"] = None
+        elif isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            raise WorkerAdapterError(f"{field}[{index}].size must be a non-negative integer or null")
+        else:
+            material["size"] = size
+        materials.append(material)
+    return materials
+
+
+def _normalize_replay_acceptance_checks(raw: object, *, field: str) -> list[dict[str, object]]:
+    if raw is None:
+        raise WorkerAdapterError(f"{field} must be present and be a list")
+    if not isinstance(raw, list):
+        raise WorkerAdapterError(f"{field} must be a list")
+
+    checks: list[dict[str, object]] = []
+    for index, raw_check in enumerate(raw):
+        if not isinstance(raw_check, dict):
+            raise WorkerAdapterError(f"{field}[{index}] must be an object")
+        oracle_name_raw = raw_check.get("oracle_name")
+        if oracle_name_raw is None:
+            oracle_name = None
+        elif isinstance(oracle_name_raw, str):
+            oracle_name = oracle_name_raw.strip() or None
+        else:
+            raise WorkerAdapterError(f"{field}[{index}].oracle_name must be a string or null")
+
+        command_raw = raw_check.get("command")
+        if command_raw is None:
+            command = None
+        elif isinstance(command_raw, str):
+            command = command_raw.strip() or None
+        else:
+            raise WorkerAdapterError(f"{field}[{index}].command must be a string or null")
+
+        reason_raw = raw_check.get("reason")
+        if reason_raw is None:
+            reason = None
+        elif isinstance(reason_raw, str):
+            reason = reason_raw.strip() or None
+        else:
+            raise WorkerAdapterError(f"{field}[{index}].reason must be a string or null")
+
+        checks.append(
+            {
+                "name": _required_str(raw_check.get("name"), f"{field}[{index}].name"),
+                "oracle_name": oracle_name,
+                "command": command,
+                "expected_signal": _required_str(raw_check.get("expected_signal"), f"{field}[{index}].expected_signal"),
+                "reason": reason,
+            }
+        )
+    return checks
+
+
+def _normalize_replay_equivalence_inputs(raw: object, *, field: str) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object")
+    for required_key in ("baseline_hash", "oracle_names", "material_paths", "notes"):
+        if required_key not in raw:
+            raise WorkerAdapterError(f"{field}.{required_key} must be present")
+
+    baseline_hash_raw = raw.get("baseline_hash")
+    if baseline_hash_raw is None:
+        baseline_hash = None
+    elif isinstance(baseline_hash_raw, str):
+        baseline_hash = baseline_hash_raw.strip() or None
+    else:
+        raise WorkerAdapterError(f"{field}.baseline_hash must be a string or null")
+
+    return {
+        "baseline_hash": baseline_hash,
+        "oracle_names": _string_list(raw.get("oracle_names"), f"{field}.oracle_names"),
+        "material_paths": _string_list(raw.get("material_paths"), f"{field}.material_paths"),
+        "notes": _string_list(raw.get("notes"), f"{field}.notes"),
+    }
+
+
+def _normalize_replay_parity_results(raw: object, *, field: str) -> dict[str, object] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise WorkerAdapterError(f"{field} must be an object or null")
+
+    baseline_hash_raw = raw.get("baseline_hash")
+    observed_hash_raw = raw.get("observed_hash")
+    oracle_digest_raw = raw.get("oracle_digest")
+    details_raw = raw.get("details")
+    trace_count_raw = raw.get("trace_count")
+    match = raw.get("match")
+    if match is not None and not isinstance(match, bool):
+        raise WorkerAdapterError(f"{field}.match must be a boolean or null")
+    if baseline_hash_raw is not None and not isinstance(baseline_hash_raw, str):
+        raise WorkerAdapterError(f"{field}.baseline_hash must be a string or null")
+    if observed_hash_raw is not None and not isinstance(observed_hash_raw, str):
+        raise WorkerAdapterError(f"{field}.observed_hash must be a string or null")
+    if oracle_digest_raw is not None and not isinstance(oracle_digest_raw, str):
+        raise WorkerAdapterError(f"{field}.oracle_digest must be a string or null")
+    if details_raw is not None and not isinstance(details_raw, str):
+        raise WorkerAdapterError(f"{field}.details must be a string or null")
+    if trace_count_raw is not None and (isinstance(trace_count_raw, bool) or not isinstance(trace_count_raw, int) or trace_count_raw < 0):
+        raise WorkerAdapterError(f"{field}.trace_count must be a non-negative integer or null")
+
+    return {
+        "match": match,
+        "details": details_raw.strip() if isinstance(details_raw, str) and details_raw.strip() else None,
+        "baseline_hash": baseline_hash_raw.strip() if isinstance(baseline_hash_raw, str) and baseline_hash_raw.strip() else None,
+        "observed_hash": observed_hash_raw.strip() if isinstance(observed_hash_raw, str) and observed_hash_raw.strip() else None,
+        "oracle_digest": oracle_digest_raw.strip() if isinstance(oracle_digest_raw, str) and oracle_digest_raw.strip() else None,
+        "trace_count": trace_count_raw if isinstance(trace_count_raw, int) and trace_count_raw >= 0 else None,
+    }
+
+
 def _normalize_replay_plan(raw: object) -> dict[str, object]:
     if not isinstance(raw, dict):
         raise WorkerAdapterError("replay output must be an object")
@@ -6913,6 +7114,9 @@ def _normalize_replay_plan(raw: object) -> dict[str, object]:
         raise WorkerAdapterError("replay output interface_version mismatch")
     run_id = _required_str(raw.get("run_id"), "run_id")
     capsule_id = _required_str(raw.get("capsule_id"), "capsule_id")
+    if "capsule_scope" not in raw:
+        raise WorkerAdapterError("replay output capsule_scope must be present and be a list")
+    capsule_scope = _string_list(raw.get("capsule_scope"), "replay output capsule_scope")
     raw_steps = raw.get("steps")
     if raw_steps is None:
         steps: list[dict[str, object]] = []
@@ -6949,10 +7153,26 @@ def _normalize_replay_plan(raw: object) -> dict[str, object]:
         "interface_version": WORKER_INTERFACE_VERSION,
         "run_id": run_id,
         "capsule_id": capsule_id,
+        "capsule_scope": capsule_scope,
+        "material_inputs": _normalize_replay_material_inputs(
+            raw.get("material_inputs"),
+            field="replay output material_inputs",
+        ),
         "steps": steps,
+        "acceptance_checks": _normalize_replay_acceptance_checks(
+            raw.get("acceptance_checks"),
+            field="replay output acceptance_checks",
+        ),
+        "equivalence_inputs": _normalize_replay_equivalence_inputs(
+            raw.get("equivalence_inputs"),
+            field="replay output equivalence_inputs",
+        ),
         "status": str(raw.get("status") or "ok"),
         "message": str(raw.get("message") or ""),
-        "parity_results": parity_results,
+        "parity_results": _normalize_replay_parity_results(
+            parity_results,
+            field="replay output parity_results",
+        ),
         "failures": _safe_string_list(raw.get("failures")),
     }
 
@@ -10748,6 +10968,60 @@ def _collect_replay_equivalence_baseline(repo_root: str, capsule_id: str) -> str
     return candidate_hash if isinstance(candidate_hash, str) and candidate_hash else None
 
 
+def _collect_scope_materials_from_repo(repo_root: str, scope: list[str]) -> list[dict[str, object]]:
+    if not scope:
+        return []
+
+    selected: dict[str, dict[str, object]] = {}
+    for current_root, dirnames, filenames in os.walk(repo_root):
+        relative_root = os.path.relpath(current_root, repo_root).replace("\\", "/")
+        if relative_root == ".":
+            relative_root = ""
+
+        kept_dirs: list[str] = []
+        for dirname in dirnames:
+            relative_dir = dirname if not relative_root else f"{relative_root}/{dirname}"
+            normalized_dir = _normalize_repo_relative_path(relative_dir)
+            if not normalized_dir:
+                continue
+            if normalized_dir == ".git" or normalized_dir.startswith(".git/"):
+                continue
+            if any(
+                normalized_dir == prefix.rstrip("/") or normalized_dir.startswith(prefix)
+                for prefix in RUNTIME_IGNORE_PREFIXES
+            ):
+                continue
+            kept_dirs.append(dirname)
+        dirnames[:] = kept_dirs
+
+        for filename in filenames:
+            relative_path = filename if not relative_root else f"{relative_root}/{filename}"
+            normalized_path = _normalize_repo_relative_path(relative_path)
+            if not normalized_path:
+                continue
+            if normalized_path.startswith(".git/") or normalized_path == ".git":
+                continue
+            if any(normalized_path.startswith(prefix) for prefix in RUNTIME_IGNORE_PREFIXES):
+                continue
+            if not _path_matches_capsule_scope(normalized_path, scope):
+                continue
+            digest = _file_sha256(normalized_path, repo_root)
+            if not digest:
+                continue
+            entry: dict[str, object] = {
+                "path": normalized_path,
+                "digest": digest,
+                "kind": "file",
+            }
+            absolute_path = os.path.join(repo_root, normalized_path)
+            try:
+                entry["size"] = os.path.getsize(absolute_path)
+            except OSError:
+                pass
+            selected[normalized_path] = entry
+    return [selected[path] for path in sorted(selected)]
+
+
 def _collect_capsule_scope_materials(
     repo_root: str,
     capsule_id: str,
@@ -10769,7 +11043,164 @@ def _collect_capsule_scope_materials(
             continue
         if _path_matches_capsule_scope(path, scope):
             selected[path] = {"path": path, "digest": digest}
+    for material in _collect_scope_materials_from_repo(repo_root, scope):
+        path = str(material.get("path") or "").strip()
+        if path and path not in selected:
+            selected[path] = dict(material)
     return [selected[path] for path in sorted(selected)]
+
+
+def _collect_executable_oracle_map(oracles: list[dict[str, object]]) -> dict[str, str]:
+    executable: dict[str, str] = {}
+    for oracle in oracles:
+        if not isinstance(oracle, dict):
+            continue
+        name = str(oracle.get("name") or "").strip()
+        command = str(oracle.get("command") or "").strip()
+        if not name or not command:
+            continue
+        executable[name] = command
+    return executable
+
+
+def _validate_replay_plan_contract(
+    run_id: str,
+    capsule_id: str,
+    plan: dict[str, object],
+    capsule_payload: dict[str, object],
+    scope_materials: list[dict[str, object]],
+    capsule_oracles: list[dict[str, object]],
+    baseline_equivalence: dict[str, object],
+) -> list[str]:
+    failures: list[str] = []
+    expected_scope = _safe_string_list(capsule_payload.get("scope"))
+    if not expected_scope:
+        failures.append(f"Replay capsule {capsule_id} lacks capsule scope needed for regeneration proof.")
+
+    if str(plan.get("run_id") or "") != run_id:
+        failures.append(f"Replay plan for {capsule_id} returned run_id '{plan.get('run_id')}' instead of '{run_id}'.")
+    if str(plan.get("capsule_id") or "") != capsule_id:
+        failures.append(
+            f"Replay plan for {capsule_id} returned capsule_id '{plan.get('capsule_id')}' instead of '{capsule_id}'."
+        )
+
+    plan_scope = _safe_string_list(plan.get("capsule_scope"))
+    if not plan_scope:
+        failures.append(f"Replay plan for {capsule_id} must declare capsule_scope.")
+    elif expected_scope:
+        scope_overlap = any(scope_item in expected_scope for scope_item in plan_scope)
+        if not scope_overlap:
+            plan_scope_patterns = plan_scope
+            expected_scope_paths = [str(item.get("path") or "") for item in scope_materials if isinstance(item, dict)]
+            scope_overlap = any(
+                _path_matches_capsule_scope(path, plan_scope_patterns)
+                for path in expected_scope_paths
+                if path
+            )
+        if not scope_overlap:
+            failures.append(f"Replay plan for {capsule_id} must stay within the recorded capsule scope.")
+
+    scope_materials_by_path: dict[str, dict[str, object]] = {}
+    for material in scope_materials:
+        if not isinstance(material, dict):
+            continue
+        path = str(material.get("path") or "").strip()
+        if not path:
+            continue
+        scope_materials_by_path[path] = material
+    if not scope_materials_by_path:
+        failures.append(f"Replay capsule {capsule_id} lacks scoped material inputs for regeneration proof.")
+
+    material_inputs = _safe_object_list(plan.get("material_inputs"))
+    if not material_inputs:
+        failures.append(f"Replay plan for {capsule_id} must declare material_inputs.")
+    for material in material_inputs:
+        path = str(material.get("path") or "").strip()
+        digest = str(material.get("digest") or "").strip()
+        if not path or not digest:
+            failures.append(f"Replay plan for {capsule_id} includes an incomplete material input.")
+            continue
+        expected_material = scope_materials_by_path.get(path)
+        if expected_material is None:
+            failures.append(f"Replay plan for {capsule_id} references scoped material '{path}' that was not materialized.")
+            continue
+        expected_digest = str(expected_material.get("digest") or "").strip()
+        if expected_digest and digest != expected_digest:
+            failures.append(
+                f"Replay plan for {capsule_id} uses digest '{digest}' for '{path}', expected '{expected_digest}'."
+            )
+
+    executable_oracles = _collect_executable_oracle_map(capsule_oracles)
+    if not executable_oracles:
+        failures.append(f"Replay capsule {capsule_id} lacks executable acceptance oracles for regeneration proof.")
+
+    acceptance_checks = _safe_object_list(plan.get("acceptance_checks"))
+    if not acceptance_checks:
+        failures.append(f"Replay plan for {capsule_id} must declare acceptance_checks.")
+
+    acceptance_oracle_names: list[str] = []
+    for index, raw_check in enumerate(acceptance_checks):
+        oracle_name = str(raw_check.get("oracle_name") or "").strip()
+        command = str(raw_check.get("command") or "").strip()
+        if not oracle_name:
+            failures.append(
+                f"Replay plan for {capsule_id} acceptance_checks[{index}] must reference an executable capsule oracle."
+            )
+            continue
+        expected_command = executable_oracles.get(oracle_name)
+        if expected_command is None:
+            failures.append(
+                f"Replay plan for {capsule_id} acceptance_checks[{index}] references unknown oracle '{oracle_name}'."
+            )
+            continue
+        if not command:
+            failures.append(
+                f"Replay plan for {capsule_id} acceptance_checks[{index}] must include the oracle command for '{oracle_name}'."
+            )
+            continue
+        if command != expected_command:
+            failures.append(
+                f"Replay plan for {capsule_id} acceptance_checks[{index}] command does not match oracle '{oracle_name}'."
+            )
+            continue
+        acceptance_oracle_names.append(oracle_name)
+
+    equivalence_inputs = plan.get("equivalence_inputs") if isinstance(plan.get("equivalence_inputs"), dict) else {}
+    planned_material_paths = _safe_string_list(equivalence_inputs.get("material_paths"))
+    if not planned_material_paths:
+        failures.append(f"Replay plan for {capsule_id} must declare equivalence_inputs.material_paths.")
+    else:
+        planned_material_set = {str(item.get("path") or "").strip() for item in material_inputs if isinstance(item, dict)}
+        for path in planned_material_paths:
+            if path not in planned_material_set:
+                failures.append(
+                    f"Replay plan for {capsule_id} equivalence_inputs.material_paths references '{path}' outside material_inputs."
+                )
+
+    planned_oracle_names = _safe_string_list(equivalence_inputs.get("oracle_names"))
+    baseline_hash = equivalence_inputs.get("baseline_hash")
+    expected_baseline_hash = baseline_equivalence.get("oracle_digest") or baseline_equivalence.get("observed_hash")
+    normalized_expected_baseline = expected_baseline_hash if isinstance(expected_baseline_hash, str) and expected_baseline_hash else None
+    normalized_planned_baseline = baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None
+    if normalized_expected_baseline is not None and normalized_planned_baseline != normalized_expected_baseline:
+        failures.append(
+            f"Replay plan for {capsule_id} must carry baseline hash '{normalized_expected_baseline}' in equivalence_inputs."
+        )
+    if normalized_expected_baseline is None and normalized_planned_baseline is not None:
+        failures.append(f"Replay plan for {capsule_id} must not invent a baseline hash when no prior replay baseline exists.")
+
+    if not planned_oracle_names and normalized_expected_baseline is None:
+        failures.append(
+            f"Replay plan for {capsule_id} must declare executable oracle-based equivalence inputs or an existing baseline hash."
+        )
+    for oracle_name in planned_oracle_names:
+        if oracle_name not in acceptance_oracle_names:
+            failures.append(
+                f"Replay plan for {capsule_id} equivalence_inputs.oracle_names must match declared acceptance checks."
+            )
+            break
+
+    return failures
 
 
 def _collect_replay_sandbox_paths(
@@ -14117,6 +14548,7 @@ def _run_replay_stage(
         trace_path = _build_trace_path(capsule, run_id, "replay")
         capsule_payload = _load_capsule_payload(repo_root, capsule)
         scope_materials = _collect_capsule_scope_materials(repo_root, capsule, changed_materials)
+        capsule_oracles = _load_capsule_oracles(repo_root, capsule)
         baseline_equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule)
         try:
             input_payload = _build_replay_input(
@@ -14178,6 +14610,23 @@ def _run_replay_stage(
 
         step_status = str(plan.get("status") or "ok")
         lower_status = step_status.lower()
+        plan_contract_failures = _validate_replay_plan_contract(
+            run_id,
+            capsule,
+            plan,
+            capsule_payload,
+            scope_materials,
+            capsule_oracles,
+            baseline_equivalence,
+        )
+        acceptance_checks = _safe_object_list(plan.get("acceptance_checks"))
+        acceptance_oracle_names: list[str] = []
+        acceptance_oracle_seen: set[str] = set()
+        for raw_check in acceptance_checks:
+            oracle_name = str(raw_check.get("oracle_name") or "").strip()
+            if oracle_name and oracle_name not in acceptance_oracle_seen:
+                acceptance_oracle_seen.add(oracle_name)
+                acceptance_oracle_names.append(oracle_name)
         replay_status = "success"
         replay_failures = _safe_string_list(plan.get("failures"))
         replay_steps: list[dict[str, object]] = []
@@ -14191,6 +14640,10 @@ def _run_replay_stage(
             "certificate_id": None,
             "trace": trace_path,
             "failures": replay_failures,
+            "capsule_scope": _safe_string_list(plan.get("capsule_scope")),
+            "material_inputs": _safe_object_list(plan.get("material_inputs")),
+            "acceptance_checks": acceptance_checks,
+            "equivalence_inputs": dict(plan.get("equivalence_inputs")) if isinstance(plan.get("equivalence_inputs"), dict) else {},
             "parity_results": plan.get("parity_results"),
             "replay_steps": replay_steps,
             "equivalence": None,
@@ -14199,10 +14652,14 @@ def _run_replay_stage(
             **({"prompt_provenance": plan_prompt_provenance} if plan_prompt_provenance is not None else {}),
         }
 
-        if lower_status in {"error", "failed", "fail", "warn"}:
+        if lower_status in {"error", "failed", "fail", "warn", "pending"}:
             replay_status = "failed"
             overall_failed = True
             replay_failures.append(f"Replay plan rejected with status '{step_status}'.")
+        if plan_contract_failures:
+            replay_status = "failed"
+            overall_failed = True
+            replay_failures.extend(plan_contract_failures)
 
         certificate_id = f"cert-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
         claim_id = f"cl-{_safe_slug(capsule)}-{_short_hash(f'{run_id}:{capsule}:replay')}"
@@ -14216,90 +14673,116 @@ def _run_replay_stage(
                     "Replay sandbox materialization missing required paths: " + ", ".join(missing_paths)
                 )
             else:
+                planned_material_paths = {
+                    str(item.get("path") or "").strip()
+                    for item in _safe_object_list(plan.get("material_inputs"))
+                    if str(item.get("path") or "").strip()
+                }
+                missing_planned_paths = sorted(path for path in planned_material_paths if path not in materialized_paths)
+                if missing_planned_paths:
+                    replay_status = "failed"
+                    overall_failed = True
+                    replay_failures.append(
+                        "Replay sandbox did not materialize planned inputs: " + ", ".join(missing_planned_paths)
+                    )
+
                 sandbox_steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
-                if not sandbox_steps:
+                if replay_status == "success" and not sandbox_steps:
                     replay_status = "failed"
                     overall_failed = True
                     replay_failures.append("Replay plan omitted executable steps.")
-                for step_index, raw_step in enumerate(sandbox_steps):
-                    if not isinstance(raw_step, dict):
-                        replay_status = "failed"
-                        overall_failed = True
-                        replay_failures.append(f"Replay step {step_index} was not a valid object.")
-                        break
-                    step_result = _run_replay_step(
-                        repo_root=repo_root,
-                        sandbox_root=sandbox_root,
-                        run_id=run_id,
-                        capsule_id=capsule,
-                        step_index=step_index,
-                        step=raw_step,
-                        timeout_seconds=timeout_seconds if isinstance(timeout_seconds, int) and timeout_seconds > 0 else None,
-                        max_retries=max_retries,
-                    )
-                    replay_steps.append(step_result)
-                    replay_result["replay_steps"] = replay_steps
-                    recovery = step_result.get("recovery")
-                    if isinstance(recovery, dict):
-                        recovery_records.append(recovery)
-                    replay_receipts.extend(_safe_object_list(step_result.get("receipt_pointers")))
-                    if str(step_result.get("status") or "") != "pass":
-                        replay_status = "failed"
-                        overall_failed = True
-                        replay_failures.extend(_safe_string_list(step_result.get("failures")))
-                        if str(step_result.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
-                            replay_error_code = str(step_result.get("code"))
-                        break
+                if replay_status == "success":
+                    for step_index, raw_step in enumerate(sandbox_steps):
+                        if not isinstance(raw_step, dict):
+                            replay_status = "failed"
+                            overall_failed = True
+                            replay_failures.append(f"Replay step {step_index} was not a valid object.")
+                            break
+                        step_result = _run_replay_step(
+                            repo_root=repo_root,
+                            sandbox_root=sandbox_root,
+                            run_id=run_id,
+                            capsule_id=capsule,
+                            step_index=step_index,
+                            step=raw_step,
+                            timeout_seconds=timeout_seconds if isinstance(timeout_seconds, int) and timeout_seconds > 0 else None,
+                            max_retries=max_retries,
+                        )
+                        replay_steps.append(step_result)
+                        replay_result["replay_steps"] = replay_steps
+                        recovery = step_result.get("recovery")
+                        if isinstance(recovery, dict):
+                            recovery_records.append(recovery)
+                        replay_receipts.extend(_safe_object_list(step_result.get("receipt_pointers")))
+                        if str(step_result.get("status") or "") != "pass":
+                            replay_status = "failed"
+                            overall_failed = True
+                            replay_failures.extend(_safe_string_list(step_result.get("failures")))
+                            if str(step_result.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
+                                replay_error_code = str(step_result.get("code"))
+                            break
 
                 oracle_checks: list[dict[str, object]] = []
-                sandbox_exec_root = os.path.join(repo_root, sandbox_root)
-                for oracle in _load_capsule_oracles(repo_root, capsule):
-                    check = _run_oracle_check(
-                        repo_root,
-                        capsule,
-                        oracle,
-                        materialized_paths,
-                        run_id,
-                        mode,
-                        policy=policy_payload,
-                        exec_root=sandbox_exec_root,
-                        trace_label="replay",
-                        timeout_seconds=timeout_seconds,
-                        max_retries=max_retries,
-                    )
-                    oracle_checks.append(check)
-                    recovery = check.get("recovery")
-                    if isinstance(recovery, dict):
-                        recovery_records.append(recovery)
-                    replay_receipts.extend(_safe_object_list(check.get("receipt_pointers")))
-                    if str(check.get("status") or "") not in {"pass", "skipped"}:
+                if replay_status == "success":
+                    selected_oracles = [
+                        oracle
+                        for oracle in capsule_oracles
+                        if str(oracle.get("name") or "").strip() in acceptance_oracle_names
+                    ]
+                    if not selected_oracles:
                         replay_status = "failed"
                         overall_failed = True
-                        replay_failures.append(
-                            f"Replay oracle {check.get('oracle_name', 'unknown-oracle')} finished with status {check.get('status', 'unknown')}."
-                        )
-                        if str(check.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
-                            replay_error_code = str(check.get("code"))
-                replay_result["oracle_results"] = oracle_checks
+                        replay_failures.append("Replay plan did not bind any executable acceptance oracles.")
+                    else:
+                        sandbox_exec_root = os.path.join(repo_root, sandbox_root)
+                        for oracle in selected_oracles:
+                            check = _run_oracle_check(
+                                repo_root,
+                                capsule,
+                                oracle,
+                                materialized_paths,
+                                run_id,
+                                mode,
+                                policy=policy_payload,
+                                exec_root=sandbox_exec_root,
+                                trace_label="replay",
+                                timeout_seconds=timeout_seconds,
+                                max_retries=max_retries,
+                            )
+                            oracle_checks.append(check)
+                            recovery = check.get("recovery")
+                            if isinstance(recovery, dict):
+                                recovery_records.append(recovery)
+                            replay_receipts.extend(_safe_object_list(check.get("receipt_pointers")))
+                            if str(check.get("status") or "") not in {"pass", "skipped"}:
+                                replay_status = "failed"
+                                overall_failed = True
+                                replay_failures.append(
+                                    f"Replay oracle {check.get('oracle_name', 'unknown-oracle')} finished with status {check.get('status', 'unknown')}."
+                                )
+                                if str(check.get("code") or "") in {TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE}:
+                                    replay_error_code = str(check.get("code"))
+                    replay_result["oracle_results"] = oracle_checks
 
-                baseline_hash = _collect_replay_equivalence_baseline(repo_root, capsule)
-                observed_hash = _compute_oracle_observed_hash(oracle_checks)
-                plan_hash = _compute_replay_observed_hash(replay_steps)
-                equivalence = {
-                    "baseline_hash": baseline_hash,
-                    "observed_hash": observed_hash,
-                    "oracle_digest": observed_hash,
-                    "plan_digest": plan_hash,
-                    "match": baseline_hash is None or baseline_hash == observed_hash,
-                    "materialized_path_count": len(materialized_paths),
-                    "trace_count": len(replay_steps),
-                    "oracle_count": len(oracle_checks),
-                }
-                replay_result["equivalence"] = equivalence
-                if baseline_hash is not None and not equivalence["match"]:
-                    replay_status = "failed"
-                    overall_failed = True
-                    replay_failures.append("Replay output did not match baseline equivalence hash.")
+                if replay_status == "success":
+                    baseline_hash = _collect_replay_equivalence_baseline(repo_root, capsule)
+                    observed_hash = _compute_oracle_observed_hash(oracle_checks)
+                    plan_hash = _compute_replay_observed_hash(replay_steps)
+                    equivalence = {
+                        "baseline_hash": baseline_hash,
+                        "observed_hash": observed_hash,
+                        "oracle_digest": observed_hash,
+                        "plan_digest": plan_hash,
+                        "match": baseline_hash is None or baseline_hash == observed_hash,
+                        "materialized_path_count": len(materialized_paths),
+                        "trace_count": len(replay_steps),
+                        "oracle_count": len(oracle_checks),
+                    }
+                    replay_result["equivalence"] = equivalence
+                    if baseline_hash is not None and not equivalence["match"]:
+                        replay_status = "failed"
+                        overall_failed = True
+                        replay_failures.append("Replay output did not match baseline equivalence hash.")
 
         replay_result["status"] = replay_status
         replay_result["failures"] = replay_failures
@@ -14355,6 +14838,10 @@ def _run_replay_stage(
                 "adapter_profile": profile,
                 "source_ref": "HEAD",
                 "sandbox_root": sandbox_root,
+                "capsule_scope": replay_result.get("capsule_scope"),
+                "material_inputs": replay_result.get("material_inputs"),
+                "acceptance_checks": replay_result.get("acceptance_checks"),
+                "equivalence_inputs": replay_result.get("equivalence_inputs"),
                 "changed_materials": scope_materials,
                 "materialized_paths": materialized_paths,
                 "oracle_results": replay_result.get("oracle_results"),

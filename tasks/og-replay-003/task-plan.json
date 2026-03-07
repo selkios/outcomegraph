@@ -1,0 +1,50 @@
+{
+  "task_id": "OG-REPLAY-003",
+  "title": "Tighten replay as a real regeneration proof path",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "RUNBOOKS.md",
+    "og.py",
+    "prompts/workers/manifest.json",
+    "prompts/workers/replay-v1.txt",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-prompt-002/TASK.md",
+    "tasks/og-prompt-002/task-plan.json"
+  ],
+  "write_files": [
+    "og.py",
+    "prompts/workers/manifest.json",
+    "prompts/workers/replay-v1.txt",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "SPEC-v2.md",
+    "RUNBOOKS.md",
+    "tasks/og-replay-003/TASK.md",
+    "tasks/og-replay-003/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Tighten replay plan normalization, validation, sandbox materialization, and acceptance-oracle execution so replay proves regeneration instead of shallow success",
+      "status": "done"
+    },
+    {
+      "step": "Version the replay prompt asset with explicit capsule scope, material input, acceptance check, and equivalence input requirements",
+      "status": "done"
+    },
+    {
+      "step": "Add replay proof-path regressions and update spec/runbook guidance to match the stricter contract",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m unittest -q tests.test_og_sync_verify_replay_hooks"
+  ]
+}

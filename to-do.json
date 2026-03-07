@@ -1943,8 +1943,8 @@
       "id": "OG-REPLAY-003",
       "title": "Tighten replay as a real regeneration proof path",
       "priority": 2,
-      "status": "todo",
-      "details": "Phase 6 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: externalize the replay prompt and strengthen replay plans so they prove capsule regeneration and equivalence more directly.",
+      "status": "done",
+      "details": "Phase 6 complete: replay plans now require capsule scope, scoped material inputs, executable acceptance checks, and explicit equivalence inputs; replay fails clearly when capsules lack regeneration-proof data; the replay prompt asset, docs, and regression tests were updated together.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 6 and move the replay prompt into the shared prompt asset system with the same provenance rules as distill",
         "Require replay plans to be capsule-scoped, materially executable in isolated environments, and explicit about acceptance checks and equivalence inputs",
@@ -1965,12 +1965,17 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
+        "prompts/workers/manifest.json",
+        "prompts/workers/replay-v1.txt",
         "tests/test_og_sync_verify_replay_hooks.py",
         "RUNBOOKS.md",
-        "SPEC-v2.md"
+        "SPEC-v2.md",
+        "tasks/og-replay-003/TASK.md",
+        "tasks/og-replay-003/task-plan.json",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T11:48:16Z"
     },
     {
       "id": "OG-EVAL-001",

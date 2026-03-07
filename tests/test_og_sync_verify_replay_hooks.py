@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import tomllib
 from contextlib import redirect_stdout
@@ -97,6 +98,136 @@ def _distill_update(capsule_id: str, changed_files: list[str], *, status: str = 
         "receipts": [],
         "changed_files": changed_files,
     }
+
+
+def _write_replayable_capsule_fixture(
+    repo: Path,
+    *,
+    capsule_id: str = "default",
+    source_path: str = "capsules/default.yaml",
+    oracle_command: str | None = "python -c \"print('ok')\"",
+    oracle_name: str | None = None,
+) -> dict[str, object]:
+    source_file = repo / source_path
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("kind: replay-fixture\n", encoding="utf-8")
+    digest = og._file_sha256(source_path, str(repo))
+    if digest is None:
+        raise AssertionError(f"expected digest for {source_path}")
+
+    material_input = {
+        "path": source_path,
+        "digest": digest,
+        "kind": "file",
+        "size": source_file.stat().st_size,
+    }
+    resolved_oracle_name = oracle_name or f"{capsule_id}-acceptance"
+    oracle_payload: dict[str, object] = {
+        "name": resolved_oracle_name,
+        "command": oracle_command,
+        "scope": [source_path],
+    }
+    if oracle_command is None:
+        oracle_payload["reason"] = "This fixture intentionally omits an executable replay oracle."
+
+    capsule_payload = {
+        "schema_version": 2,
+        "artifact_type": "capsule",
+        "id": capsule_id,
+        "status": "active",
+        "scope": [source_path],
+        "oracles": [oracle_payload],
+        "created_at": "2026-03-05T00:00:00Z",
+        "updated_at": "2026-03-05T00:00:00Z",
+    }
+
+    og_root = repo / og.OG_ROOT
+    (og_root / "capsules").mkdir(parents=True, exist_ok=True)
+    (og_root / "capsules" / f"{capsule_id}.json").write_text(
+        json.dumps(capsule_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    og_root.mkdir(parents=True, exist_ok=True)
+    (og_root / "materials.lock").write_text(
+        json.dumps(
+            og._build_materials_lock_payload(
+                "2026-03-05T00:00:00Z",
+                [material_input],
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    return {
+        "capsule_payload": capsule_payload,
+        "scope_materials": [material_input],
+        "oracles": [oracle_payload],
+        "source_path": source_path,
+        "digest": digest,
+    }
+
+
+def _build_replay_plan_fixture(
+    run_id: str,
+    fixture: dict[str, object],
+    *,
+    status: str = "ok",
+    steps: list[dict[str, object]] | None = None,
+    failures: list[str] | None = None,
+    message: str = "",
+    baseline_hash: str | None = None,
+    prompt_provenance: dict[str, object] | None = None,
+) -> dict[str, object]:
+    scope_materials = [dict(item) for item in fixture["scope_materials"] if isinstance(item, dict)]
+    oracle_payload = next(iter([item for item in fixture["oracles"] if isinstance(item, dict)]), {})
+    oracle_name = str(oracle_payload.get("name") or "").strip()
+    oracle_command = str(oracle_payload.get("command") or "").strip()
+    material_paths = [str(item.get("path") or "") for item in scope_materials if str(item.get("path") or "")]
+    acceptance_checks = []
+    if oracle_name and oracle_command:
+        acceptance_checks.append(
+            {
+                "name": oracle_name,
+                "oracle_name": oracle_name,
+                "command": oracle_command,
+                "expected_signal": "exit_code=0",
+                "reason": None,
+            }
+        )
+
+    plan = {
+        "schema_version": 2,
+        "interface_version": 1,
+        "run_id": run_id,
+        "capsule_id": str(fixture["capsule_payload"].get("id") or "default"),
+        "capsule_scope": list(fixture["capsule_payload"].get("scope") or []),
+        "material_inputs": scope_materials,
+        "steps": steps or [{"command": "echo ok", "cwd": ".", "expected_exit_code": 0, "timeout_s": None}],
+        "acceptance_checks": acceptance_checks,
+        "equivalence_inputs": {
+            "baseline_hash": baseline_hash,
+            "oracle_names": [oracle_name] if oracle_name and oracle_command else [],
+            "material_paths": material_paths,
+            "notes": ["Replay proof uses the recorded capsule oracle and scoped materials."],
+        },
+        "status": status,
+        "message": message,
+        "failures": failures or [],
+        "parity_results": {
+            "match": None,
+            "details": None,
+            "baseline_hash": baseline_hash,
+            "observed_hash": None,
+            "oracle_digest": None,
+            "trace_count": None,
+        },
+    }
+    if prompt_provenance is not None:
+        plan["prompt_provenance"] = prompt_provenance
+    return plan
 
 
 class TestDistillSnapshotSelection(_RepoTestCase):
@@ -216,6 +347,32 @@ class TestDistillSnapshotSelection(_RepoTestCase):
         self.assertIn(
             {"path": "tests/test_widget.py", "reason": "discovered from changed-file feature tokens"},
             targets[0]["related_test_hints"],
+        )
+
+    def test_build_distill_target_capsules_skips_nested_test_cache_support(self) -> None:
+        source_path = self.repo / "src" / "widget.py"
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text("def build_widget() -> str:\n    return 'ok'\n", encoding="utf-8")
+        test_path = self.repo / "tests" / "test_widget.py"
+        test_path.parent.mkdir(parents=True, exist_ok=True)
+        test_path.write_text(
+            "from src.widget import build_widget\n\n\ndef test_build_widget() -> None:\n    assert build_widget() == 'ok'\n",
+            encoding="utf-8",
+        )
+        pycache_path = self.repo / "tests" / "__pycache__" / "test_widget.cpython-314.pyc"
+        pycache_path.parent.mkdir(parents=True, exist_ok=True)
+        pycache_path.write_text("compiled", encoding="utf-8")
+
+        targets = og._build_distill_target_capsules(
+            str(self.repo),
+            ["widget"],
+            {"widget": ["src/widget.py"]},
+        )
+
+        self.assertNotIn("tests/__pycache__/test_widget.cpython-314.pyc", targets[0]["supporting_scope_paths"])
+        self.assertEqual(
+            targets[0]["related_test_hints"],
+            [{"path": "tests/test_widget.py", "reason": "discovered from changed-file feature tokens"}],
         )
 
     def test_build_distill_target_capsules_adds_existing_capsule_material_and_oracle_context(self) -> None:
@@ -2223,6 +2380,83 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(work_state["status"], "idle")
         self.assertEqual(work_state["last_message"], "sync finished (warn)")
 
+    def test_run_sync_job_apply_warn_only_keeps_overall_status_ok(self) -> None:
+        snapshot = {
+            "repository_head": "abc123",
+            "branch": "main",
+            "changed_files": ["capsules/default.yaml"],
+            "changed_count": 1,
+            "has_changes": True,
+            "profile": "analyze",
+            "mode": "observe",
+            "captured_at": "2026-03-04T00:00:00Z",
+        }
+        distill_result = {
+            "name": "distill",
+            "status": "ok",
+            "message": "distill ok",
+            "generated_deltas": [],
+            "affected_capsules": ["default"],
+        }
+        apply_result = {"name": "apply", "status": "warn", "message": "apply warned", "warnings": ["partial evidence"]}
+        verify_result = {
+            "name": "verify",
+            "status": "ok",
+            "message": "verify ok",
+            "verified_capsules": ["default"],
+            "failed_capsules": [],
+            "errors": [],
+            "warnings": [],
+            "oracle_results": {},
+            "receipt_pointers": {},
+            "certificate_refs": [],
+        }
+        export_result = {
+            "name": "export",
+            "status": "ok",
+            "message": "export ok",
+            "updated_exports": [],
+            "unchanged_exports": [],
+            "artifact_counts": {},
+            "artifact_total": 0,
+        }
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            with patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
+                og,
+                "_compute_idempotency_key",
+                return_value="sync-apply-warn-key",
+            ), patch.object(og, "_read_work_state", return_value={}), patch.object(
+                og,
+                "_consume_pending",
+                return_value=False,
+            ), patch.object(
+                og,
+                "_run_distill_stage",
+                return_value=distill_result,
+            ), patch.object(
+                og,
+                "_run_apply_stage",
+                return_value=apply_result,
+            ), patch.object(
+                og,
+                "_run_verify_stage",
+                return_value=verify_result,
+            ), patch.object(
+                og,
+                "_run_export_stage",
+                return_value=export_result,
+            ), patch.object(
+                og,
+                "_record_sync_summary_event",
+                return_value="events/sync-apply-warn.json",
+            ):
+                payload = og._run_sync_job(str(self.repo), {"changed": False, "profile": "analyze", "mode": "observe"})
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["message"], "sync workflow completed")
+
 
 class TestIntegrityValidation(_RepoTestCase):
     def _build_verified_events(self) -> None:
@@ -2493,9 +2727,10 @@ class TestVerifyWorkflows(_RepoTestCase):
 class TestReplayWorkflows(_RepoTestCase):
     def test_run_replay_step_rejects_prefix_based_cwd_escape(self) -> None:
         sandbox_root = f"{og.OG_ROOT}/work/replay/run-1/default"
-        observed: dict[str, str] = {}
+        observed: dict[str, object] = {}
 
-        def fake_subprocess_run(command, shell, cwd, capture_output, text, timeout):
+        def fake_subprocess_run(command, cwd, capture_output, text, timeout):
+            observed["command"] = command
             observed["cwd"] = cwd
             return subprocess.CompletedProcess(
                 args=command,
@@ -2520,20 +2755,49 @@ class TestReplayWorkflows(_RepoTestCase):
             )
 
         expected_cwd = str((self.repo / sandbox_root).resolve())
+        self.assertEqual(observed["command"], ["bash", "-lc", "echo ok"])
         self.assertEqual(observed["cwd"], expected_cwd)
         self.assertEqual(payload["status"], "pass")
         self.assertEqual(payload["resolved_cwd"], ".")
 
+    def test_run_replay_step_executes_with_bash_shell(self) -> None:
+        sandbox_root = f"{og.OG_ROOT}/work/replay/run-1/default"
+        observed: dict[str, object] = {}
+
+        def fake_subprocess_run(command, cwd, capture_output, text, timeout):
+            observed["command"] = command
+            observed["cwd"] = cwd
+            return subprocess.CompletedProcess(
+                args=command,
+                returncode=0,
+                stdout="ok\n",
+                stderr="",
+            )
+
+        step = {
+            "command": "set -euo pipefail\nprintf 'ok\\n'",
+            "cwd": ".",
+            "expected_exit_code": 0,
+        }
+        with patch.object(og.subprocess, "run", side_effect=fake_subprocess_run):
+            payload = og._run_replay_step(
+                repo_root=str(self.repo),
+                sandbox_root=sandbox_root,
+                run_id="run-1",
+                capsule_id="default",
+                step_index=0,
+                step=step,
+            )
+
+        expected_cwd = str((self.repo / sandbox_root).resolve())
+        self.assertEqual(observed["command"], ["bash", "-lc", step["command"]])
+        self.assertEqual(observed["cwd"], expected_cwd)
+        self.assertEqual(payload["status"], "pass")
+
     def test_run_replay_stage_defaults_to_default_capsule_when_no_targets(self) -> None:
         snapshot = {"changed_files": []}
-        replay_plan = {
-            "schema_version": 2,
-            "interface_version": 1,
-            "run_id": "run-1",
-            "capsule_id": "default",
-            "steps": [{"command": "echo ok"}],
-            "status": "ok",
-        }
+        fixture = _write_replayable_capsule_fixture(self.repo)
+        replay_plan = _build_replay_plan_fixture("run-1", fixture)
 
         with self.git_root_patch(), patch.object(
             og, "_collect_affected_capsules", return_value=[]
@@ -2566,20 +2830,15 @@ class TestReplayWorkflows(_RepoTestCase):
             "has_changes": True,
             "captured_at": "2026-03-05T00:00:00Z",
         }
-        replay_plan = {
-            "schema_version": 2,
-            "interface_version": 1,
-            "run_id": "run-replay-export",
-            "capsule_id": "default",
-            "steps": [{"command": "echo ok"}],
-            "status": "ok",
-            "parity_results": {"match": True},
-        }
+        fixture = _write_replayable_capsule_fixture(self.repo)
+
+        def build_replay_plan(role, payload, repo_root, trace_path, adapter=None, timeout_seconds=120):
+            return (_build_replay_plan_fixture(str(payload["run_id"]), fixture), [])
 
         with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
             og,
             "_run_codex_worker",
-            return_value=(replay_plan, []),
+            side_effect=build_replay_plan,
         ), patch.object(
             og,
             "_collect_changed_materials",
@@ -2621,6 +2880,37 @@ class TestReplayWorkflows(_RepoTestCase):
         self.assertEqual([step["name"] for step in payload["steps"]], ["replay"])
         self.assertFalse((self.repo / ".outcomegraph" / "export" / "AGENTS.md").exists())
         self.assertFalse((self.repo / "skills" / "outcome-steward" / "SKILL.md").exists())
+
+    def test_run_replay_stage_fails_clearly_when_capsule_lacks_executable_regeneration_inputs(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+        fixture = _write_replayable_capsule_fixture(self.repo, oracle_command=None)
+        replay_plan = _build_replay_plan_fixture("run-1", fixture)
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["default"]
+        ), patch.object(
+            og, "_collect_changed_materials", return_value=[]
+        ), patch.object(
+            og,
+            "_run_codex_worker",
+            return_value=(replay_plan, []),
+        ):
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "observe",
+                changed_only=True,
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["replay_results"][0]["status"], "failed")
+        self.assertIn(
+            "lacks executable acceptance oracles for regeneration proof",
+            " ".join(payload["replay_results"][0]["failures"]),
+        )
+        self.assertEqual(payload["certificate_ids"], [])
 
     def test_run_replay_stage_errors_on_adapter_interface_mismatch(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
@@ -2704,14 +2994,8 @@ class TestReplayWorkflows(_RepoTestCase):
 
     def test_run_replay_stage_retries_transient_worker_timeout(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
-        replay_plan = {
-            "schema_version": 2,
-            "interface_version": 1,
-            "run_id": "run-1",
-            "capsule_id": "default",
-            "steps": [{"command": "echo ok"}],
-            "status": "ok",
-        }
+        fixture = _write_replayable_capsule_fixture(self.repo)
+        replay_plan = _build_replay_plan_fixture("run-1", fixture)
 
         with self.git_root_patch(), patch.object(
             og, "_collect_affected_capsules", return_value=["default"]
@@ -2951,6 +3235,8 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertIn("unknowns", prompt)
         self.assertIn("do not write a file-by-file summary", prompt.lower())
         self.assertIn("command=null and provide a non-empty reason", prompt)
+        self.assertIn("prefer `uv run pytest -q <path>`", prompt)
+        self.assertIn("For doc, config, or runtime capsules, use status='success'", prompt)
         self.assertEqual(
             prompt,
             og._build_worker_prompt(
@@ -2963,6 +3249,60 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
                 },
             ),
         )
+
+    def test_worker_output_schemas_require_every_declared_property(self) -> None:
+        def assert_required_fields(schema: object, *, path: str) -> None:
+            if isinstance(schema, dict):
+                schema_type = schema.get("type")
+                allows_object = schema_type == "object" or (
+                    isinstance(schema_type, list) and "object" in schema_type
+                )
+                if allows_object:
+                    self.assertIs(
+                        schema.get("additionalProperties"),
+                        False,
+                        msg=f"{path} must set additionalProperties=false for strict worker schemas",
+                    )
+                    if isinstance(schema.get("properties"), dict):
+                        properties = schema["properties"]
+                        required = schema.get("required")
+                        self.assertIsInstance(required, list, msg=f"{path} missing required list")
+                        self.assertEqual(
+                            sorted(required),
+                            sorted(properties.keys()),
+                            msg=f"{path} properties must match required fields for strict worker schemas",
+                        )
+                for key, value in schema.items():
+                    assert_required_fields(value, path=f"{path}.{key}")
+                return
+            if isinstance(schema, list):
+                for index, value in enumerate(schema):
+                    assert_required_fields(value, path=f"{path}[{index}]")
+
+        for role in ("distill", "replay"):
+            assert_required_fields(og._build_worker_output_schema(role), path=role)
+
+    def test_build_worker_prompt_replay_mentions_regeneration_contract_fields(self) -> None:
+        fixture = _write_replayable_capsule_fixture(self.repo)
+        prompt = og._build_worker_prompt(
+            "replay",
+            og._build_replay_input(
+                run_id="run-1",
+                profile="analyze",
+                mode="observe",
+                capsule_id="default",
+                changed_materials=[dict(item) for item in fixture["scope_materials"] if isinstance(item, dict)],
+                capsule_payload=dict(fixture["capsule_payload"]),
+                scope_materials=[dict(item) for item in fixture["scope_materials"] if isinstance(item, dict)],
+                baseline_equivalence={},
+            ),
+        )
+
+        self.assertIn("capsule_scope", prompt)
+        self.assertIn("material_inputs", prompt)
+        self.assertIn("acceptance_checks", prompt)
+        self.assertIn("equivalence_inputs", prompt)
+        self.assertIn("status='pending'", prompt)
 
     def test_build_worker_prompt_fails_fast_when_prompt_asset_is_missing(self) -> None:
         prompt_dir = self.repo / "prompts" / "workers"
@@ -2997,7 +3337,10 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
             with self.assertRaises(og.WorkerAdapterError) as context:
                 og._build_worker_prompt("distill", {"schema_version": 2, "interface_version": 1, "run_id": "run-1"})
 
-        self.assertIn("worker-replay@1.0.0", str(context.exception))
+        self.assertIn(
+            f"worker-replay@{og.WORKER_PROMPT_BINDINGS['replay']['version']}",
+            str(context.exception),
+        )
         self.assertIn("is missing", str(context.exception))
 
     def test_build_worker_prompt_fails_fast_when_prompt_template_is_malformed(self) -> None:
@@ -3034,7 +3377,10 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
             with self.assertRaises(og.WorkerAdapterError) as context:
                 og._build_worker_prompt("distill", {"schema_version": 2, "interface_version": 1, "run_id": "run-1"})
 
-        self.assertIn("worker-replay@1.0.0", str(context.exception))
+        self.assertIn(
+            f"worker-replay@{og.WORKER_PROMPT_BINDINGS['replay']['version']}",
+            str(context.exception),
+        )
         self.assertIn("does not reference required variables", str(context.exception))
 
     def test_normalize_distill_delta_requires_oracle_reason_when_command_missing(self) -> None:
@@ -3108,6 +3454,28 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         trace_result = json.loads((self.repo / "trace-result.json").read_text(encoding="utf-8"))
         self.assertEqual(trace_result["prompt_provenance"], expected_prompt_provenance)
         self.assertEqual(trace_result["output"]["run_id"], "run-2")
+
+    def test_build_worker_command_variants_honors_model_override_env(self) -> None:
+        with patch.dict(os.environ, {og.WORKER_MODEL_OVERRIDE_ENV: "gpt-5.4"}, clear=False):
+            command = og._build_worker_command_variants("codex://v1", "schema.json", "last.json")[0]
+
+        self.assertEqual(
+            command,
+            [
+                "codex",
+                "exec",
+                "--json",
+                "--sandbox",
+                "read-only",
+                "--model",
+                "gpt-5.4",
+                "--output-schema",
+                "schema.json",
+                "--output-last-message",
+                "last.json",
+                "-",
+            ],
+        )
 
     def test_collect_policy_checks_flags_schema_errors(self) -> None:
         (self.repo / ".outcomegraph").mkdir()
@@ -3884,19 +4252,16 @@ class TestSpecComplianceGates(_RepoTestCase):
         }
         with self.git_root_patch():
             snapshot = {"changed_files": ["capsules/default.yaml"]}
+            fixture = _write_replayable_capsule_fixture(self.repo)
             receipts = [
                 {"schema_version": 2, "type": "file", "target": ".outcomegraph/traces/replay-run.json"},
             ]
-            replay_plan = {
-                "schema_version": 2,
-                "interface_version": 1,
-                "run_id": "run-replay-gates",
-                "capsule_id": "default",
-                "steps": [{"command": "echo ok"}],
-                "status": "ok",
-                "parity_results": {"match": True, "details": "equivalence output checksum identical"},
-                "prompt_provenance": prompt_provenance,
-            }
+            replay_plan = _build_replay_plan_fixture(
+                "run-1",
+                fixture,
+                prompt_provenance=prompt_provenance,
+            )
+            replay_plan["parity_results"]["details"] = "equivalence output checksum identical"
 
             with patch.object(
                 og, "_collect_affected_capsules", return_value=["default"]
@@ -3933,6 +4298,14 @@ class TestSpecComplianceGates(_RepoTestCase):
         self.assertEqual(certificate_payload["prompt_provenance"], prompt_provenance)
         self.assertIn("equivalence", certificate_payload["replay_context"])
         self.assertEqual(
+            certificate_payload["replay_context"]["acceptance_checks"],
+            replay_result["acceptance_checks"],
+        )
+        self.assertEqual(
+            certificate_payload["replay_context"]["equivalence_inputs"],
+            replay_result["equivalence_inputs"],
+        )
+        self.assertEqual(
             certificate_payload["replay_context"]["equivalence"],
             result_equivalence,
         )
@@ -3948,6 +4321,7 @@ class TestSpecComplianceGates(_RepoTestCase):
     def test_run_replay_stage_skips_certificate_on_equivalence_mismatch(self) -> None:
         with self.git_root_patch():
             snapshot = {"changed_files": ["capsules/default.yaml"]}
+            fixture = _write_replayable_capsule_fixture(self.repo)
             baseline_claim_payload = og._build_claim_payload(
                 "cl-default-replay-baseline",
                 "default",
@@ -3993,14 +4367,11 @@ class TestSpecComplianceGates(_RepoTestCase):
                 baseline_certificate,
             )
 
-            replay_plan = {
-                "schema_version": 2,
-                "interface_version": 1,
-                "run_id": "run-replay-gates",
-                "capsule_id": "default",
-                "steps": [{"command": "echo ok"}],
-                "status": "ok",
-            }
+            replay_plan = _build_replay_plan_fixture(
+                "run-mismatch",
+                fixture,
+                baseline_hash="sha256:baseline-equivalence-hash",
+            )
 
             with patch.object(
                 og, "_collect_affected_capsules", return_value=["default"]
