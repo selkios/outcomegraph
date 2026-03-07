@@ -209,6 +209,7 @@ Machine introspection is supported:
 
 - `og schema` emits all supported command signatures, request fields, response envelope shape, and known error codes in machine-readable form.
 - `og describe <command>` emits the signature for one command, including nested command names like `daemon status`.
+- The same command-signature registry drives `og --help`, `og schema`, `og describe`, and MCP `tools[]` descriptors so CLI and MCP surfaces cannot drift independently.
 - `og doctor` emits structured diagnostics and remediation hints for runtime, integrity, drift, export control surfaces, and daemon state.
 
 `og optimize prompts` accepts:

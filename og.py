@@ -359,41 +359,8 @@ SYNC_GENERATED_IGNORE_PATHS = (
     f"{OG_ROOT}/materials.lock",
     OUTCOME_GITIGNORE,
 )
-MCP_CONTROL_TOOL_DEFS = (
-    {
-        "uri": "outcomegraph://tools/sync",
-        "name": "sync",
-        "description": "Run autonomous reconcile pipeline.",
-        "category": "tool",
-    },
-    {
-        "uri": "outcomegraph://tools/verify",
-        "name": "verify",
-        "description": "Run fast verification on impacted capsules.",
-        "category": "tool",
-    },
-    {
-        "uri": "outcomegraph://tools/replay",
-        "name": "replay",
-        "description": "Run replay checks against canonical artifacts.",
-        "category": "tool",
-    },
-    {
-        "uri": "outcomegraph://tools/explain",
-        "name": "explain",
-        "description": "Explain claims and provenance pointers.",
-        "category": "tool",
-    },
-    {
-        "uri": "outcomegraph://tools/status",
-        "name": "status",
-        "description": "Read runtime and freshness summary.",
-        "category": "tool",
-    },
-)
 MCP_CONTROL_RESOURCES = ("capsules", "refs", "constitution", "certificates")
 MCP_CONTROL_PROMPTS = ("bootstrap", "replay", "repair")
-MCP_CONTROL_TOOL_NAMES = tuple(item["name"] for item in MCP_CONTROL_TOOL_DEFS)
 MCP_CONTROL_RESOURCE_NAMES = tuple(MCP_CONTROL_RESOURCES)
 MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
 CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
@@ -1227,25 +1194,11 @@ def _current_typer_command_context() -> _TyperCommandContext:
 
 
 def emit_usage() -> str:
+    core_commands = "\n".join(f"  {_command_overview_usage(entry)}" for entry in _CLI_COMMAND_SIGNATURES if " " not in str(entry.get("command", "")))
     return f"""Usage: og [--json] [--strict] [--non-interactive] [--profile analyze|propose|apply] [--mode observe|autonomous] <command>
 
 Core commands:
-  og init
-  og sync
-  og verify [--changed]
-  og replay [--changed]
-  og status
-  og doctor
-  og export
-  og clean [--scope runtime|generated|all] [--dry-run] [--yes]
-  og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]]
-  og schema
-  og describe <command>
-  og drift
-  og mcp-server
-  og optimize prompts
-  og autopilot init|disable
-  og daemon install|start|stop|status|run
+{core_commands}
 
 Use: og <command> --help for command-specific contracts.
 Defaults: CLI flags override {DEFAULT_OUTPUT_ENV}, {DEFAULT_PROFILE_ENV}, and {DEFAULT_MODE_ENV}; env defaults override {CONFIG_FILE_ENV}; worker state can use {CODEX_HOME_OVERRIDE_ENV} or {CODEX_HOME_ENV}.
@@ -1278,6 +1231,11 @@ def _command_help(usage: str, summary: str, options: list[str], examples: list[s
             options = [*options, "--strict[=true|false]"]
         else:
             options.append("--strict[=true|false]")
+    if not any(option.startswith("--non-interactive") for option in options):
+        if options == ["none"]:
+            options = [*options, "--non-interactive[=true|false]"]
+        else:
+            options.append("--non-interactive[=true|false]")
 
     lines = [f"Usage: {usage}", "", summary, "", "Accepted options:"]
     if options:
@@ -1295,285 +1253,102 @@ def _command_help(usage: str, summary: str, options: list[str], examples: list[s
     return "\n".join(lines)
 
 
+_COMMAND_FIELD_PLACEHOLDERS: dict[str, str] = {
+    "--baseline": "<path>",
+    "--candidate": "<path>",
+    "--capsule": "<id>[,<id>...]",
+    "--certificate": "<id>[,<id>...]",
+    "--dataset": "<path>",
+    "--fields": "<field>[,<field>...]",
+    "--limit": "<n>",
+    "--max-retries": "<n>",
+    "--min-improvement": "<float>",
+    "--offset": "<n>",
+    "--params": "<json-file|->",
+    "--ref": "<id>[,<id>...]",
+    "--session-id": "<id>",
+    "--timeout": "<seconds>",
+}
+
+
+def _command_overview_usage(signature: dict[str, object]) -> str:
+    command = str(signature.get("command") or "").strip()
+    if not command:
+        return "og <unknown>"
+    subcommands = [str(item) for item in signature.get("subcommands", []) if isinstance(item, str) and item.strip()]
+    request = signature.get("request") if isinstance(signature.get("request"), dict) else {}
+    request_fields = request.get("fields") if isinstance(request.get("fields"), list) else []
+    has_positional_required = any(
+        isinstance(field, dict)
+        and not str(field.get("name") or "").startswith("--")
+        and field.get("required") is True
+        for field in request_fields
+    )
+    if subcommands:
+        joined = "|".join(subcommands)
+        return f"og {command} {joined}"
+    if has_positional_required:
+        return str(signature.get("usage") or f"og {command}")
+    return f"og {command}"
+
+
+def _command_field_syntax(field: dict[str, object]) -> str:
+    name = str(field.get("name") or "").strip()
+    if not name:
+        return "<unknown>"
+    if not name.startswith("--"):
+        return f"<{name}>"
+    if name in _COMMAND_FIELD_PLACEHOLDERS:
+        return f"{name} {_COMMAND_FIELD_PLACEHOLDERS[name]}"
+
+    enum = field.get("enum")
+    if isinstance(enum, list):
+        enum_values = [str(item) for item in enum if str(item).strip()]
+        if enum_values:
+            return f"{name} {'|'.join(enum_values)}"
+
+    field_type = str(field.get("type") or "").strip()
+    if field_type == "boolean":
+        return name if name == "--json" else f"{name}[=true|false]"
+    if field_type == "array":
+        return f"{name} <value>[,<value>...]"
+    if field_type == "integer":
+        return f"{name} <int>"
+    if field_type == "number":
+        return f"{name} <number>"
+    if field_type == "string":
+        return f"{name} <value>"
+    return name
+
+
+def _command_help_from_signature(signature: dict[str, object]) -> str:
+    usage = str(signature.get("usage") or f"og {signature.get('command') or 'unknown'}")
+    summary = str(signature.get("summary") or "").strip()
+    request = signature.get("request") if isinstance(signature.get("request"), dict) else {}
+    request_fields = request.get("fields") if isinstance(request.get("fields"), list) else []
+    subcommands = [str(item) for item in signature.get("subcommands", []) if isinstance(item, str) and item.strip()]
+    examples = [str(item) for item in signature.get("examples", []) if isinstance(item, str) and item.strip()]
+    notes = [str(item) for item in signature.get("notes", []) if isinstance(item, str) and item.strip()]
+
+    options: list[str] = []
+    if subcommands:
+        options.append("subcommand: " + " | ".join(subcommands))
+    options.extend(
+        _command_field_syntax(cast(dict[str, object], field))
+        for field in request_fields
+        if isinstance(field, dict)
+    )
+    if not options:
+        options = ["none"]
+    return _command_help(usage, summary, options, examples, notes)
+
+
 def _help_for_command(command: str) -> str:
-    normalized = " ".join(command.split())
-    if normalized == "init":
-        return _command_help(
-            "og init",
-            "Initialize .outcomegraph state and default policy files.",
-            ["--json"],
-            ["og init"],
-        )
-    if normalized == "sync":
-        return _command_help(
-            "og sync [--profile analyze|propose|apply] [--mode observe|autonomous] [--force-full-sync[=true|false]] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
-            "Collect changes, distill/categorize them, apply artifacts, verify, and export outputs.",
-            [
-                "--json",
-                "--profile analyze|propose|apply",
-                "--mode observe|autonomous",
-                "--force-full-sync[=true|false]",
-                "--validate[=true|false]",
-                "--dry-run[=true|false]",
-                "--max-retries <n>",
-                "--timeout <seconds>",
-            ],
-            [
-                "og sync",
-                "og sync --profile propose --mode autonomous",
-                "og sync --force-full-sync=true",
-                "og sync --validate --json",
-                "og sync --dry-run --timeout 180 --max-retries 1",
-            ],
-        )
-    if normalized == "verify":
-        return _command_help(
-            "og verify [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
-            "Run verification for known or changed capsules and emit verification artifacts.",
-            [
-                "--json",
-                "--output json|jsonl|human",
-                "--fields <field>[,<field>...]",
-                "--limit <n>",
-                "--offset <n>",
-                "--changed[=true|false]",
-                "--profile analyze|propose|apply",
-                "--mode observe|autonomous",
-                "--validate[=true|false]",
-                "--dry-run[=true|false]",
-                "--max-retries <n>",
-                "--timeout <seconds>",
-            ],
-            [
-                "og verify",
-                "og verify --changed",
-                "og verify --changed=false --json",
-                "og verify --validate --json",
-            ],
-        )
-    if normalized == "replay":
-        return _command_help(
-            "og replay [--changed] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>] [--validate[=true|false]] [--dry-run[=true|false]] [--max-retries <n>] [--timeout <seconds>]",
-            "Replay changed artifacts in isolated worktrees to regenerate replay receipts.",
-            [
-                "--json",
-                "--output json|jsonl|human",
-                "--fields <field>[,<field>...]",
-                "--limit <n>",
-                "--offset <n>",
-                "--changed[=true|false]",
-                "--profile analyze|propose|apply",
-                "--mode observe|autonomous",
-                "--validate[=true|false]",
-                "--dry-run[=true|false]",
-                "--max-retries <n>",
-                "--timeout <seconds>",
-            ],
-            [
-                "og replay",
-                "og replay --changed",
-                "og replay --json",
-                "og replay --dry-run --timeout 180",
-            ],
-        )
-    if normalized == "status":
-        return _command_help(
-            "og status",
-            "Show freshness, lock, verification, and daemon/autopilot state.",
-            ["--json"],
-            ["og status", "og status --json"],
-        )
-    if normalized == "doctor":
-        return _command_help(
-            "og doctor",
-            "Run machine-readable diagnostics with remediation hints for policy, integrity, exports, and runtime health.",
-            ["--json"],
-            ["og doctor", "og doctor --json"],
-        )
-    if normalized == "export":
-        return _command_help(
-            "og export [--validate[=true|false]] [--dry-run[=true|false]]",
-            "Render configured export surfaces from canonical artifacts.",
-            [
-                "--json",
-                "--validate[=true|false]",
-                "--dry-run[=true|false]",
-            ],
-            ["og export", "og export --json", "og export --dry-run --json"],
-        )
-    if normalized == "clean":
-        return _command_help(
-            "og clean [--scope runtime|generated|all] [--dry-run[=true|false]] [--yes]",
-            "Remove runtime and/or generated outcomegraph state.",
-            [
-                "--scope runtime|generated|all",
-                "--dry-run[=true|false]",
-                "--yes[=true|false]",
-                "--json",
-            ],
-            [
-                "og clean --scope runtime",
-                "og clean --scope all --dry-run",
-                "og clean --scope generated --yes",
-            ],
-        )
-    if normalized == "explain":
-        return _command_help(
-            "og explain [--capsule <id>[,<id>...]] [--ref <id>[,<id>...]] [--certificate <id>[,<id>...]] [--profile analyze|propose|apply] [--mode observe|autonomous] [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
-            "Explain artifact provenance and proof chain for selected capsules, refs, and certificates.",
-            [
-                "--json",
-                "--output json|jsonl|human",
-                "--fields <field>[,<field>...]",
-                "--limit <n>",
-                "--offset <n>",
-                "--capsule <id>[,<id>...]",
-                "--ref <id>[,<id>...]",
-                "--certificate <id>[,<id>...]",
-                "--profile analyze|propose|apply",
-                "--mode observe|autonomous",
-            ],
-            [
-                "og explain",
-                "og explain --capsule default",
-                "og explain --json --capsule default --ref ref-1",
-            ],
-        )
-    if normalized == "drift":
-        return _command_help(
-            "og drift",
-            "Run canonical drift checks for policy and certificate health.",
-            ["--json"],
-            ["og drift", "og drift --json"],
-        )
-    if normalized == "mcp-server":
-        return _command_help(
-            "og mcp-server [--output json|jsonl|human] [--fields <field>[,<field>...]] [--limit <n>] [--offset <n>]",
-            "Render MCP server control surface definitions (tools/resources/prompts).",
-            [
-                "--json",
-                "--output json|jsonl|human",
-                "--fields <field>[,<field>...]",
-                "--limit <n>",
-                "--offset <n>",
-            ],
-            ["og mcp-server", "og mcp-server --json"],
-        )
-    if normalized == "optimize":
-        return _command_help(
-            "og optimize",
-            "Command group for optimization workflows.",
-            ["subcommand: prompts"],
-            ["og optimize --help", "og optimize prompts --help"],
-            ["subcommand aliases are currently not supported"],
-        )
-    if normalized == "optimize prompts":
-        return _command_help(
-            "og optimize prompts --dataset <path> --candidate <path> --baseline <path> [--metric contains|exact] [--min-improvement <float>] [--approve[=true|false]] [--params <json-file|->]",
-            "Run dataset-based prompt optimization and optionally activate a candidate when it passes thresholds.",
-            [
-                "--dataset <path>",
-                "--candidate <path>",
-                "--baseline <path>",
-                "--metric contains|exact",
-                "--min-improvement <float>",
-                "--approve[=true|false]",
-                "--params <json-file|->",
-                "--json",
-            ],
-            [
-                "og optimize prompts --dataset .outcomegraph/datasets/bugfix.json --candidate next.txt --baseline base.txt",
-                "og optimize prompts --dataset ds.json --candidate next.txt --baseline base.txt --approve",
-                "cat payload.json | og optimize prompts --params -",
-            ],
-        )
-    if normalized == "autopilot":
-        return _command_help(
-            "og autopilot",
-            "Command group for hook bootstrap/teardown.",
-            ["subcommand: init | disable"],
-            ["og autopilot --help", "og autopilot init --help", "og autopilot disable --help"],
-        )
-    if normalized == "autopilot init":
-        return _command_help(
-            "og autopilot init [--force-hooks-path[=true|false]] [--yes]",
-            "Install outcomegraph-managed git hooks for lifecycle integration.",
-            [
-                "--force-hooks-path[=true|false]",
-                "--yes[=true|false]",
-                "--json",
-            ],
-            ["og autopilot init", "og autopilot init --force-hooks-path --yes --json"],
-        )
-    if normalized == "autopilot disable":
-        return _command_help(
-            "og autopilot disable [--session-id <id>]",
-            "Remove outcomegraph-managed hooks and restore prior hook state where available.",
-            ["--session-id <id>", "--json"],
-            ["og autopilot disable", "og autopilot disable --session-id autopilot-20260307t000000z-abcdef1234 --json"],
-            ["`autopilot init` emits a resumable session_id that can be asserted on disable."],
-        )
-    if normalized == "daemon":
-        return _command_help(
-            "og daemon",
-            "Command group for watcher lifecycle.",
-            ["subcommand: install | start | stop | status | run"],
-            ["og daemon --help", "og daemon status --help", "og daemon install --help", "og daemon run --help"],
-        )
-    if normalized == "daemon install":
-        return _command_help(
-            "og daemon install",
-            "Install the long-running watcher wrapper under .outcomegraph/work/daemon.",
-            ["--json"],
-            ["og daemon install", "og daemon install --json"],
-        )
-    if normalized == "daemon start":
-        return _command_help(
-            "og daemon start [--session-id <id>]",
-            "Start the managed watcher process and persist runtime status.",
-            ["--session-id <id>", "--json"],
-            ["og daemon start", "og daemon start --session-id daemon-20260307t000000z-abcdef1234 --json"],
-            ["`daemon install` and `daemon status` emit a resumable daemon session_id."],
-        )
-    if normalized == "daemon stop":
-        return _command_help(
-            "og daemon stop [--session-id <id>]",
-            "Stop the managed watcher process.",
-            ["--session-id <id>", "--json"],
-            ["og daemon stop", "og daemon stop --session-id daemon-20260307t000000z-abcdef1234 --json"],
-        )
-    if normalized == "daemon status":
-        return _command_help(
-            "og daemon status [--session-id <id>]",
-            "Read watcher install/runtime and last-sync status.",
-            ["--session-id <id>", "--json"],
-            ["og daemon status", "og daemon status --session-id daemon-20260307t000000z-abcdef1234 --json"],
-        )
-    if normalized == "daemon run":
-        return _command_help(
-            "og daemon run",
-            "Internal run loop entrypoint. This command is used by the installed watcher wrapper.",
-            ["none"],
-            ["og daemon run"],
-            [
-                "This command blocks while polling repository changes; no JSON payload is emitted.",
-            ],
-        )
-    if normalized == "schema":
-        return _command_help(
-            "og schema",
-            "Emit machine-readable command signatures and request/response schemas.",
-            ["--json"],
-            ["og schema", "og schema --json"],
-        )
-    if normalized == "describe":
-        return _command_help(
-            "og describe <command>",
-            "Describe the request/response signature for a known CLI command.",
-            ["--json"],
-            ["og describe sync", "og describe daemon status"],
-        )
-    return emit_usage() + "\nUse --help with a recognized command for details."
+    normalized = _normalize_command_signature_target(command)
+    signature = _CLI_COMMAND_SIGNATURE_BY_NAME.get(normalized)
+    if not signature:
+        return emit_usage() + "\nUse --help with a recognized command for details."
+    return _command_help_from_signature(signature)
 
 
 def _render_command_schema_field(field: dict[str, object]) -> str:
@@ -1708,6 +1483,9 @@ def _command_signature_entry(
     *,
     examples: list[str] | None = None,
     subcommands: list[str] | None = None,
+    notes: list[str] | None = None,
+    mcp_tool: bool = False,
+    mcp_uri: str | None = None,
 ) -> dict[str, object]:
     response_schema = {
         "envelope_schema_version": COMMAND_RESULT_SCHEMA_VERSION,
@@ -1748,6 +1526,11 @@ def _command_signature_entry(
     }
     if subcommands:
         signature["subcommands"] = subcommands
+    if notes:
+        signature["notes"] = notes
+    if mcp_tool:
+        signature["mcp_tool"] = True
+        signature["mcp_uri"] = mcp_uri or f"outcomegraph://tools/{command.replace(' ', '-')}"
     return signature
 
 
@@ -1818,6 +1601,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 RECOVERY_RETRY_EXHAUSTED_CODE,
             ],
             examples=["og sync", "og sync --profile propose", "og sync --force-full-sync", "og sync --validate --json"],
+            mcp_tool=True,
+            mcp_uri="outcomegraph://tools/sync",
         ),
         _command_signature_entry(
             "verify",
@@ -1853,6 +1638,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, TIMEOUT_EXPIRED_CODE, RECOVERY_RETRY_EXHAUSTED_CODE],
             examples=["og verify --changed", "og verify --json", "og verify --validate --json"],
+            mcp_tool=True,
+            mcp_uri="outcomegraph://tools/verify",
         ),
         _command_signature_entry(
             "replay",
@@ -1896,6 +1683,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 RECOVERY_RETRY_EXHAUSTED_CODE,
             ],
             examples=["og replay --changed", "og replay --json", "og replay --dry-run --json"],
+            mcp_tool=True,
+            mcp_uri="outcomegraph://tools/replay",
         ),
         _command_signature_entry(
             "status",
@@ -1909,6 +1698,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og status", "og status --json"],
+            mcp_tool=True,
+            mcp_uri="outcomegraph://tools/status",
         ),
         _command_signature_entry(
             "doctor",
@@ -1993,6 +1784,8 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             examples=["og explain --capsule default", "og explain --json --certificate cert-1"],
+            mcp_tool=True,
+            mcp_uri="outcomegraph://tools/explain",
         ),
         _command_signature_entry(
             "drift",
@@ -2030,6 +1823,9 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("tools", "array", "Discovered MCP tools."),
                 _command_schema_field("resources", "array", "Discovered MCP resources."),
+                _command_schema_field("prompts", "array", "Discovered MCP prompts."),
+                _command_schema_field("artifact_counts", "object", "Canonical artifact counts for exported MCP resources."),
+                _command_schema_field("generated_at", "string", "Snapshot generation timestamp when available."),
                 _command_schema_field("list_window", "object", "Pagination metadata for emitted list fields."),
             ],
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE, CONTROL_SURFACE_MISMATCH_CODE],
@@ -2047,6 +1843,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             [USAGE_ERROR_CODE, RUNTIME_ERROR_CODE],
             subcommands=["prompts"],
             examples=["og optimize", "og optimize --help"],
+            notes=["subcommand aliases are currently not supported"],
         ),
         _command_signature_entry(
             "optimize prompts",
@@ -2129,6 +1926,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, POLICY_DENIED_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
             examples=["og autopilot disable", "og autopilot disable --session-id autopilot-20260307t000000z-abcdef1234 --json"],
+            notes=["`autopilot init` emits a resumable session_id that can be asserted on disable."],
         ),
         _command_signature_entry(
             "daemon",
@@ -2174,6 +1972,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
             examples=["og daemon start", "og daemon start --session-id daemon-20260307t000000z-abcdef1234 --json"],
+            notes=["`daemon install` and `daemon status` emit a resumable daemon session_id."],
         ),
         _command_signature_entry(
             "daemon stop",
@@ -2224,6 +2023,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             ],
             [USAGE_ERROR_CODE, SESSION_CONTENDED_CODE, RUNTIME_ERROR_CODE],
             examples=["og daemon run"],
+            notes=["This command blocks while polling repository changes; no JSON payload is emitted."],
         ),
         _command_signature_entry(
             "schema",
@@ -2267,6 +2067,37 @@ _CLI_COMMAND_SIGNATURE_BY_NAME = {entry["command"]: entry for entry in _CLI_COMM
 
 def _normalize_command_signature_target(raw_target: str) -> str:
     return " ".join(raw_target.split())
+
+
+def _command_subcommands(command: str) -> list[str]:
+    signature = _CLI_COMMAND_SIGNATURE_BY_NAME.get(_normalize_command_signature_target(command))
+    if not isinstance(signature, dict):
+        return []
+    return [str(item) for item in signature.get("subcommands", []) if isinstance(item, str) and item.strip()]
+
+
+def _command_subcommands_text(command: str) -> str:
+    subcommands = _command_subcommands(command)
+    return ", ".join(subcommands)
+
+
+def _mcp_command_signatures() -> list[dict[str, object]]:
+    return [entry for entry in _CLI_COMMAND_SIGNATURES if entry.get("mcp_tool") is True]
+
+
+def _build_mcp_tool_definition(signature: dict[str, object]) -> dict[str, object]:
+    command = str(signature.get("command") or "").strip()
+    return {
+        "uri": str(signature.get("mcp_uri") or f"outcomegraph://tools/{command.replace(' ', '-')}"),
+        "name": command,
+        "description": str(signature.get("summary") or "").strip(),
+        "category": "tool",
+        "signature": signature,
+    }
+
+
+def _mcp_tool_definitions() -> list[dict[str, object]]:
+    return sorted((_build_mcp_tool_definition(signature) for signature in _mcp_command_signatures()), key=lambda item: str(item["name"]))
 
 
 
@@ -8067,39 +7898,10 @@ def _render_skill_export(snapshot: dict[str, object]) -> str:
 
 
 def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
+    tools = _mcp_tool_definitions()
     resources = [
-        {
-            "uri": "outcomegraph://tools/sync",
-            "name": "sync",
-            "description": "Run autonomous reconcile pipeline.",
-            "category": "tool",
-        },
-        {
-            "uri": "outcomegraph://tools/verify",
-            "name": "verify",
-            "description": "Run fast verification on impacted capsules.",
-            "category": "tool",
-        },
-        {
-            "uri": "outcomegraph://tools/replay",
-            "name": "replay",
-            "description": "Run replay checks against canonical artifacts.",
-            "category": "tool",
-        },
-        {
-            "uri": "outcomegraph://tools/explain",
-            "name": "explain",
-            "description": "Explain claims and provenance pointers.",
-            "category": "tool",
-        },
-        {
-            "uri": "outcomegraph://tools/status",
-            "name": "status",
-            "description": "Read runtime and freshness summary.",
-            "category": "tool",
-        },
-    ]
-    resources.extend(
+        *tools,
+        *(
         {
             "uri": f"outcomegraph://{scope}",
             "name": scope,
@@ -8108,13 +7910,14 @@ def _render_mcp_resource_export(snapshot: dict[str, object]) -> str:
             "paths": [record["path"] for record in snapshot["artifacts"] if record["path"].startswith(f"{OG_ROOT}/{scope}")],
         }
         for scope in sorted(snapshot["counts"]["by_scope"])
-    )
+        ),
+    ]
     payload = {
         "schema_version": 2,
         "artifact_type": "mcp_resource_export",
         "id": "mcp-export",
-        "tools": sorted(resources[:5], key=lambda item: item["name"]),
-        "resources": sorted(resources[5:], key=lambda item: item["uri"]),
+        "tools": tools,
+        "resources": sorted(resources[len(tools) :], key=lambda item: item["uri"]),
         "prompts": [
             "bootstrap",
             "replay",
@@ -8146,7 +7949,7 @@ def _build_mcp_server_payload(snapshot: dict[str, object], options: dict[str, ob
         for scope in MCP_CONTROL_RESOURCES
     ]
     controls = {
-        "tools": sorted(MCP_CONTROL_TOOL_DEFS, key=lambda item: item["name"]),
+        "tools": _mcp_tool_definitions(),
         "resources": resources,
         "prompts": list(MCP_CONTROL_PROMPTS),
     }
@@ -8179,11 +7982,12 @@ def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[st
         issues.append("`prompts` must be a list")
         prompts = []
 
+    expected_tools = {str(item["name"]): item for item in _mcp_tool_definitions()}
     tool_names = sorted({str(item.get("name")) for item in tools if isinstance(item, dict) and str(item.get("name"))})
     resource_names = sorted({str(item.get("name")) for item in resources if isinstance(item, dict) and str(item.get("name"))})
     prompt_values = sorted(str(value) for value in prompts if str(value))
 
-    expected_tool_names = sorted(MCP_CONTROL_TOOL_NAMES)
+    expected_tool_names = sorted(expected_tools)
     expected_resource_names = sorted(MCP_CONTROL_RESOURCE_NAMES)
     expected_prompt_names = sorted(MCP_CONTROL_PROMPT_NAMES)
     if tool_names != expected_tool_names:
@@ -8192,6 +7996,18 @@ def _validate_mcp_control_surface_payload(payload: dict[str, object]) -> list[st
         issues.append(f"`resources` does not match contract: expected {expected_resource_names}, observed {resource_names}")
     if prompt_values != expected_prompt_names:
         issues.append(f"`prompts` does not match contract: expected {expected_prompt_names}, observed {prompt_values}")
+
+    observed_tools = {
+        str(item.get("name")): item
+        for item in tools
+        if isinstance(item, dict) and str(item.get("name"))
+    }
+    for name, expected in expected_tools.items():
+        observed = observed_tools.get(name)
+        if observed is None:
+            continue
+        if observed != expected:
+            issues.append(f"`tools[{name}]` does not match the shared CLI contract signature")
 
     if str(payload.get("command")) != "mcp-server":
         issues.append("command field must be 'mcp-server'")
@@ -8246,9 +8062,13 @@ def _render_mcp_server(payload: dict[str, object]) -> str:
         name = item.get("name") or item.get("uri")
         uri = item.get("uri", "outcomegraph://tools/unknown")
         description = item.get("description", "")
+        signature = item.get("signature") if isinstance(item.get("signature"), dict) else {}
+        usage = str(signature.get("usage") or "").strip() if isinstance(signature, dict) else ""
         lines.append(f"- {name}: {uri}")
         if description:
             lines.append(f"  {description}")
+        if usage:
+            lines.append(f"  usage: {usage}")
 
     lines.append("")
     lines.append("resources:")
@@ -16925,6 +16745,7 @@ def run_command(
     strict: bool = False,
     non_interactive: bool = False,
 ) -> int:
+    command_runtime_defaults: dict[str, object] = {}
     try:
         command_runtime_defaults = _apply_output_json_override(_load_runtime_defaults(_maybe_git_root()), output_json_override)
     except ValueError as exc:
@@ -17293,11 +17114,11 @@ def run_command(
             )
             return EXIT_SUCCESS
         if not rest:
-            emit_error("missing optimize subcommand\n\nAvailable: prompts", "optimize", EXIT_USAGE, output_json)
+            emit_error(f"missing optimize subcommand\n\nAvailable: {_command_subcommands_text('optimize')}", "optimize", EXIT_USAGE, output_json)
         sub = rest[0]
         if sub != "prompts":
             emit_error(
-                f"unknown optimize subcommand '{sub}'\n\nAvailable: prompts",
+                f"unknown optimize subcommand '{sub}'\n\nAvailable: {_command_subcommands_text('optimize')}",
                 "optimize",
                 EXIT_USAGE,
                 output_json,
@@ -17325,11 +17146,16 @@ def run_command(
             )
             return EXIT_SUCCESS
         if not rest:
-            emit_error("missing autopilot subcommand\n\nAvailable: init, disable", "autopilot", EXIT_USAGE, output_json)
+            emit_error(
+                f"missing autopilot subcommand\n\nAvailable: {_command_subcommands_text('autopilot')}",
+                "autopilot",
+                EXIT_USAGE,
+                output_json,
+            )
         sub = rest[0]
         if sub not in {"init", "disable"}:
             emit_error(
-                f"unknown autopilot subcommand '{sub}'\n\nAvailable: init, disable",
+                f"unknown autopilot subcommand '{sub}'\n\nAvailable: {_command_subcommands_text('autopilot')}",
                 "autopilot",
                 EXIT_USAGE,
                 output_json,
@@ -17377,11 +17203,11 @@ def run_command(
             )
             return EXIT_SUCCESS
         if not rest:
-            emit_error("missing daemon action\n\nAvailable: install, start, stop, status, run", "daemon", EXIT_USAGE, output_json)
+            emit_error(f"missing daemon action\n\nAvailable: {_command_subcommands_text('daemon')}", "daemon", EXIT_USAGE, output_json)
         sub = rest[0]
         if sub not in {"install", "start", "stop", "status", "run"}:
             emit_error(
-                f"unknown daemon action '{sub}'\n\nAvailable: install, start, stop, status, run",
+                f"unknown daemon action '{sub}'\n\nAvailable: {_command_subcommands_text('daemon')}",
                 "daemon",
                 EXIT_USAGE,
                 output_json,
@@ -17567,6 +17393,7 @@ def main(argv: list[str]) -> int:
     output_json_override: bool | None = None
     strict = False
     non_interactive = False
+    runtime_defaults: dict[str, object] = {}
     try:
         runtime_defaults = _load_runtime_defaults(_maybe_git_root())
     except ValueError as exc:

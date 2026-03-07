@@ -683,6 +683,39 @@ class TestCommandIntrospectionContracts(TestCase):
         self.assertEqual(payload["errors"][0]["error_code"], og.USAGE_ERROR_CODE)
 
 
+class TestControlSurfaceContracts(_RepoTestCase):
+    def test_mcp_tools_embed_shared_cli_signatures(self) -> None:
+        schema_buffer = io.StringIO()
+        mcp_buffer = io.StringIO()
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            with redirect_stdout(schema_buffer):
+                schema_code = og.main(["--json", "schema"])
+            with redirect_stdout(mcp_buffer):
+                mcp_code = og.main(["--json", "mcp-server"])
+
+        self.assertEqual(schema_code, 0)
+        self.assertEqual(mcp_code, 0)
+
+        schema_payload = json.loads(schema_buffer.getvalue())
+        mcp_payload = json.loads(mcp_buffer.getvalue())
+
+        expected_tools = {
+            entry["command"]: entry
+            for entry in schema_payload["data"]["commands"]
+            if entry.get("mcp_tool") is True
+        }
+        observed_tools = {entry["name"]: entry for entry in mcp_payload["data"]["tools"]}
+
+        self.assertEqual(sorted(observed_tools), sorted(expected_tools))
+        for name, signature in expected_tools.items():
+            tool = observed_tools[name]
+            self.assertEqual(tool["description"], signature["summary"])
+            self.assertEqual(tool["uri"], signature["mcp_uri"])
+            self.assertEqual(tool["signature"], signature)
+
+
 class TestRecoveryContracts(_RepoTestCase):
     def test_doctor_command_reports_machine_readable_checks(self) -> None:
         with self.git_root_patch():

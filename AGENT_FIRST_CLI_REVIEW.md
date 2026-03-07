@@ -16,7 +16,7 @@ Scope: `/home/agent/outcomegraph`
 1. `--help` contract is command-complete for top-level and nested commands.
 2. JSON output uses a single, versioned, command-level envelope for all command results and failures.
 3. Error payloads are now typed with `error_class`, `error_code`, and bounded `retryable`/`hint` metadata.
-4. Runtime introspection is now first-class via `schema` and `describe`, with request/response metadata discoverable for each command.
+4. Runtime introspection is now first-class via `schema` and `describe`, with the same command signatures also embedded into MCP tool descriptors.
 5. Path inputs for `optimize prompts` are constrained to repository-safe paths.
 
 ## Checklist Results

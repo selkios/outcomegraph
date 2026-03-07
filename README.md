@@ -328,6 +328,9 @@ Builds a runtime/freshness dashboard used by operators and daemons:
 
 Generates a control-plane resource payload for MCP clients (`tools`, `resources`,
 `prompts`, counts, and errors when available).
+Each `tools[]` entry now embeds the same command signature object exposed by
+`og schema` and `og describe`, so CLI help/introspection and MCP tool metadata
+are generated from one registry.
 
 ### `og optimize prompts`
 
