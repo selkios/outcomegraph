@@ -1479,7 +1479,7 @@ def _help_for_command(command: str) -> str:
             "og autopilot disable [--session-id <id>]",
             "Remove outcomegraph-managed hooks and restore prior hook state where available.",
             ["--session-id <id>", "--json"],
-            ["og autopilot disable", "og autopilot disable --session-id autopilot-20260307T000000Z-abcdef1234 --json"],
+            ["og autopilot disable", "og autopilot disable --session-id autopilot-20260307t000000z-abcdef1234 --json"],
             ["`autopilot init` emits a resumable session_id that can be asserted on disable."],
         )
     if normalized == "daemon":
@@ -1501,7 +1501,7 @@ def _help_for_command(command: str) -> str:
             "og daemon start [--session-id <id>]",
             "Start the managed watcher process and persist runtime status.",
             ["--session-id <id>", "--json"],
-            ["og daemon start", "og daemon start --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            ["og daemon start", "og daemon start --session-id daemon-20260307t000000z-abcdef1234 --json"],
             ["`daemon install` and `daemon status` emit a resumable daemon session_id."],
         )
     if normalized == "daemon stop":
@@ -1509,14 +1509,14 @@ def _help_for_command(command: str) -> str:
             "og daemon stop [--session-id <id>]",
             "Stop the managed watcher process.",
             ["--session-id <id>", "--json"],
-            ["og daemon stop", "og daemon stop --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            ["og daemon stop", "og daemon stop --session-id daemon-20260307t000000z-abcdef1234 --json"],
         )
     if normalized == "daemon status":
         return _command_help(
             "og daemon status [--session-id <id>]",
             "Read watcher install/runtime and last-sync status.",
             ["--session-id <id>", "--json"],
-            ["og daemon status", "og daemon status --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            ["og daemon status", "og daemon status --session-id daemon-20260307t000000z-abcdef1234 --json"],
         )
     if normalized == "daemon run":
         return _command_help(
@@ -2097,7 +2097,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("state_present", "boolean", "Whether disable state was found."),
             ],
             [USAGE_ERROR_CODE, POLICY_DENIED_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
-            examples=["og autopilot disable", "og autopilot disable --session-id autopilot-20260307T000000Z-abcdef1234 --json"],
+            examples=["og autopilot disable", "og autopilot disable --session-id autopilot-20260307t000000z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon",
@@ -2142,7 +2142,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
             ],
             [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon start", "og daemon start --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            examples=["og daemon start", "og daemon start --session-id daemon-20260307t000000z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon stop",
@@ -2160,7 +2160,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("runtime", "object", "Current runtime lifecycle state."),
             ],
             [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon stop", "og daemon stop --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            examples=["og daemon stop", "og daemon stop --session-id daemon-20260307t000000z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon status",
@@ -2179,7 +2179,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("install", "object", "Installation details for daemon wrapper."),
             ],
             [USAGE_ERROR_CODE, SESSION_EXPIRED_CODE, SESSION_RESUME_INVALID_CODE, RUNTIME_ERROR_CODE],
-            examples=["og daemon status", "og daemon status --session-id daemon-20260307T000000Z-abcdef1234 --json"],
+            examples=["og daemon status", "og daemon status --session-id daemon-20260307t000000z-abcdef1234 --json"],
         ),
         _command_signature_entry(
             "daemon run",
@@ -2538,7 +2538,13 @@ def _normalize_errors_recursive(
             else:
                 normalized[key] = value
         if status == "error" and not normalized.get("errors"):
-            normalized["errors"] = _normalize_error_list([], fallback_code=code_hint, fallback_message=message_hint)
+            normalized["errors"] = [
+                _normalize_error_record(
+                    None,
+                    fallback_code=code_hint,
+                    fallback_message=message_hint,
+                )
+            ]
         return normalized
     if isinstance(raw, list):
         return [_normalize_errors_recursive(item, fallback_code=fallback_code, fallback_message=fallback_message) for item in raw]
@@ -2580,11 +2586,21 @@ def _build_command_result_envelope(
             fallback_message=status_message,
         )
     else:
-        errors = _normalize_error_list(
-            [],
-            fallback_code=fallback_code,
-            fallback_message=status_message,
-        ) if status == "error" else []
+        errors = [] if status != "error" else [
+            _normalize_error_record(
+                None,
+                fallback_code=fallback_code,
+                fallback_message=status_message,
+            )
+        ]
+    if status == "error" and not errors:
+        errors = [
+            _normalize_error_record(
+                None,
+                fallback_code=fallback_code,
+                fallback_message=status_message,
+            )
+        ]
 
     warnings = _ensure_text_list(payload.get("warnings"))
 

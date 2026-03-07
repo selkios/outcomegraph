@@ -240,6 +240,7 @@ Structured output:
   - `metrics`
 - `data` contains command-specific payload for backward-readable migration from the pre-envelope contract.
 - `data.session` is present for lock, daemon, and autopilot lifecycles and includes `session_id`, `lifecycle`, `state`, `expires_at`, and resume metadata.
+- Session lifecycle failures are mirrored into top-level `errors` even when the full session payload remains under `data`.
 - Command IDs are stable across help/usage, success, and failure envelopes.
 
 Example:
@@ -628,6 +629,7 @@ Contention:
 
 Session policy:
 
+- Session ids use the lowercase shape `<kind>-<yyyymmdd>t<hhmmss>z-<hash>`.
 - `sync` lock sessions are `ephemeral`.
   - emitted in command envelopes and sync summary events as `session_id`
   - never resumable

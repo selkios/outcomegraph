@@ -711,7 +711,7 @@ class TestHookLifecycle(_RepoTestCase):
     def test_autopilot_disable_rejects_invalid_session_resume(self) -> None:
         self._write_quality_pass_script(0)
         with self.git_root_patch():
-            init = og._init_autopilot(False)
+            og._init_autopilot(False)
             bad_session_id = "autopilot-20260307t000000z-deadbeef00"
             disable = og._disable_autopilot(bad_session_id)
 
@@ -719,6 +719,19 @@ class TestHookLifecycle(_RepoTestCase):
         self.assertEqual(disable["code"], og.SESSION_RESUME_INVALID_CODE)
         self.assertEqual(disable["requested_session_id"], bad_session_id)
         self.assertTrue((self.repo / ".outcomegraph" / "autopilot" / "state.json").exists())
+
+    def test_autopilot_disable_main_returns_runtime_exit_for_invalid_session_resume(self) -> None:
+        self._write_quality_pass_script(0)
+        with self.git_root_patch():
+            og._init_autopilot(False)
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", "autopilot", "disable", "--session-id", "autopilot-20260307t000000z-deadbeef00"])
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, og.EXIT_RUNTIME)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["errors"][0]["error_code"], og.SESSION_RESUME_INVALID_CODE)
 
     def test_autopilot_init_restores_existing_managed_hook_from_backup(self) -> None:
         hooks_dir = self.repo / og.AUTOPILOT_MANAGED_HOOK_DIR
@@ -961,6 +974,25 @@ class TestDaemonLifecycle(_RepoTestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["code"], og.SESSION_EXPIRED_CODE)
         self.assertEqual(payload["session"]["state"], og.SESSION_STATE_EXPIRED)
+
+    def test_daemon_status_main_returns_runtime_exit_for_expired_session_resume(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            install_payload = og._daemon_install()
+            session_id = install_payload["session_id"]
+            state_path = self.repo / ".outcomegraph" / "work" / "daemon" / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["session"]["expires_at"] = "2000-01-01T00:00:00Z"
+            state["session"]["state"] = og.SESSION_STATE_ACTIVE
+            state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", "daemon", "status", "--session-id", session_id])
+
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(code, og.EXIT_RUNTIME)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["errors"][0]["error_code"], og.SESSION_EXPIRED_CODE)
 
     def test_daemon_run_sync_rejects_invalid_status_payload(self) -> None:
         completed = subprocess.CompletedProcess(
@@ -1391,6 +1423,7 @@ class TestSyncWorkflows(_RepoTestCase):
                 {
                     "run_id": "sync-1",
                     "status": "ok",
+                    "session_id": "sync-20260307t000000z-abcdef1234",
                     "idempotency_key": "sync-key",
                     "snapshot": {"changed_files": ["og.py"]},
                     "steps": [
@@ -1412,6 +1445,7 @@ class TestSyncWorkflows(_RepoTestCase):
 
         event_payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
         self.assertEqual(event_payload["worker_prompt_provenance"], [prompt_provenance])
+        self.assertEqual(event_payload["session_id"], "sync-20260307t000000z-abcdef1234")
 
     def test_run_distill_stage_uses_bootstrap_timeout_for_full_snapshot(self) -> None:
         snapshot = {
@@ -1830,6 +1864,15 @@ class TestSyncWorkflows(_RepoTestCase):
             "mode": "observe",
             "captured_at": "2026-03-04T00:00:00Z",
         }
+        session = og._build_session_record(
+            og.SESSION_KIND_SYNC,
+            og.SESSION_LIFECYCLE_EPHEMERAL,
+            og.SESSION_STATE_ACTIVE,
+            session_id="sync-20260307t000000z-shortcircuit",
+            created_at="2026-03-07T00:00:00Z",
+            updated_at="2026-03-07T00:00:00Z",
+            ttl_seconds=og.WORK_LOCK_STALE_SECONDS,
+        )
 
         with self.git_root_patch(), patch.object(og, "_collect_sync_snapshot", return_value=snapshot), patch.object(
             og,
@@ -1840,12 +1883,17 @@ class TestSyncWorkflows(_RepoTestCase):
             "_consume_pending",
             return_value=True,
         ), patch.object(og, "_record_sync_summary_event", return_value="events/sync-1.json"):
-            payload = og._run_sync_job(str(self.repo), {"changed": False, "profile": "analyze", "mode": "observe"})
+            payload = og._run_sync_job(
+                str(self.repo),
+                {"changed": False, "profile": "analyze", "mode": "observe"},
+                session,
+            )
 
         self.assertTrue(payload["short_circuit"])
         self.assertTrue(payload["pending_consumed"])
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["steps"][0]["name"], "short_circuit")
+        self.assertEqual(payload["session_id"], session["session_id"])
 
     def test_run_sync_job_force_full_sync_bypasses_short_circuit(self) -> None:
         snapshot = {

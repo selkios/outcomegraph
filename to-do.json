@@ -1415,14 +1415,17 @@
         "OG-AGENT-003"
       ],
       "files": [
-        "og.py",
+        "AGENT_FIRST_CLI_REVIEW.md",
         "README.md",
-        "SPEC-v2.md",
         "RUNBOOKS.md",
+        "SPEC-v2.md",
+        "og.py",
+        "tasks/og-agent-010/TASK.md",
+        "tasks/og-agent-010/task-plan.json",
         "tests/test_og_sync_verify_replay_hooks.py",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "to-do.json"
       ],
-      "updated_at": "2026-03-07T10:27:20Z"
+      "updated_at": "2026-03-07T10:38:33Z"
     },
     {
       "id": "OG-AGENT-011",

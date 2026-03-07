@@ -55,6 +55,7 @@ Symptom: `og sync` exits without running job, reports pending state, and emits `
 
 Recovery:
 
+- Inspect the top-level `errors[0]` record for the typed `SESSION_CONTENDED` payload and copy the emitted `session_id` if needed for later correlation.
 - Retry after active run finishes.
 - Confirm `og status` no longer shows active sync.
 - Pending work will be picked up on next run.
@@ -65,6 +66,7 @@ Symptom: `daemon status|start|stop` or `autopilot disable` fails with `code: SES
 
 Recovery:
 
+- Read the top-level `errors[0]` record first; the same typed session failure is mirrored there for machine handling.
 - Read the emitted `session_id` and `data.session` metadata from the most recent successful lifecycle command.
 - If the session expired, start a fresh daemon/autopilot session and use the new `session_id`.
 - If the resume attempt was invalid, rerun the command with the currently recorded `session_id` from daemon/autopilot state.

@@ -152,7 +152,7 @@ Common flags:
 - `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
 - `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
 - `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
-- `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session)
+- `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session using the emitted lowercase `<kind>-<timestamp>-<hash>` id)
 
 Command help contracts also list output modes and exit semantics:
 
@@ -201,6 +201,7 @@ Return contract:
   - `message`: human-readable summary
   - `retryable`: boolean retryability hint
   - `hint`: bounded short remediation hint
+- Session resume/expiry/conflict failures are surfaced both in `data` and in the top-level `errors` list.
 - `warnings` are strings and remain informational.
 - `metrics` holds command-level timing and counters.
 - `data.list_window` advertises list pagination metadata when `--fields`, `--limit`, or `--offset` are used.
@@ -332,8 +333,12 @@ The daemon watches file changes and pending work; when triggered it invokes
 
 ### Session model
 
+- Session ids use the lowercase shape `<kind>-<yyyymmdd>t<hhmmss>z-<hash>`.
 - `sync` emits an ephemeral lock `session_id`; it is never resumable and expires on release or stale-lock timeout.
+- `sync` carries the active lock `session_id` in command envelopes and sync summary events.
 - Lock contention returns `status: "warn"` with `error_code: "SESSION_CONTENDED"` and the active sync `session_id`.
+- `autopilot` is resumable only across `autopilot init` and `autopilot disable`; `disable --session-id <id>` asserts the currently installed session before teardown.
+- `daemon` is resumable across `install`, `start`, `status`, and `stop`; active daemon sessions expire when the watcher state goes stale.
 - `daemon` and `autopilot` emit resumable session records with `data.session.state`, `data.session.expires_at`, and `data.session.resume_command`.
 - Explicit resume/assert failures return typed session errors: `SESSION_EXPIRED` and `SESSION_RESUME_INVALID`.
 

@@ -1,0 +1,55 @@
+{
+  "task_id": "OG-AGENT-010",
+  "title": "Define explicit session/state policy and emit `session_id`",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "RUNBOOKS.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-distill-001/TASK.md",
+    "tasks/og-distill-001/task-plan.json",
+    "tasks/og-prompt-002/TASK.md",
+    "tasks/og-prompt-002/task-plan.json"
+  ],
+  "write_files": [
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "README.md",
+    "RUNBOOKS.md",
+    "SPEC-v2.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-agent-010/TASK.md",
+    "tasks/og-agent-010/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Finalize session lifecycle behavior and normalize top-level session error envelopes",
+      "status": "done"
+    },
+    {
+      "step": "Add regression coverage for session continuity, resume failures, and sync session propagation",
+      "status": "done"
+    },
+    {
+      "step": "Align help text and repo docs with the explicit sync/autopilot/daemon session policy",
+      "status": "done"
+    },
+    {
+      "step": "Run focused tests and the repo quality gate",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "uv run pytest tests/test_og_sync_verify_replay_hooks.py -q",
+    "bash skills/og-quality-pass/scripts/run_quality_pass.sh"
+  ]
+}
