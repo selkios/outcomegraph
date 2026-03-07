@@ -1,0 +1,57 @@
+{
+  "task_id": "OG-DOC-003",
+  "title": "Document the new prompt asset system and capsule quality contract",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "RUNBOOKS.md",
+    "og.py",
+    "prompts/workers/manifest.json",
+    "prompts/workers/distill-v1.txt",
+    "prompts/workers/replay-v1.txt",
+    "tests/test_capsule_quality_eval.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-prompt-002/TASK.md",
+    "tasks/og-prompt-002/task-plan.json",
+    "tasks/og-replay-003/TASK.md",
+    "tasks/og-eval-001/TASK.md",
+    "tasks/og-dogfood-001/TASK.md",
+    "tasks/og-dogfood-001/task-plan.json",
+    "skills/og-dogfood/SKILL.md"
+  ],
+  "write_files": [
+    "README.md",
+    "ARCHITECTURE.md",
+    "SPEC-v2.md",
+    "RUNBOOKS.md",
+    "tasks/og-doc-003/TASK.md",
+    "tasks/og-doc-003/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Document the repo-managed worker prompt asset location, manifest/version rules, and prompt-provenance boundary against canonical .outcomegraph artifacts",
+      "status": "done"
+    },
+    {
+      "step": "Describe the capsule recreation-brief quality contract, including kind-specific oracle expectations and stronger success criteria",
+      "status": "done"
+    },
+    {
+      "step": "Update the dogfood workflow docs, add the task receipt, and validate the edited docs/task JSON",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "git diff --check -- README.md ARCHITECTURE.md SPEC-v2.md RUNBOOKS.md tasks/og-doc-003/TASK.md",
+    "jq empty to-do.json",
+    "jq empty tasks/og-doc-003/task-plan.json"
+  ]
+}

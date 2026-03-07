@@ -219,23 +219,49 @@ Use this checklist for release candidates and handoff gates:
 
 ## 4.1) Full-spec dogfood evidence runbook
 
-Run these commands during pre-release rollout:
+Prefer the bundled deterministic flow:
 
-1. `og status --json > .outcomegraph/events/dogfood-status.json`
-2. `og sync --json > .outcomegraph/events/dogfood-sync.json`
-3. `og verify --changed --json > .outcomegraph/events/dogfood-verify.json`
-4. `og drift > .outcomegraph/events/dogfood-drift.txt`
+```bash
+bash skills/og-dogfood/scripts/run_dogfood.sh /home/agent/outcomegraph
+```
+
+That script runs this exact sequence during pre-release rollout:
+
+1. `uv run og clean --scope all --yes --json`
+2. `uv run og init --json`
+3. `uv run og status --json > .outcomegraph/events/dogfood-status-pre-sync.json`
+4. `uv run og sync --json > .outcomegraph/events/dogfood-sync.json`
+5. `uv run og verify --changed --json > .outcomegraph/events/dogfood-verify.json`
+6. `uv run og replay --changed --json > .outcomegraph/events/dogfood-replay.json`
+7. `uv run og drift > .outcomegraph/events/dogfood-drift.txt`
+8. `uv run og status --json > .outcomegraph/events/dogfood-status-final.json`
+9. `cp .outcomegraph/events/dogfood-status-final.json .outcomegraph/events/dogfood-status.json`
 
 Acceptance criteria:
 
 - `dogfood-status.json` has `status: ok`, runtime `status: idle`, and `issues: []`.
 - `dogfood-sync.json` has `status: ok`, a non-empty `steps` array, and no schema validation errors.
 - `dogfood-verify.json` has `status: ok` and a populated `verified_capsules` list.
+- `dogfood-replay.json` has `status: ok` and a populated `replay_results` list.
 - `dogfood-drift.txt` does not report `POLICY_DENIED` or drift-blocking recommendations.
 
+Prompt and capsule-quality review gates:
+
+- Confirm `dogfood-sync.json`, `dogfood-verify.json`, `dogfood-replay.json`, and resulting certificates expose
+  `worker_prompt_provenance` or `prompt_provenance` records that resolve to
+  `prompts/workers/*.txt`.
+- Treat `prompts/workers/manifest.json` as the control point for prompt identity. When a
+  prompt changes materially, ship the asset update with a version bump so dogfood evidence
+  distinguishes the new run from prior prompt generations.
+- Review the target capsules called out in the refactor plan:
+  `og`, `tests`, `runbooks`, `spec-v2`, and `uv`.
+- Each reviewed capsule should have a bounded goal/scope plus `behavior_claims`,
+  `invariants`, `dependencies`, and `unknowns`; missing fields are evidence gaps, not
+  cleanup work for apply.
+- `code` and `test` capsules should keep executable oracle commands.
+  `doc`, `config`, and `runtime` capsules may keep advisory `command: null` oracles only
+  when the `reason` is explicit and the capsule remains materially reusable.
+- Record stale-doc contradictions or other remaining recreation gaps explicitly in the
+  review notes; do not smooth them into silent `success`.
+
 Store evidence under `.outcomegraph/events` and include event IDs in release notes.
-
-This repository currently has a dogfood migration blocker:
-
-- Validation fails with `materials.lock` schema mismatch because `artifact_type` is missing.
-- Fix the migration first, then rerun from step 1 before deciding rollout completion.

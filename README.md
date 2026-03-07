@@ -12,6 +12,28 @@ boundary for humans, agents, CI, and MCP clients.
 - `work`, `events`, and `objects` are written as immutable evidence for replay and audit.
 - Runtime errors are surfaced with structured status payloads so callers can branch safely.
 
+## Worker prompt assets and capsule quality
+
+- Worker prompt bodies live under `prompts/workers/`, and `prompts/workers/manifest.json`
+  binds each supported role to a stable prompt `id`, `version`, `path`, and required
+  template variables.
+- Worker startup fails fast when the manifest is missing, a role/version binding drifts,
+  an asset is unreadable, or a template references undeclared variables.
+- Prompt assets are repo-owned implementation inputs. Keep them reviewed and versioned in
+  the main codebase, not under `.outcomegraph/`.
+- `.outcomegraph/` remains the canonical replayable truth. Worker runs only persist prompt
+  provenance (`id`, `version`, `source_path`) into traces, stage payloads, certificates,
+  and sync/verify/replay summary events so a run can be tied back to the exact prompt asset.
+- When prompt behavior changes, update the asset and bump its declared version in the
+  manifest/binding so provenance remains meaningful across runs.
+- Strong capsules are compact recreation briefs, not file-by-file summaries. They should
+  carry a bounded goal/scope plus behavior claims, invariants, dependencies, unknowns, and
+  an acceptance oracle or explicit oracle-gap reason.
+- `code` and `test` capsules need executable oracle evidence to stay `success`.
+  `doc`, `config`, and `runtime` capsules may still be `success` with advisory or
+  `command: null` oracles only when the gap is explained explicitly and the capsule remains
+  materially reusable.
+
 ## Quick start (recommended)
 
 Run from your project repository root (no install required):
@@ -60,25 +82,24 @@ uv run og <command>
 
 ## Full-spec rollout and dogfood checklist
 
-Use this repository as rollout validation:
+Use the bundled dogfood flow so the evidence layout stays deterministic:
 
-1. `uv run og status --json` and confirm top-level `status: "ok"` and `state: "ok"`.
-2. `uv run og sync --json` and confirm:
-   - `status: "ok"`
-   - `steps` include `distill`, `apply`, `verify`, and `export`
-3. `uv run og verify --changed --json` and confirm:
-   - `status: "ok"`
-   - `steps` include `verify` and `export`
-   - `verified_capsules` is non-empty
-4. Run `uv run og drift` to confirm policy/certificate checks are healthy.
+```bash
+bash skills/og-dogfood/scripts/run_dogfood.sh /home/agent/outcomegraph
+```
 
-Canonical evidence artifacts captured in this repo:
+Review the generated artifacts under `.outcomegraph/events/`:
 
-- `.outcomegraph/events/sync-20260305T082953Z-8485041f63.json` (successful sync summary)
-- `.outcomegraph/events/sync-20260305T092058Z-9008c47e88.json` (migration validation failure)
-- `.outcomegraph/events/verify-20260305T092059Z-a1789787d4.json` (migration validation failure)
+1. `dogfood-status.json` should end with top-level `status: "ok"`, `data.issues: []`, and `data.runtime.status: "idle"`.
+2. `dogfood-sync.json` should end with top-level `status: "ok"` and include `distill`, `apply`, `verify`, and `export`.
+3. `dogfood-verify.json` should end with top-level `status: "ok"` and a non-empty `data.verified_capsules`.
+4. `dogfood-replay.json` should end with top-level `status: "ok"` and a non-empty `data.replay_results`.
+5. `dogfood-drift.txt` should include `drift: ok` and should not include `POLICY_DENIED`.
+6. `dogfood-sync.json`, `dogfood-verify.json`, `dogfood-replay.json`, and resulting certificates should expose prompt provenance that points back to `prompts/workers/*.txt`.
+7. Review `og`, `tests`, `runbooks`, `spec-v2`, and `uv` under `.outcomegraph/capsules/` for bounded scope, recreation-brief fields, and any stale-doc contradictions.
+8. `code` and `test` capsules should show executable oracle commands. `doc`, `config`, and `runtime` capsules may use advisory oracle gaps only with an explicit reason.
 
-If sync or verify fails with schema checks, apply `MIGRATION_GUIDE.md` and rerun from step 1.
+If the bundled run fails, inspect the written `dogfood-*.json` artifacts before trying ad hoc reruns.
 
 ### Dogfood Example In This Repository
 

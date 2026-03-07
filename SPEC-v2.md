@@ -319,6 +319,11 @@ skills/
   config.toml
   rules/
   agents/
+prompts/
+  workers/
+    manifest.json
+    distill-v1.txt
+    replay-v1.txt
 .outcomegraph/
   constitution/
   capsules/
@@ -345,6 +350,7 @@ Git-tracked by default:
 - `certificates/**` (compact manifests)
 - `export/AGENTS.md`
 - `export/README_OUTCOMES.md`
+- `prompts/workers/**`
 
 Not Git-tracked by default:
 
@@ -354,6 +360,29 @@ Not Git-tracked by default:
 - local cache blobs
 
 Bulky evidence is stored in CAS (local or remote). Git tracks pointers and hashes.
+
+### 6.1 Worker prompt assets
+
+Worker prompt assets are repo-managed implementation inputs, not canonical ArtifactGraph
+records.
+
+- Location: `prompts/workers/`
+- Control file: `prompts/workers/manifest.json`
+- Manifest schema:
+  - `schema_version: 1`
+  - `prompts[]` entries with `id`, `version`, `role`, `path`, and `required_variables`
+- Supported worker roles in the current runtime:
+  - `distill`
+  - `replay`
+- Prompt templates must be human-readable repo files and may reference only the declared
+  template variables for that manifest entry.
+- Worker execution must fail fast when the manifest is missing, schema-invalid, role-bound
+  versions drift, assets are missing, or templates reference undeclared variables.
+- Prompt changes that materially affect worker behavior must ship with an updated asset and
+  a version bump so provenance can distinguish runs across prompt revisions.
+- `.outcomegraph` never stores prompt bodies as canonical truth. Worker runs record only
+  `prompt_provenance` (`id`, `version`, `source_path`) in traces, stage payloads,
+  certificates, and summary events.
 
 ## 7) Canonical artifact model
 
@@ -418,6 +447,23 @@ Kind policy:
 - `kind` is one of `code`, `test`, `doc`, `config`, or `runtime`.
 - `code` and `test` capsules require at least one executable oracle command before `status: success` is considered strong enough to persist.
 - `doc`, `config`, and `runtime` capsules may remain `success` with advisory or `command: null` oracles when that is the strongest honest evidence.
+
+Recreation-brief policy:
+
+- Strong capsules are compact recreation briefs rather than file summaries.
+- `status: success` requires materially reusable content:
+  - explicit `goal` and bounded `scope`
+  - non-empty `behavior_claims`
+  - non-empty `invariants`
+  - non-empty `dependencies`
+  - non-empty `unknowns`
+  - at least one evidence-backed `claims[]` entry with `category: behavior`
+  - an executable acceptance oracle or an explicit advisory oracle-gap `reason`
+- `status: warn` means the capsule is useful but still missing recreation context,
+  executable proof, or contradiction handling needed for strong reuse.
+- `status: pending` means the bounded evidence is too thin to write a reusable capsule.
+- Apply must preserve evidence gaps and downgrade weak outputs instead of synthesizing a
+  stronger capsule than the distill evidence supports.
 
 ### 7.2 `refs/<name>.yaml`
 
@@ -1001,6 +1047,10 @@ Execution:
 - Use `codex exec` in non-interactive mode.
 - Use JSONL event capture where configured.
 - Use output schema validation for structured deltas.
+- Load worker prompt templates from `prompts/workers/manifest.json`, failing fast when
+  manifest bindings, versions, asset files, or required variables drift.
+- Emit prompt provenance with each worker run so downstream traces, certificates, and
+  summary events can identify the exact prompt asset revision that produced the output.
 
 Roles:
 

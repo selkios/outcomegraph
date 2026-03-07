@@ -130,6 +130,31 @@ sequenceDiagram
   OG-->>T: sync result
 ```
 
+### 4.1 Worker prompt assets and provenance
+
+- Distill and replay prompt templates live under `prompts/workers/`.
+- `prompts/workers/manifest.json` binds each worker role to a stable prompt `id`,
+  `version`, relative asset `path`, and required template variables.
+- Worker startup fails fast when the manifest is missing, a role/version binding drifts, an
+  asset is unreadable, or a template references undeclared variables.
+- These prompt files are implementation inputs in the main codebase, not canonical
+  ArtifactGraph records. Canonical artifacts keep only prompt provenance
+  (`id`, `version`, `source_path`) in traces, stage payloads, certificates, and summary
+  events.
+
+### 4.2 Capsule quality gate
+
+- Distill outputs are expected to be compact recreation briefs rather than file summaries.
+- Strong capsules carry a goal, bounded scope, behavior claims, invariants, dependencies,
+  unknowns, and an acceptance oracle or explicit oracle-gap reason.
+- Apply preserves evidence gaps instead of heuristically promoting thin outputs to strong
+  success.
+- `code` and `test` capsules need executable oracle evidence for `success`.
+  `doc`, `config`, and `runtime` capsules may remain `success` with advisory evidence when
+  the gap is explicit and the capsule is still materially reusable.
+- Dogfood review checks the target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`)
+  plus the captured `dogfood-*.json` evidence against this same contract.
+
 ## 5) Verification and replay loops
 
 Verification is continuous, not a final ceremony.
