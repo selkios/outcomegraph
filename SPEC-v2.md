@@ -37,7 +37,7 @@ Code is a materialization. Artifacts are durable truth. Steward keeps truth in s
 - Distill code changes into compact capsules and evidence-backed claims.
 - Verify behavior through oracle receipts.
 - Replay changed capabilities in clean environments.
-- Keep agent-facing instructions current (`AGENTS.md`, skill docs, MCP resources).
+- Keep agent-facing instructions current (`CONTEXT.md`, exported `AGENTS.md`, skill docs, MCP resources).
 - Support future workers/oracles/sandboxes without schema breakage.
 
 ### 3.2 Non-goals
@@ -277,7 +277,7 @@ Migration note:
 Recommended layout:
 
 ```text
-AGENTS.md
+CONTEXT.md
 skills/
   outcome-steward/
     SKILL.md
@@ -889,7 +889,7 @@ bytes: 1234
 interface_version: 1
 schema_version: 2
 targets:
-  - "AGENTS.md"
+  - "CONTEXT.md"
   - "skills/outcome-steward/SKILL.md"
 files_written:
   - ".outcomegraph/export/AGENTS.md"
@@ -955,7 +955,7 @@ Default autopilot mode is `observe`.
 Allowed automatically:
 
 - update `.outcomegraph/**`
-- update generated `AGENTS.md` block/files per config
+- seed `CONTEXT.md` during bootstrap and update generated export control-surface files
 - update vendored skill artifacts
 - read-only repo inspection
 - safe configured verify commands
@@ -1135,10 +1135,16 @@ If storage/index is corrupted:
 
 ## 17) Standards triad contract
 
-`AGENTS.md`:
+`CONTEXT.md`:
 
-- short startup contract for any agent.
-- points to OutcomeGraph commands and generated guidance.
+- canonical top-level startup contract for any agent.
+- versioned with the CLI and schema contract.
+- documents required automation patterns (`--fields`, `--dry-run`, explicit confirmation flags, and `--strict` expectations).
+
+`.outcomegraph/export/AGENTS.md`:
+
+- generated projection of `CONTEXT.md` plus current artifact snapshot metadata.
+- consumed by agent surfaces that expect an `AGENTS.md` export.
 
 `skills/outcome-steward/SKILL.md`:
 

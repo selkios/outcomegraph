@@ -104,6 +104,19 @@ og replay --changed --json  # optional stronger confirmation; also refreshes exp
 og drift --json             # should stay clean after the standalone flows above
 ```
 
+## Agent guidance contract
+
+`og init` seeds a root [`CONTEXT.md`](./CONTEXT.md). This is the canonical, versioned
+startup contract for automation. [`.outcomegraph/export/AGENTS.md`](./.outcomegraph/export/AGENTS.md)
+is the generated projection kept in sync with it during export refresh.
+
+Machine callers should follow these rules:
+
+- discover command shapes with `og schema` and `og describe <command>`
+- narrow large payloads with `--fields`, `--limit`, `--offset`, or `--output jsonl`
+- run `--validate` or `--dry-run` before mutating commands when you need a no-write preview
+- require explicit `--yes` for destructive actions and treat `--strict` failures as hard contract violations
+
 ## Core command contract
 
 `og` supports these top-level commands:

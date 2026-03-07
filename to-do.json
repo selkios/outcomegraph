@@ -1431,8 +1431,8 @@
       "id": "OG-AGENT-011",
       "title": "Ship a top-level versioned agent guidance contract",
       "priority": 2,
-      "status": "todo",
-      "details": "Publish stable agent operating guidance alongside the binary instead of relying only on generated exports. Backward compatibility is not required; prefer clean contract breaks and update docs/tests in the same change.",
+      "status": "done",
+      "details": "Shipped a canonical top-level CONTEXT.md agent contract, projected .outcomegraph/export/AGENTS.md from it, updated docs/review artifacts, and added tests that keep the export and canonical guidance in sync.",
       "steps": [
         "Backward compatibility is not required; implement as a breaking change and update docs/tests accordingly.",
         "Create top-level `CONTEXT.md` (or root `AGENTS.md`) with invariants for safe automation",
@@ -1450,13 +1450,16 @@
         "OG-AGENT-002"
       ],
       "files": [
-        "README.md",
-        "SPEC-v2.md",
         "CONTEXT.md",
         ".outcomegraph/export/AGENTS.md",
-        "AGENT_FIRST_CLI_REVIEW.md"
+        "README.md",
+        "SPEC-v2.md",
+        "AGENT_FIRST_CLI_REVIEW.md",
+        "og.py",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ],
-      "updated_at": "2026-03-05T16:37:41Z"
+      "updated_at": "2026-03-07T10:40:18Z"
     },
     {
       "id": "OG-AGENT-012",

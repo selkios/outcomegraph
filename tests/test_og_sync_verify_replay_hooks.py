@@ -3975,3 +3975,42 @@ class TestSpecComplianceGates(_RepoTestCase):
         issue_types = {issue.get("type") for issue in status_payload.get("issues", [])}
         self.assertIn("verify_warning", issue_types)
         self.assertNotIn("verify_error", issue_types)
+
+
+class TestAgentGuidanceContract(_RepoTestCase):
+    def test_init_bootstraps_context_contract_and_agents_export_projection(self) -> None:
+        with self.git_root_patch():
+            init_payload = og._init_outcomegraph()
+            updated_exports, unchanged_exports, _snapshot = og._run_export_refresh(str(self.repo))
+
+        self.assertIn("CONTEXT.md", init_payload["created"]["files"])
+        self.assertIn(".outcomegraph/export/AGENTS.md", updated_exports)
+        self.assertEqual(unchanged_exports, [])
+
+        context_text = (self.repo / "CONTEXT.md").read_text(encoding="utf-8")
+        export_text = (self.repo / ".outcomegraph" / "export" / "AGENTS.md").read_text(encoding="utf-8")
+
+        self.assertEqual(context_text, og._render_context_contract())
+        self.assertTrue(export_text.startswith(context_text.rstrip() + "\n\n## Export snapshot\n"))
+        self.assertIn("Generated from `CONTEXT.md` by OutcomeGraph export stage.", export_text)
+
+
+class TestRepositoryGuidanceContract(TestCase):
+    def test_repository_context_contract_matches_runtime_template(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        observed = (repo_root / "CONTEXT.md").read_text(encoding="utf-8")
+        self.assertEqual(observed, og._render_context_contract())
+
+    def test_context_contract_mentions_required_safe_automation_patterns(self) -> None:
+        text = og._render_context_contract()
+
+        for snippet in (
+            "--fields",
+            "--dry-run",
+            "--yes",
+            "--strict",
+            "--non-interactive",
+            f"CLI version: {og.VERSION}",
+            f"JSON envelope schema_version: {og.COMMAND_RESULT_SCHEMA_VERSION}",
+        ):
+            self.assertIn(snippet, text)
