@@ -11205,11 +11205,8 @@ def _apply_kind_specific_success_policy(
         return normalized_status, []
 
     explicit_commands = _safe_string_list(oracle_summary.get("explicit_executable_commands"))
-    inferred_commands = _safe_string_list(oracle_summary.get("inferred_executable_commands"))
     blocked_commands = _safe_string_list(oracle_summary.get("policy_blocked_commands"))
 
-    if normalized_status == "warn" and explicit_commands:
-        return "success", []
     if normalized_status != "success":
         return normalized_status, []
     if explicit_commands:
@@ -11218,8 +11215,6 @@ def _apply_kind_specific_success_policy(
     warning = f"{capsule_kind} capsule {capsule_id} requires explicit executable oracle evidence for success"
     if blocked_commands:
         warning = f"{warning}; policy blocked {', '.join(blocked_commands)}"
-    elif inferred_commands:
-        warning = f"{warning}; inferred commands remain advisory ({', '.join(inferred_commands)})"
     return "warn", [warning]
 
 
@@ -12498,17 +12493,11 @@ def _build_capsule_payload(
     )
 
     existing_oracles = _safe_object_list(existing.get("oracles"))
-    resolved_oracles = [oracle for oracle in (oracles or []) if isinstance(oracle, dict)]
+    if oracles is None:
+        resolved_oracles = existing_oracles
+    else:
+        resolved_oracles = [oracle for oracle in oracles if isinstance(oracle, dict)]
     if not resolved_oracles:
-        resolved_oracles = existing_oracles if existing_oracles else [
-            {
-                "name": f"{_safe_slug(capsule_id)}-verify",
-                "command": None,
-                "reason": "No explicit executable oracle was recorded for this capsule.",
-                "scope": [],
-            }
-        ]
-    if not isinstance(existing_oracles, list) or (not existing_oracles and not resolved_oracles):
         resolved_oracles = [
             {
                 "name": f"{_safe_slug(capsule_id)}-verify",
@@ -12522,21 +12511,26 @@ def _build_capsule_payload(
     merged_decision_refs.extend(_safe_string_list(decision_refs))
     merged_decision_refs = sorted({item for item in merged_decision_refs if isinstance(item, str)})
     created_at = str(existing.get("created_at") or created_at_default)
-    resolved_behavior_claims = [item for item in _safe_string_list(behavior_claims) if item]
-    if not resolved_behavior_claims:
+    if behavior_claims is None:
         resolved_behavior_claims = _safe_string_list(existing.get("behavior_claims"))
-    resolved_constraints = [item for item in _safe_string_list(constraints) if item]
-    if not resolved_constraints:
+    else:
+        resolved_behavior_claims = _safe_string_list(behavior_claims)
+    if constraints is None:
         resolved_constraints = _safe_string_list(existing.get("constraints"))
-    resolved_invariants = [item for item in _safe_string_list(invariants) if item]
-    if not resolved_invariants:
+    else:
+        resolved_constraints = _safe_string_list(constraints)
+    if invariants is None:
         resolved_invariants = _safe_string_list(existing.get("invariants"))
-    resolved_dependencies = [item for item in _safe_string_list(dependencies) if item]
-    if not resolved_dependencies:
+    else:
+        resolved_invariants = _safe_string_list(invariants)
+    if dependencies is None:
         resolved_dependencies = _safe_string_list(existing.get("dependencies"))
-    resolved_unknowns = [item for item in _safe_string_list(unknowns) if item]
-    if not resolved_unknowns:
+    else:
+        resolved_dependencies = _safe_string_list(dependencies)
+    if unknowns is None:
         resolved_unknowns = _safe_string_list(existing.get("unknowns"))
+    else:
+        resolved_unknowns = _safe_string_list(unknowns)
     resolved_status = str(status).strip() if str(status).strip() else str(existing.get("status") or "active")
     return {
         "schema_version": 2,
@@ -12584,9 +12578,7 @@ def _normalize_capsule_oracles_for_apply(
     mode: str,
 ) -> tuple[list[dict[str, object]], str, dict[str, object]]:
     normalized: list[dict[str, object]] = []
-    executable_commands: set[str] = set()
     explicit_executable_commands: set[str] = set()
-    inferred_executable_commands: set[str] = set()
     policy_blocked_commands: set[str] = set()
     oracle_scope = sorted(
         {
@@ -12610,27 +12602,9 @@ def _normalize_capsule_oracles_for_apply(
             policy_blocked_commands.add(command_value)
         command_after = str(normalized_oracle.get("command") or "").strip()
         if command_after:
-            executable_commands.add(command_after)
             if command_value:
                 explicit_executable_commands.add(command_after)
         normalized.append(normalized_oracle)
-
-    python_or_test_scope = any(
-        path == "og.py"
-        or path.startswith("tests/")
-        or os.path.splitext(path)[1].lower() == ".py"
-        for path in oracle_scope
-    )
-    if python_or_test_scope and "pytest -q" not in executable_commands and _policy_allows_verify_command(policy, mode, "pytest -q"):
-        normalized.append(
-            {
-                "name": "pytest regression suite",
-                "command": "pytest -q",
-                "scope": oracle_scope or ["og.py", "tests/**"],
-            }
-        )
-        executable_commands.add("pytest -q")
-        inferred_executable_commands.add("pytest -q")
 
     if not normalized:
         normalized = [
@@ -12646,7 +12620,6 @@ def _normalize_capsule_oracles_for_apply(
         _normalize_distill_status(status),
         {
             "explicit_executable_commands": sorted(explicit_executable_commands),
-            "inferred_executable_commands": sorted(inferred_executable_commands),
             "policy_blocked_commands": sorted(policy_blocked_commands),
         },
     )

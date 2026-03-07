@@ -1908,7 +1908,7 @@
       "id": "OG-APPLY-001",
       "title": "Reduce apply-stage heuristics and preserve evidence gaps honestly",
       "priority": 2,
-      "status": "todo",
+      "status": "done",
       "details": "Phase 5 of `WORKER_CAPSULE_REFACTOR_PLAN.md`: keep policy-safe normalization but stop apply from turning weak distill outputs into misleadingly strong capsules.",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 5 and audit every apply-stage heuristic that upgrades status, synthesizes claims, or strengthens oracle posture",
@@ -1929,10 +1929,13 @@
       "files": [
         "WORKER_CAPSULE_REFACTOR_PLAN.md",
         "og.py",
-        "tests/test_og_sync_verify_replay_hooks.py"
+        "tasks/og-apply-001/TASK.md",
+        "tasks/og-apply-001/task-plan.json",
+        "tests/test_og_sync_verify_replay_hooks.py",
+        "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T05:47:03Z"
+      "updated_at": "2026-03-07T10:48:42Z"
     },
     {
       "id": "OG-REPLAY-003",

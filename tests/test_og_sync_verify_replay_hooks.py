@@ -3224,7 +3224,7 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(capsule_payload["kind"], "doc")
         self.assertEqual(capsule_payload["status"], "success")
 
-    def test_run_apply_stage_infers_pytest_oracle_for_python_capsule(self) -> None:
+    def test_run_apply_stage_does_not_infer_pytest_oracle_for_python_capsule(self) -> None:
         with self.git_root_patch():
             og._init_outcomegraph()
             payload = og._run_apply_stage(
@@ -3247,7 +3247,7 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(payload["status"], "warn")
         self.assertEqual(capsule_payload["kind"], "test")
         self.assertEqual(capsule_payload["status"], "warn")
-        self.assertIn("pytest -q", oracle_commands)
+        self.assertEqual(oracle_commands, [None])
 
     def test_run_apply_stage_does_not_mark_code_capsule_success_with_inferred_pytest_only(self) -> None:
         with self.git_root_patch():
@@ -3272,10 +3272,10 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertEqual(payload["status"], "warn")
         self.assertEqual(capsule_payload["kind"], "code")
         self.assertEqual(capsule_payload["status"], "warn")
-        self.assertIn("pytest -q", oracle_commands)
+        self.assertEqual(oracle_commands, [None])
         self.assertTrue(any("explicit executable oracle evidence" in warning for warning in payload["warnings"]))
 
-    def test_run_apply_stage_promotes_warn_python_capsule_with_executable_oracle(self) -> None:
+    def test_run_apply_stage_does_not_promote_warn_python_capsule_with_executable_oracle(self) -> None:
         with self.git_root_patch():
             og._init_outcomegraph()
             delta = _distill_update("tests", ["tests/test_example.py"], status="warn")
@@ -3300,9 +3300,9 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
             )
 
         capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "tests.json").read_text(encoding="utf-8"))
-        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["status"], "warn")
         self.assertEqual(capsule_payload["kind"], "test")
-        self.assertEqual(capsule_payload["status"], "success")
+        self.assertEqual(capsule_payload["status"], "warn")
 
     def test_run_apply_stage_downgrades_success_without_recreation_brief_fields(self) -> None:
         with self.git_root_patch():
@@ -3331,6 +3331,74 @@ class TestAdapterCompatibilityAndPolicy(_RepoTestCase):
         self.assertTrue(any("behavior_claims" in warning for warning in payload["warnings"]))
         self.assertTrue(any("dependencies" in warning for warning in payload["warnings"]))
         self.assertTrue(any("unknowns" in warning for warning in payload["warnings"]))
+
+    def test_run_apply_stage_preserves_evidence_gaps_over_existing_strong_capsule(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            existing_payload = og._build_capsule_payload(
+                "og",
+                ["og.py"],
+                [],
+                None,
+                og._utc_timestamp(),
+                goal="Provide the stable OutcomeGraph CLI and sync orchestration contract.",
+                scope=["og.py", "tests/test_og_sync_verify_replay_hooks.py"],
+                kind="code",
+                behavior_claims=["`og` exposes the stable CLI contract."],
+                invariants=["CLI command parsing remains stable."],
+                dependencies=["og.py", "tests/test_og_sync_verify_replay_hooks.py"],
+                oracles=[
+                    {
+                        "name": "pytest regression suite",
+                        "command": "pytest -q",
+                        "scope": ["og.py", "tests/test_og_sync_verify_replay_hooks.py"],
+                    }
+                ],
+                unknowns=["Full repo-wide sync still required for broader confidence."],
+                status="success",
+            )
+            (self.repo / ".outcomegraph" / "capsules" / "og.json").write_text(
+                json.dumps(existing_payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            delta = _distill_update("og", ["og.py"], status="success")
+            delta["behavior_claims"] = []
+            delta["invariants"] = []
+            delta["dependencies"] = []
+            delta["unknowns"] = []
+            delta["oracles"] = [
+                {
+                    "name": "og-verify",
+                    "command": None,
+                    "reason": "Distill did not recover an executable oracle from the bounded evidence.",
+                    "scope": ["og.py"],
+                }
+            ]
+            payload = og._run_apply_stage(
+                str(self.repo),
+                {
+                    "name": "distill",
+                    "status": "ok",
+                    "generated_deltas": [delta],
+                    "affected_capsules": ["og"],
+                    "adapter_name": "codex",
+                },
+                "run-1",
+                "observe",
+            )
+
+        capsule_payload = json.loads((self.repo / ".outcomegraph" / "capsules" / "og.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "warn")
+        self.assertEqual(capsule_payload["status"], "warn")
+        self.assertEqual(capsule_payload["behavior_claims"], [])
+        self.assertEqual(capsule_payload["invariants"], [])
+        self.assertEqual(capsule_payload["dependencies"], [])
+        self.assertEqual(capsule_payload["unknowns"], [])
+        self.assertEqual(capsule_payload["oracles"][0]["command"], None)
+        self.assertEqual(
+            capsule_payload["oracles"][0]["reason"],
+            "Distill did not recover an executable oracle from the bounded evidence.",
+        )
 
     def test_run_apply_stage_persists_recreation_brief_for_og_capsule(self) -> None:
         with self.git_root_patch():

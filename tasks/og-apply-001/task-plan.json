@@ -1,0 +1,43 @@
+{
+  "task_id": "OG-APPLY-001",
+  "title": "Reduce apply-stage heuristics and preserve evidence gaps honestly",
+  "status": "done",
+  "read_files": [
+    "to-do.json",
+    "to-do.schema.json",
+    "AGENT_FIRST_CLI_REVIEW.md",
+    "ARCHITECTURE.md",
+    "QUICKSTART.md",
+    "README.md",
+    "SPEC-v2.md",
+    "WORKER_CAPSULE_REFACTOR_PLAN.md",
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-distill-002/TASK.md",
+    "tasks/og-distill-002/task-plan.json"
+  ],
+  "write_files": [
+    "og.py",
+    "tests/test_og_sync_verify_replay_hooks.py",
+    "tasks/og-apply-001/TASK.md",
+    "tasks/og-apply-001/task-plan.json",
+    "to-do.json"
+  ],
+  "steps": [
+    {
+      "step": "Remove apply-side oracle and status heuristics that overstate thin capsule evidence",
+      "status": "done"
+    },
+    {
+      "step": "Preserve evidence gaps in written capsule payloads instead of backfilling stronger prior brief fields",
+      "status": "done"
+    },
+    {
+      "step": "Add focused regressions for thin Python capsules and run the apply-stage unittest suite",
+      "status": "done"
+    }
+  ],
+  "verification": [
+    "python3 -m unittest -q tests.test_og_sync_verify_replay_hooks"
+  ]
+}
