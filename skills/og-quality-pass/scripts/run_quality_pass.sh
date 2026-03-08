@@ -6,10 +6,31 @@ DEFAULT_REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 REPO_ROOT="${1:-$DEFAULT_REPO_ROOT}"
 VENV_BIN="${REPO_ROOT}/.venv/bin"
 
-if [[ ! -x "${VENV_BIN}/ruff" || ! -x "${VENV_BIN}/ty" || ! -x "${VENV_BIN}/pytest" ]]; then
-  echo "Missing required tools in ${VENV_BIN}."
-  echo "Install with:"
-  echo "  ${REPO_ROOT}/.venv/bin/pip install ruff ty pytest"
+resolve_tool() {
+  local tool_name="$1"
+  local candidates=(
+    "${VENV_BIN}/${tool_name}"
+    "/usr/bin/${tool_name}"
+    "/usr/local/bin/${tool_name}"
+    "${tool_name}"
+  )
+  for candidate in "${candidates[@]}"; do
+    if command -v "$candidate" >/dev/null 2>&1 && [[ -x "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo ""
+  return 1
+}
+
+RUFF_BIN="$(resolve_tool ruff || true)"
+TY_BIN="$(resolve_tool ty || true)"
+PYTEST_BIN="$(resolve_tool pytest || true)"
+
+if [[ -z "$RUFF_BIN" || -z "$TY_BIN" || -z "$PYTEST_BIN" ]]; then
+  echo "Missing required tools: ruff, ty, or pytest."
+  echo "Hint: install in venv with '${REPO_ROOT}/.venv/bin/pip install ruff ty pytest' or use a Python environment containing them."
   exit 2
 fi
 
@@ -36,9 +57,9 @@ run_step() {
   echo
 }
 
-run_step "ruff" "${VENV_BIN}/ruff" check og.py tests
-run_step "ty" "${VENV_BIN}/ty" check --output-format concise
-run_step "pytest" "${VENV_BIN}/pytest" -q
+run_step "ruff" "$RUFF_BIN" check og.py tests
+run_step "ty" "$TY_BIN" check --output-format concise
+run_step "pytest" "$PYTEST_BIN" -q
 
 if [[ "${FAILURES}" -eq 0 ]]; then
   echo "PASS: all quality checks succeeded."
