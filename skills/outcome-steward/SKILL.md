@@ -23,5 +23,5 @@ Scope: This skill documents canonical Steward workflows for bootstrap, sync, and
 - Keep exporting control surfaces from available truth where possible.
 
 ## 5) Artifact health
-- Tracked canonical paths currently include 812 known artifact files.
+- Tracked canonical paths currently include 242 known artifact files.
 - Export refresh includes `export/AGENTS.md`, `export/README_OUTCOMES.md`, and `export/mcp-resources.json`.

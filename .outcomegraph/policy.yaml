@@ -1,5 +1,5 @@
 schema_version: 2
-created_at: "2026-03-06T19:58:02Z"
+created_at: "2026-03-08T13:53:57Z"
 name: observe-policy
 mode: observe
 allow:
@@ -8,11 +8,20 @@ allow:
     - "export/**"
     - "skills/outcome-steward/**"
     - "AGENTS.md"
+    - "CONTEXT.md"
   verify_commands:
     - "npm test --listTests"
     - "npm test"
+    - "npm test*"
     - "go test ./..."
+    - "go test ./...*"
     - "pytest -q"
+    - "pytest -q*"
+    - "uv run --with pytest --no-project pytest -q*"
+    - "uv run --with pytest pytest -q*"
+    - "uv run pytest -q*"
+    - "python -m unittest -q*"
+    - "python3 -m unittest -q*"
   sandbox_operations:
     - create_isolated_worktree
     - read_repo_state

@@ -53,16 +53,13 @@ OutcomeGraph canonical agent guidance contract.
 - og autopilot init|disable
 - og daemon install|start|stop|status
 
-- Canonical artifact directories tracked: ['capsules', 'certificates', 'claims', 'constitution', 'decisions', 'materials.lock', 'refs']
-- Total canonical artifacts: 812
+- Canonical artifact directories tracked: ['certificates', 'claims', 'constitution', 'materials.lock']
+- Total canonical artifacts: 242
 
-- `capsules`: 26 item(s)
-- `certificates`: 196 item(s)
-- `claims`: 465 item(s)
+- `certificates`: 120 item(s)
+- `claims`: 120 item(s)
 - `constitution`: 1 item(s)
-- `decisions`: 97 item(s)
 - `materials.lock`: 1 item(s)
-- `refs`: 26 item(s)
 
 ## Export semantics
 - Exports are generated deterministically from canonical artifacts.

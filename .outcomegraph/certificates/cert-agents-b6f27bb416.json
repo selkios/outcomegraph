@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "agents",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-agents-b6f27bb416.json"
+  ],
+  "created_at": "2026-03-08T14:05:41Z",
+  "id": "cert-agents-b6f27bb416",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:fd255c7aca99edc9da224560d0c16cd8d8010dcba9395552f28b5c8b78a91d44",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4852,
+      "target": ".outcomegraph/traces/agents-verify-20260308t140541z-a1789787d4-agents-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:fd255c7aca99edc9da224560d0c16cd8d8010dcba9395552f28b5c8b78a91d44",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4852,
+      "target": "sha256:fd255c7aca99edc9da224560d0c16cd8d8010dcba9395552f28b5c8b78a91d44",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T140541Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T140541Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:05:41Z"
+}

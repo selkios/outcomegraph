@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "pyproject",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-pyproject-7b33b1a65c.json"
+  ],
+  "created_at": "2026-03-08T14:17:19Z",
+  "id": "cert-pyproject-7b33b1a65c",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:2803bb038173e93e8db04d5c2d27ec83828199c097424ce812c410f3f7c654fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4861,
+      "target": ".outcomegraph/traces/pyproject-verify-20260308t141719z-a1789787d4-pyproject-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:2803bb038173e93e8db04d5c2d27ec83828199c097424ce812c410f3f7c654fd",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4861,
+      "target": "sha256:2803bb038173e93e8db04d5c2d27ec83828199c097424ce812c410f3f7c654fd",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T141719Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T141719Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:17:19Z"
+}

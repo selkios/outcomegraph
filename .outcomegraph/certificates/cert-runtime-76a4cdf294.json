@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "runtime",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-runtime-76a4cdf294.json"
+  ],
+  "created_at": "2026-03-08T14:32:30Z",
+  "id": "cert-runtime-76a4cdf294",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:b8a637d486961b99079e788294dc5fc6c44794bb488c7de29fdd6ca764b6b12f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4899,
+      "target": ".outcomegraph/traces/runtime-verify-20260308t143230z-a1789787d4-runtime-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:b8a637d486961b99079e788294dc5fc6c44794bb488c7de29fdd6ca764b6b12f",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4899,
+      "target": "sha256:b8a637d486961b99079e788294dc5fc6c44794bb488c7de29fdd6ca764b6b12f",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T143230Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T143230Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:32:30Z"
+}

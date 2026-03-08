@@ -408,6 +408,7 @@ MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
 CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
 WORK_LOCK_STALE_SECONDS = 300
 WORK_LOCK_HEARTBEAT_SECONDS = 60
+WORK_PROGRESS_HEARTBEAT_SECONDS = 20
 OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
 OPTIMIZATION_SUPPORTED_METRICS = ("contains", "exact")
 LOCK_STATUS_LOCKED = "locked"
@@ -1327,6 +1328,7 @@ _COMMAND_FIELD_PLACEHOLDERS: dict[str, str] = {
     "--min-improvement": "<float>",
     "--offset": "<n>",
     "--params": "<json-file|->",
+    "--recover-stale-lock": "[=true|false]",
     "--ref": "<id>[,<id>...]",
     "--session-id": "<id>",
     "--timeout": "<seconds>",
@@ -1673,6 +1675,12 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 ),
                 _command_schema_field("--validate", "boolean", "Run preflight validation without mutating artifacts.", default=False),
                 _command_schema_field("--dry-run", "boolean", "Render a no-write execution plan for the command.", default=False),
+                _command_schema_field(
+                    "--recover-stale-lock",
+                    "boolean",
+                    "If lock contention is detected, recover orphaned/expired locks and retry once.",
+                    default=False,
+                ),
                 _command_schema_field("--max-retries", "integer", "Maximum retries for transient worker and oracle failures.", default=0),
                 _command_schema_field("--timeout", "integer", "Override subprocess timeout in seconds for worker and oracle steps."),
             ],
@@ -1762,7 +1770,7 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
                 _command_schema_field("--timeout", "integer", "Override worker, replay-step, and oracle timeouts in seconds."),
             ],
             [
-                _command_schema_field("status", "string", "Command status (`ok` or `error`)."),
+                _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
                 _command_schema_field("command", "string", "Command identifier for envelope payload."),
                 _command_schema_field("options", "object", "Parsed command options."),
                 _command_schema_field("replay_plans", "array", "Replay plan artifacts produced."),
@@ -1786,7 +1794,15 @@ def _build_cli_command_signatures() -> list[dict[str, object]]:
             "status",
             "og status",
             "Show freshness, lock, verification, and daemon/autopilot state.",
-            [_command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False)],
+            [
+                _command_schema_field("--json", "boolean", "Emit machine-readable JSON output.", default=False),
+                _command_schema_field(
+                    "--verbose",
+                    "boolean",
+                    "Include full nested verification/drift payload details instead of a compact dashboard summary.",
+                    default=False,
+                ),
+            ],
             [
                 _command_schema_field("status", "string", "Command status (`ok`, `warn`, or `error`)."),
                 _command_schema_field("schema_version", "integer", "Status schema version."),
@@ -4002,6 +4018,8 @@ def _collect_verification_state(
     repo_root: str,
     sync_event: dict | None,
     now: datetime.datetime,
+    *,
+    verbose: bool = False,
 ) -> dict[str, object]:
     replay_event, _ = _read_latest_replay_event(repo_root)
 
@@ -4009,9 +4027,24 @@ def _collect_verification_state(
         created_at_raw = event.get("created_at")
         created_at = _parse_utc_timestamp(created_at_raw) if isinstance(created_at_raw, str) else None
         age = int((now - created_at).total_seconds()) if created_at else None
-        steps = event.get("steps") if isinstance(event.get("steps"), list) else []
+        raw_steps = event.get("steps") if isinstance(event.get("steps"), list) else []
+        projected_steps: list[dict[str, object]] = []
+        if verbose:
+            projected_steps = [step for step in raw_steps if isinstance(step, dict)]
+        else:
+            for step in raw_steps:
+                if not isinstance(step, dict):
+                    continue
+                projected_steps.append(
+                    {
+                        "name": step.get("name"),
+                        "status": step.get("status"),
+                        "code": step.get("code"),
+                        "message": step.get("message"),
+                    }
+                )
         matching_step = None
-        for raw_step in steps:
+        for raw_step in raw_steps:
             if not isinstance(raw_step, dict):
                 continue
             if raw_step.get("name") == step_name:
@@ -4058,7 +4091,8 @@ def _collect_verification_state(
             "message": message,
             "last_verified_at": created_at_raw if isinstance(created_at_raw, str) else None,
             "sync_status": event.get("status", "unknown"),
-            "steps": steps,
+            "steps": projected_steps,
+            "step_count": len(raw_steps),
             "threshold_seconds": STATUS_VERIFY_STALE_SECONDS,
             "event_created_at": created_at_raw if isinstance(created_at_raw, str) else None,
             "command": event.get("command"),
@@ -4924,14 +4958,43 @@ def _build_status_payload(
     project_agent_reliability: bool = True,
 ) -> dict[str, object]:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
+    verbose = bool(options.get("verbose", False))
     state = _read_work_state(repo_root)
     lock = _read_lock_status(repo_root, now)
     pending_file_present, pending_file_source = _read_work_pending_file(repo_root)
     sync_event, _ = _read_latest_sync_event(repo_root)
     sync = _collect_sync_freshness(sync_event, now)
-    verification = _collect_verification_state(repo_root, sync_event, now)
+    verification = _collect_verification_state(repo_root, sync_event, now, verbose=verbose)
     certificates = _collect_certificate_freshness(repo_root, now)
     drift = _collect_drift_state(repo_root, now)
+    if not verbose:
+        compact_checks: list[dict[str, object]] = []
+        for raw_check in drift.get("checks", []) if isinstance(drift.get("checks"), list) else []:
+            if not isinstance(raw_check, dict):
+                continue
+            compact_check: dict[str, object] = {
+                "type": raw_check.get("type"),
+                "status": raw_check.get("status"),
+                "message": raw_check.get("message"),
+            }
+            remediation = raw_check.get("remediation")
+            if isinstance(remediation, list) and remediation:
+                compact_check["remediation"] = remediation
+            details = raw_check.get("details")
+            if isinstance(details, dict) and details:
+                compact_details: dict[str, object] = {}
+                for key, value in details.items():
+                    if isinstance(value, list):
+                        compact_details[key] = f"{len(value)} item(s)"
+                    elif isinstance(value, dict):
+                        compact_details[key] = f"{len(value)} field(s)"
+                    else:
+                        compact_details[key] = value
+                if compact_details:
+                    compact_check["details"] = compact_details
+            compact_checks.append(compact_check)
+        drift = dict(drift)
+        drift["checks"] = compact_checks
     integrity = _collect_integrity_state(repo_root)
 
     has_pending = bool(state.get("pending", False)) or pending_file_present
@@ -8989,6 +9052,46 @@ def _acquire_work_lock(repo_root: str, holder: dict) -> tuple[bool, dict | None]
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 
 
+def _lock_recovery_reason(lock_payload: dict | None) -> str | None:
+    if not isinstance(lock_payload, dict):
+        return None
+    if str(lock_payload.get("status") or "") != LOCK_STATUS_LOCKED:
+        return None
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    if _is_lock_stale(lock_payload, now):
+        return "stale"
+
+    session = _session_from_payload(lock_payload.get("session"), now=now)
+    if isinstance(session, dict) and str(session.get("state") or "").strip().lower() == SESSION_STATE_EXPIRED:
+        return "expired_session"
+
+    holder = lock_payload.get("holder")
+    if not isinstance(holder, dict):
+        return "missing_holder"
+    holder_host = str(holder.get("host") or "").strip()
+    holder_pid = holder.get("pid")
+    if holder_host and holder_host != socket.gethostname():
+        return None
+    if isinstance(holder_pid, int) and holder_pid > 0 and not _daemon_running(holder_pid):
+        return "orphaned_pid"
+    return None
+
+
+def _recover_sync_lock(repo_root: str, lock_payload: dict | None) -> str | None:
+    reason = _lock_recovery_reason(lock_payload)
+    if reason is None:
+        return None
+    lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    try:
+        os.remove(lock_path)
+    except FileNotFoundError:
+        return reason
+    except OSError as exc:
+        raise RuntimeError(f"failed to recover sync lock: {exc}") from exc
+    return reason
+
+
 def _release_work_lock(repo_root: str, holder: dict) -> None:
     lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
     lock_payload = _read_json_file(lock_path)
@@ -10181,6 +10284,8 @@ def parse_command_flags(
     allow_validate: bool = False,
     allow_dry_run: bool = False,
     allow_recovery_controls: bool = False,
+    allow_recover_stale_lock: bool = False,
+    allow_verbose: bool = False,
     runtime_defaults: dict[str, object] | None = None,
     default_strict: bool = False,
 ) -> tuple[dict[str, object], list[str]]:
@@ -10205,6 +10310,8 @@ def parse_command_flags(
             _command_accepts_field(command, field_name)
             for field_name in ("--max-retries", "--timeout")
         )
+        allow_recover_stale_lock = _command_accepts_field(command, "--recover-stale-lock")
+        allow_verbose = _command_accepts_field(command, "--verbose")
 
     changed = False
     resolved_defaults = runtime_defaults or {}
@@ -10233,6 +10340,8 @@ def parse_command_flags(
     offset = 0
     validate_only = False
     dry_run = False
+    recover_stale_lock = False
+    verbose = False
     max_retries = 0
     timeout_seconds: int | None = None
 
@@ -10496,6 +10605,36 @@ def parse_command_flags(
                 emit_error(f"invalid --dry-run value: {exc}", command, EXIT_USAGE, output_json)
             i += 1
             continue
+        if arg == "--recover-stale-lock":
+            if not allow_recover_stale_lock:
+                emit_error(f"{command} does not accept --recover-stale-lock", command, EXIT_USAGE, output_json)
+            recover_stale_lock = True
+            i += 1
+            continue
+        if arg.startswith("--recover-stale-lock="):
+            if not allow_recover_stale_lock:
+                emit_error(f"{command} does not accept --recover-stale-lock", command, EXIT_USAGE, output_json)
+            try:
+                recover_stale_lock = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --recover-stale-lock value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
+        if arg == "--verbose":
+            if not allow_verbose:
+                emit_error(f"{command} does not accept --verbose", command, EXIT_USAGE, output_json)
+            verbose = True
+            i += 1
+            continue
+        if arg.startswith("--verbose="):
+            if not allow_verbose:
+                emit_error(f"{command} does not accept --verbose", command, EXIT_USAGE, output_json)
+            try:
+                verbose = parse_bool_option(arg.split("=", 1)[1])
+            except ValueError as exc:
+                emit_error(f"invalid --verbose value: {exc}", command, EXIT_USAGE, output_json)
+            i += 1
+            continue
         if arg == "--max-retries":
             if not allow_recovery_controls:
                 emit_error(f"{command} does not accept --max-retries", command, EXIT_USAGE, output_json)
@@ -10685,6 +10824,8 @@ def parse_command_flags(
         "non_interactive": command_non_interactive,
         "validate": validate_only,
         "dry_run": dry_run,
+        "recover_stale_lock": recover_stale_lock,
+        "verbose": verbose,
         "max_retries": max_retries,
         "timeout": timeout_seconds,
     }
@@ -11781,7 +11922,8 @@ def _run_oracle_check(
     if not command_text:
         result_payload["status"] = "pass"
         result_payload["observed_code"] = 0
-        result_payload["message"] = "No oracle command configured; marked pass."
+        result_payload["message"] = "No executable oracle command configured; treated as advisory pass."
+        result_payload["no_executable_oracle"] = True
         result_payload["recovery"] = _build_recovery_record(
             f"oracle:{oracle_name}",
             attempts=1,
@@ -16295,6 +16437,32 @@ def _run_replay_stage(
         for ref in _preserve_certificate_refs(failed_capsules):
             final_certificate_refs.add(ref)
 
+    skipped_count = 0
+    bootstrap_missing_count = 0
+    for replay_result in replay_results:
+        if not isinstance(replay_result, dict):
+            continue
+        if str(replay_result.get("status") or "").lower() == "skipped":
+            skipped_count += 1
+            if bool(replay_result.get("bootstrap_missing_capsule")):
+                bootstrap_missing_count += 1
+
+    stage_status = "error" if overall_failed else "ok"
+    warnings: list[str] = []
+    all_skipped_missing_prerequisites = False
+    if (
+        not overall_failed
+        and replay_results
+        and skipped_count == len(replay_results)
+    ):
+        all_skipped_missing_prerequisites = True
+        if bootstrap_missing_count:
+            warnings.append(
+                "Replay skipped for all targets because capsule metadata/executable acceptance oracles were missing."
+            )
+        else:
+            warnings.append("Replay skipped for all targets; no executable replay plans were produced.")
+
     if not errors and overall_failed:
         for replay_result in replay_results:
             if not isinstance(replay_result, dict):
@@ -16314,9 +16482,15 @@ def _run_replay_stage(
 
     return {
         "name": "replay",
-        "status": "error" if overall_failed else "ok",
+        "status": stage_status,
         "code": replay_error_code or (RUNTIME_ERROR_CODE if overall_failed else None),
-        "message": "Replay adapter completed with failures." if overall_failed else "Replay adapter produced executable plans.",
+        "message": (
+            "Replay adapter completed with failures."
+            if overall_failed
+            else "Replay adapter completed with warnings."
+            if warnings
+            else "Replay adapter produced executable plans."
+        ),
         "mode": mode,
         "replay_plans": plans,
         "replay_results": replay_results,
@@ -16324,6 +16498,8 @@ def _run_replay_stage(
         "certificate_refs": sorted(final_certificate_refs),
         "failed_capsules": sorted(set(failed_capsules)),
         "errors": errors,
+        "warnings": warnings,
+        "all_skipped_missing_prerequisites": all_skipped_missing_prerequisites,
         "recovery": _summarize_recovery_records(recovery_records),
         **({"prompt_provenance": replay_prompt_provenance} if replay_prompt_provenance is not None else {}),
     }
@@ -16344,7 +16520,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         changed_capsules = _list_known_capsules(repo_root)
     if not changed_capsules and not changed_only:
         changed_only = True
-        changed_capsules = ["default"]
+        changed_capsules = []
 
     run_id = _build_run_id("verify", _short_hash(f"{profile}:{mode}:{'changed' if changed_only else 'all'}", 10))
     policy_payload, policy_error = _resolve_policy_for_repo(repo_root)
@@ -16425,7 +16601,7 @@ def _run_verify_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "recovery": verify.get("recovery", {}),
     }
 
-    if policy_error is None and verify_status == "ok":
+    if policy_error is None and verify_status in {"ok", "warn"}:
         _append_export_refresh_step(payload, repo_root, mode, policy_payload)
     payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
     payload["summary_event"] = _record_verify_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
@@ -16474,8 +16650,14 @@ def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         timeout_seconds=cast(int | None, options.get("timeout")),
         max_retries=int(options.get("max_retries") or 0),
     )
+    replay_status = str(replay.get("status") or "error").lower()
+    payload_status = "error"
+    if replay_status == "ok":
+        payload_status = "ok"
+    if bool(replay.get("all_skipped_missing_prerequisites")):
+        payload_status = "warn"
     payload = {
-        "status": "ok" if replay.get("status") == "ok" else "error",
+        "status": payload_status,
         "command": "replay",
         "code": replay.get("code"),
         "options": options,
@@ -16487,9 +16669,10 @@ def _run_replay_job(repo_root: str, options: dict[str, object]) -> dict[str, obj
         "certificate_ids": replay.get("certificate_ids", []),
         "certificate_refs": replay.get("certificate_refs", []),
         "errors": replay.get("errors", []),
+        "warnings": replay.get("warnings", []),
         "recovery": replay.get("recovery", {}),
     }
-    if policy_error is None and str(replay.get("status") or "").lower() == "ok":
+    if policy_error is None and replay_status == "ok":
         _append_export_refresh_step(payload, repo_root, mode, policy_payload)
     payload["duration_ms"] = int((time.perf_counter() - start_at) * 1000)
     payload["summary_event"] = _record_replay_summary_event(repo_root, payload, payload["duration_ms"], snapshot)
@@ -17150,6 +17333,8 @@ def _run_verify_stage(
     configuration_failed = False
     recovery_records: list[dict[str, object]] = []
     timed_out = False
+    no_executable_oracle_count = 0
+    no_executable_oracle_capsules: set[str] = set()
 
     for capsule in changed_capsules:
         try:
@@ -17207,6 +17392,9 @@ def _run_verify_stage(
             if isinstance(recovery, dict):
                 recovery_records.append(recovery)
                 timed_out = timed_out or bool(recovery.get("timed_out"))
+            if bool(check.get("no_executable_oracle")):
+                no_executable_oracle_count += 1
+                no_executable_oracle_capsules.add(capsule)
             for pointer in check.get("receipt_pointers", []):
                 if isinstance(pointer, dict):
                     receipt_records.append(pointer)
@@ -17310,6 +17498,12 @@ def _run_verify_stage(
     elif policy_denied:
         status = "warn"
         warnings.extend(policy_denied_messages)
+    elif no_executable_oracle_count > 0:
+        status = "warn"
+        warnings.append(
+            f"{no_executable_oracle_count} oracle check(s) had no executable command configured across "
+            f"{len(no_executable_oracle_capsules)} capsule(s)."
+        )
 
     if not errors:
         for check_group in oracle_results.values():
@@ -17329,6 +17523,8 @@ def _run_verify_stage(
         "message": (
             "Oracle-driven verify loop completed with policy-skipped oracles."
             if policy_denied and not (overall_failed or configuration_failed)
+            else "Oracle-driven verify loop completed without executable oracle commands for one or more capsules."
+            if status == "warn" and no_executable_oracle_count > 0
             else "Oracle-driven verify loop blocked by policy."
             if policy_denied
             else "Oracle-driven verify loop failed due to invalid oracle configuration."
@@ -17676,8 +17872,21 @@ def _run_sync_job(repo_root: str, options: dict[str, object], session: dict[str,
     was_short_circuit = False
     steps: list[dict[str, object]] = []
     current_state = _read_work_state(repo_root)
+    short_circuit_blockers: list[str] = []
+    enforce_materialized_short_circuit = bool(options.get("enforce_materialized_short_circuit", False))
+    if (
+        enforce_materialized_short_circuit
+        and not force_full_sync
+        and current_state.get("last_idempotency_key") == idempotency_key
+    ):
+        certificates = _collect_certificate_freshness(repo_root, datetime.datetime.now(tz=datetime.timezone.utc))
+        export_drift = _collect_export_drift_check(repo_root)
+        if str(certificates.get("state") or "") == "unknown":
+            short_circuit_blockers.append("missing_or_empty_certificates")
+        if export_drift is not None:
+            short_circuit_blockers.append("export_control_surface_out_of_sync")
 
-    if not force_full_sync and current_state.get("last_idempotency_key") == idempotency_key:
+    if not force_full_sync and current_state.get("last_idempotency_key") == idempotency_key and not short_circuit_blockers:
         was_short_circuit = True
         steps.append(
             {
@@ -17714,6 +17923,16 @@ def _run_sync_job(repo_root: str, options: dict[str, object], session: dict[str,
             last_message="sync short-circuited by idempotency key",
         )
         return payload
+    if short_circuit_blockers:
+        steps.append(
+            {
+                "name": "short_circuit_bypass",
+                "status": "ok",
+                "message": "Idempotent key unchanged but runtime materialization is incomplete; forcing full sync stages.",
+                "blockers": short_circuit_blockers,
+                "idempotency_key": idempotency_key,
+            }
+        )
 
     def _time_step(name: str, stage_fn) -> dict[str, object]:
         start = time.perf_counter()
@@ -18050,6 +18269,7 @@ def run_command(
             runtime_defaults=command_runtime_defaults,
             default_strict=strict,
         )
+        options["enforce_materialized_short_circuit"] = True
         repo_root = _git_root()
         if bool(options.get("validate")) or bool(options.get("dry_run")):
             payload = _run_sync_preflight(repo_root, options)
@@ -18079,6 +18299,22 @@ def run_command(
                 return _command_exit_code(payload)
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
+        recovered_lock_reason: str | None = None
+        if not lock_acquired and bool(options.get("recover_stale_lock", False)):
+            try:
+                recovered_lock_reason = _recover_sync_lock(repo_root, lock_payload)
+            except RuntimeError as exc:
+                payload = {
+                    "status": "error",
+                    "command": "sync",
+                    "options": options,
+                    "message": str(exc),
+                    "errors": [_normalize_error_record({"error_code": RUNTIME_ERROR_CODE, "message": str(exc)})],
+                }
+                emit_command_result(payload, output_json)
+                return _command_exit_code(payload)
+            if recovered_lock_reason is not None:
+                lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
             active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
             active_session_id = active_session.get("session_id") if isinstance(active_session, dict) else None
@@ -18104,6 +18340,10 @@ def run_command(
                 ],
                 "message": "sync session is already running; pending work recorded.",
             }
+            if bool(options.get("recover_stale_lock", False)):
+                contended_payload["recovery_attempted"] = True
+                if recovered_lock_reason is not None:
+                    contended_payload["recovery_reason"] = recovered_lock_reason
             _set_pending_state(
                 repo_root,
                 f"lock contended by {active_session_id or lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}",
@@ -18113,6 +18353,7 @@ def run_command(
         try:
             active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
             heartbeat_stop = threading.Event()
+            progress_stop = threading.Event()
 
             def _heartbeat_loop() -> None:
                 while not heartbeat_stop.wait(WORK_LOCK_HEARTBEAT_SECONDS):
@@ -18121,20 +18362,43 @@ def run_command(
                     except Exception:
                         continue
 
+            def _progress_loop() -> None:
+                while not progress_stop.wait(WORK_PROGRESS_HEARTBEAT_SECONDS):
+                    try:
+                        work_state = _read_work_state(repo_root)
+                        stage = str(work_state.get("status") or "unknown")
+                        message = str(work_state.get("last_message") or "").strip()
+                        rendered = f"[og sync] heartbeat: stage={stage}"
+                        if message:
+                            rendered = f"{rendered} message={message}"
+                        print(rendered, file=sys.stderr, flush=True)
+                    except Exception:
+                        continue
+
             heartbeat_thread = threading.Thread(
                 target=_heartbeat_loop,
                 name="og-sync-lock-heartbeat",
                 daemon=True,
             )
+            progress_thread = threading.Thread(
+                target=_progress_loop,
+                name="og-sync-progress-heartbeat",
+                daemon=True,
+            )
             heartbeat_thread.start()
+            progress_thread.start()
             try:
+                if recovered_lock_reason is not None:
+                    options["recovered_lock_reason"] = recovered_lock_reason
                 payload = _run_sync_job(repo_root, options, active_session)
                 payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload, "session": active_session}
                 emit_command_result(payload, output_json)
                 return _command_exit_code(payload)
             finally:
                 heartbeat_stop.set()
+                progress_stop.set()
                 heartbeat_thread.join(timeout=1.0)
+                progress_thread.join(timeout=1.0)
         finally:
             _release_work_lock(repo_root, holder)
         return EXIT_SUCCESS

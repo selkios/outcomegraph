@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "security_policy",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-security_policy-87ab2adb7c.json"
+  ],
+  "created_at": "2026-03-08T14:36:16Z",
+  "id": "cert-security_policy-87ab2adb7c",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:0a72907a3c7c659540c2ebe43caa9670e8bb6404fcf3b9c62d014bf08fe462df",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4931,
+      "target": ".outcomegraph/traces/security_policy-verify-20260308t143616z-a1789787d4-security_policy-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:0a72907a3c7c659540c2ebe43caa9670e8bb6404fcf3b9c62d014bf08fe462df",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4931,
+      "target": "sha256:0a72907a3c7c659540c2ebe43caa9670e8bb6404fcf3b9c62d014bf08fe462df",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T143616Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T143616Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:36:16Z"
+}

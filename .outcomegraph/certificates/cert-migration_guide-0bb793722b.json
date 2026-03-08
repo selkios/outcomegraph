@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "migration_guide",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-migration_guide-0bb793722b.json"
+  ],
+  "created_at": "2026-03-08T14:17:19Z",
+  "id": "cert-migration_guide-0bb793722b",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:bf809bba65ecf2d218f2268e7fb29abe2e4e0997cd017f13bf99b76336225670",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4879,
+      "target": ".outcomegraph/traces/migration_guide-verify-20260308t141719z-a1789787d4-migration_guide-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:bf809bba65ecf2d218f2268e7fb29abe2e4e0997cd017f13bf99b76336225670",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4879,
+      "target": "sha256:bf809bba65ecf2d218f2268e7fb29abe2e4e0997cd017f13bf99b76336225670",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T141719Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T141719Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:17:19Z"
+}

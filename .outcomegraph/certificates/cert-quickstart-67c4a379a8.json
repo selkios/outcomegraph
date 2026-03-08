@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "quickstart",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-quickstart-67c4a379a8.json"
+  ],
+  "created_at": "2026-03-08T14:36:16Z",
+  "id": "cert-quickstart-67c4a379a8",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:3af13596ca46f311217fe6f6abfa69385a2c01cade30d6ec83666bf01b39defa",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4916,
+      "target": ".outcomegraph/traces/quickstart-verify-20260308t143616z-a1789787d4-quickstart-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:3af13596ca46f311217fe6f6abfa69385a2c01cade30d6ec83666bf01b39defa",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4916,
+      "target": "sha256:3af13596ca46f311217fe6f6abfa69385a2c01cade30d6ec83666bf01b39defa",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T143616Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T143616Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:36:16Z"
+}

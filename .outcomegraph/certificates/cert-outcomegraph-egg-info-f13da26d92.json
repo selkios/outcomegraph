@@ -1,0 +1,41 @@
+{
+  "adapter": {
+    "name": "filesystem-store",
+    "version": "1.0.0"
+  },
+  "artifact_type": "certificate",
+  "capsule_id": "outcomegraph-egg-info",
+  "claim_refs": [
+    ".outcomegraph/claims/cl-outcomegraph-egg-info-f13da26d92.json"
+  ],
+  "created_at": "2026-03-08T14:32:30Z",
+  "id": "cert-outcomegraph-egg-info-f13da26d92",
+  "receipt_pointers": [
+    {
+      "hash": "sha256:c5ac3a0c844a9aeea13e679356f8420c0a8436532ddbf610c83eacb8dfc2d5c0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4941,
+      "target": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t143230z-a1789787d4-outcomegraph-egg-info-verify-verify.json",
+      "type": "file"
+    },
+    {
+      "hash": "sha256:c5ac3a0c844a9aeea13e679356f8420c0a8436532ddbf610c83eacb8dfc2d5c0",
+      "media_type": "application/json",
+      "schema_version": 2,
+      "size": 4941,
+      "target": "sha256:c5ac3a0c844a9aeea13e679356f8420c0a8436532ddbf610c83eacb8dfc2d5c0",
+      "type": "cas"
+    }
+  ],
+  "replay_context": {
+    "adapter_profile": "verify",
+    "mode": "observe",
+    "run_id": "verify-20260308T143230Z-a1789787d4",
+    "source": "oracle-loop"
+  },
+  "run_id": "verify-20260308T143230Z-a1789787d4",
+  "schema_version": 2,
+  "status": "success",
+  "updated_at": "2026-03-08T14:32:30Z"
+}

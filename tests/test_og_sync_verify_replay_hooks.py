@@ -3368,7 +3368,7 @@ class TestVerifyWorkflows(_RepoTestCase):
             )
 
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["verified_capsules"], ["default"])
+        self.assertEqual(payload["verified_capsules"], [])
         self.assertEqual(payload["changed_only"], True)
 
     def test_run_verify_job_refreshes_exports_after_writing_verify_artifacts(self) -> None:
