@@ -1,65 +1,51 @@
 # OutcomeGraph
 
-OutcomeGraph is a Git-native workflow layer for keeping a project’s artifact graph
-canonicalized and replayable. The `og` command line interface is the stable
-boundary for humans, agents, CI, and MCP clients.
+OutcomeGraph is a Git-native workflow layer for teams that use AI builders. It turns every meaningful change into a small, replayable record so the next person or agent can continue with less guesswork.
 
-## What this repository is
+Instead of only tracking raw files, OutcomeGraph tracks:
+- what changed,
+- why it changed,
+- how it was verified,
+- and where to find the evidence.
 
-- Source-of-truth artifacts live under `.outcomegraph/`.
-- `og sync` is the reconciliation pipeline:
-  distill → apply → verify → export.
-- `work`, `events`, and `objects` are written as immutable evidence for replay and audit.
-- Runtime errors are surfaced with structured status payloads so callers can branch safely.
+If you work with coding agents, this is the difference between "what worked last time" and "what we can prove and recreate reliably."
 
-## Git tracking policy for `.outcomegraph`
+## Why this is useful
 
-Track curated control-plane files:
+As a developer:
+- reduce context churn when you switch tasks or return after a break,
+- get machine-readable evidence of what happened (`--json`),
+- and replay risky changes in clean environments before they break CI.
 
-- `.outcomegraph/constitution/**`
-- `.outcomegraph/config.yaml`
-- `.outcomegraph/policy.yaml`
-- `.outcomegraph/export/AGENTS.md`
-- `.outcomegraph/.gitignore`
+As a team:
+- align humans and agents on one command contract (`og`),
+- keep docs/runbooks/tests/artifacts synchronized through the same pipeline as code changes,
+- and surface regressions with actionable, typed errors instead of free-form logs.
 
-Ignore regenerated run outputs by default:
+As an AI explorer:
+- version control where AI behavior is derived from (`prompts/workers/*` + manifest),
+- compare prompt variants with evidence,
+- and keep prompt-driven logic traceable by run IDs and provenance.
 
-- runtime churn: `work/`, `cache/`, `events/`, `objects/`, `traces/`
-- regenerated canon: `capsules/`, `refs/`, `decisions/`, `claims/`, `certificates/`, `materials.lock`, `export/*` (except `export/AGENTS.md`)
+## In plain English: what you get after setup
 
-## Worker prompt assets and capsule quality
+- A canonical, repo-local truth plane in `.outcomegraph/` (tracked artifacts).
+- A reproducible change log (`work/`, `events/`, `objects/`, `traces/`) for replay and audit.
+- Structured command output and stable exit behavior for CI and bots.
+- A built-in workflow to keep `.outcomegraph/export/AGENTS.md` aligned for future agent sessions.
 
-- Worker prompt bodies live under `prompts/workers/`, and `prompts/workers/manifest.json`
-  binds each supported role to a stable prompt `id`, `version`, `path`, and required
-  template variables.
-- Worker startup fails fast when the manifest is missing, a role/version binding drifts,
-  an asset is unreadable, or a template references undeclared variables.
-- Prompt assets are repo-owned implementation inputs. Keep them reviewed and versioned in
-  the main codebase, not under `.outcomegraph/`.
-- `.outcomegraph/` remains the canonical replayable truth. Worker runs only persist prompt
-  provenance (`id`, `version`, `source_path`) into traces, stage payloads, certificates,
-  and sync/verify/replay summary events so a run can be tied back to the exact prompt asset.
-- When prompt behavior changes, update the asset and bump its declared version in the
-  manifest/binding so provenance remains meaningful across runs.
-- Strong capsules are compact recreation briefs, not file-by-file summaries. They should
-  carry a bounded goal/scope plus behavior claims, invariants, dependencies, unknowns, and
-  an acceptance oracle or explicit oracle-gap reason.
-- `code` and `test` capsules need executable oracle evidence to stay `success`.
-  `doc`, `config`, and `runtime` capsules may still be `success` with advisory or
-  `command: null` oracles only when the gap is explained explicitly and the capsule remains
-  materially reusable.
+## Install and run quickly
 
-## Quick start (recommended)
-
-Run from your project repository root (no install required):
+Run from a checked-out project root:
 
 ```bash
+# one-off, no install
 uvx --from git+https://github.com/selkios/outcomegraph og init
 uvx --from git+https://github.com/selkios/outcomegraph og sync --json
 uvx --from git+https://github.com/selkios/outcomegraph og status --json
 ```
 
-Install once and run as `og` everywhere:
+Then the same flow with a local install:
 
 ```bash
 uv tool install --from git+https://github.com/selkios/outcomegraph outcomegraph
@@ -68,26 +54,7 @@ og sync --json
 og status --json
 ```
 
-Optional: enable daemon mode with `uvx` (no install):
-
-```bash
-uvx --from git+https://github.com/selkios/outcomegraph og daemon install
-uvx --from git+https://github.com/selkios/outcomegraph og daemon start
-uvx --from git+https://github.com/selkios/outcomegraph og daemon status
-```
-
-Optional: enable daemon mode with installed `og`:
-
-```bash
-og daemon install
-og daemon start
-og daemon status
-```
-
-`og daemon install` now writes a launcher pinned to the current interpreter/module context.
-Daemon runtime does not fetch remote repository `HEAD` implicitly after install.
-
-## Development (from source)
+From source:
 
 ```bash
 git clone https://github.com/selkios/outcomegraph.git
@@ -95,82 +62,46 @@ cd outcomegraph
 uv run og <command>
 ```
 
-## Full-spec rollout and dogfood checklist
+## The first useful loop (recommended)
 
-Use the bundled dogfood flow so the evidence layout stays deterministic:
-
-```bash
-bash skills/og-dogfood/scripts/run_dogfood.sh /home/agent/outcomegraph
-```
-
-Review the generated artifacts under `.outcomegraph/events/`:
-
-1. `dogfood-status.json` should end with top-level `status: "ok"`, `data.issues: []`, and `data.runtime.status: "idle"`.
-2. `dogfood-sync.json` should end with top-level `status: "ok"` and include `distill`, `apply`, `verify`, and `export`.
-3. `dogfood-verify.json` should end with top-level `status: "ok"` and a non-empty `data.verified_capsules`.
-4. `dogfood-replay.json` should end with top-level `status: "ok"` and a non-empty `data.replay_results`.
-5. `dogfood-drift.txt` should include `drift: ok` and should not include `POLICY_DENIED`.
-6. `dogfood-sync.json`, `dogfood-verify.json`, `dogfood-replay.json`, and resulting certificates should expose prompt provenance that points back to `prompts/workers/*.txt`.
-7. Review `og`, `tests`, `runbooks`, `spec-v2`, and `uv` under `.outcomegraph/capsules/` for bounded scope, recreation-brief fields, and any stale-doc contradictions.
-8. `code` and `test` capsules should show executable oracle commands. `doc`, `config`, and `runtime` capsules may use advisory oracle gaps only with an explicit reason.
-
-If the bundled run fails, inspect the written `dogfood-*.json` artifacts before trying ad hoc reruns.
-
-### Dogfood Example In This Repository
-
-Use this repository itself as a reference project:
+After you make changes:
 
 ```bash
-uv run og init
-uv run og sync --json
-uv run og status --json
+og sync --recover-stale-lock --json        # reconcile project changes into OutcomeGraph
+og status --verbose --json                  # check freshness and drift in one shot
+og verify --changed --json                   # run targeted validation
+og replay --changed --json                   # optional stronger confidence check
 ```
 
-Then inspect generated artifacts under `.outcomegraph/` and exported skill output under
-`skills/outcome-steward/SKILL.md`.
+Use this pattern:
+- `--validate` or `--dry-run` before destructive changes,
+- `--changed` for focused loops during local development,
+- `--json` whenever you need automation-friendly output.
 
-Typical CI/automation loop:
+## What this solves (team language)
 
-```bash
-og status --json            # guard: if status != ok -> fail fast
-og doctor --json            # collect machine-readable diagnostics + remediation
-og sync --json              # performs deterministic reconciliation
-og verify --changed --json  # checks changed capsules only and refreshes exports
-og replay --changed --json  # optional stronger confirmation; also refreshes exports
-og drift --json             # should stay clean after the standalone flows above
-```
+- **Less tribal knowledge**: every capsule has purpose, scope, and rationale.
+- **Less "mystery fixes"**: verification/replay evidence is explicit.
+- **Less drift between humans and agents**: exports are deterministic and machine-discoverable.
+- **Less rollout uncertainty**: you can validate with `status -> sync -> verify -> replay -> drift`.
 
-Headless defaults for CI/agents:
+## Why not just keep git history?
 
-```bash
-export OG_DEFAULT_OUTPUT=json
-export OG_DEFAULT_PROFILE=analyze
-export OG_DEFAULT_MODE=observe
-export OG_CONFIG_PATH=.outcomegraph/config.yaml   # optional, legacy: OG_CONFIG_FILE
-export OG_POLICY_PATH=.outcomegraph/policy.yaml   # optional, legacy: OG_POLICY_FILE
-export OG_CODEX_HOME="$HOME/.codex"               # optional, legacy fallback: CODEX_HOME
-```
+Git tracks file snapshots. OutcomeGraph tracks:
+- behavior intent,
+- validation evidence,
+- and machine-consumable links between decisions, claims, and certificates.
 
-Precedence is `CLI flags > env vars > .outcomegraph/config.yaml`.
-Resolved sources and config/policy paths are echoed back in command `options.configuration`.
+That makes handoffs and recovery much cheaper when multiple agents or frequent context switches are involved.
 
-## Agent guidance contract
+## Core command shape
 
-`og init` seeds a root [`CONTEXT.md`](./CONTEXT.md). This is the canonical, versioned
-startup contract for automation. [`.outcomegraph/export/AGENTS.md`](./.outcomegraph/export/AGENTS.md)
-is the generated projection kept in sync with it during export refresh.
+`og` is the stable contract for both people and agents. All commands support `--help` and have explicit output modes:
+- `human` (default)
+- `--json` (single machine-readable envelope)
+- `--output jsonl|human|json`
 
-Machine callers should follow these rules:
-
-- discover command shapes with `og schema` and `og describe <command>`
-- narrow large payloads with `--fields`, `--limit`, `--offset`, or `--output jsonl`
-- run `--validate` or `--dry-run` before mutating commands when you need a no-write preview
-- require explicit `--yes` for destructive actions and treat `--strict` failures as hard contract violations
-
-## Core command contract
-
-`og` supports these top-level commands:
-
+Top-level commands:
 - `init`
 - `sync`
 - `verify [--changed]`
@@ -180,6 +111,7 @@ Machine callers should follow these rules:
 - `export`
 - `explain [--capsule --ref --certificate]`
 - `drift`
+- `clean`
 - `mcp-server`
 - `optimize prompts`
 - `autopilot init|disable`
@@ -187,332 +119,125 @@ Machine callers should follow these rules:
 - `schema`
 - `describe <command>`
 
-Every top-level command supports `--help` as a stable contract surface:
-
-- `og <command> --help` prints command-specific usage and accepted options.
-- `og daemon --help` and `og daemon run --help` are valid contract entrypoints.
-
-Machine bootstrap for agents:
+Machine-first usage that most teams adopt:
 
 ```bash
-og schema
-og describe sync
-og describe daemon status
+og schema                      # discover command signatures
+og describe sync               # inspect one command in machine-readable form
+og status --json               # CI gate, quick health check
+og sync --json                 # standard reconciliation
+og verify --changed --json      # focused validation
+og drift --json                # policy/cert drift check
 ```
 
-Common flags:
+## The sync cycle, in one line
 
-- `--json` / `--json=true|false`
-- `--output json|jsonl|human` (jsonl streams list-like fields in order)
-- `--non-interactive` disable interactive prompts and require explicit confirmation flags for privileged operations
-- `--fields <field>[,<field>...]` (top-level payload projection)
-- `--limit <n>` / `--offset <n>` (pagination for list-like fields)
-- `--strict` / `--strict=true|false`
-- `--profile {analyze|propose|apply}`
-- `--mode {observe|autonomous}`
-- `--changed` (for focused verify/replay behavior)
-- `--validate` / `--validate=true|false` (preflight mutating commands without writing)
-- `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
-- `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
-- `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
-- `--recover-stale-lock` / `--recover-stale-lock=true|false` (on `sync`, recover orphaned/expired lock state once and retry lock acquisition)
-- `--verbose` (on `status`, include full verification/drift payloads instead of compact summaries)
-- `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session using the emitted lowercase `<kind>-<timestamp>-<hash>` id)
+`og sync` runs: **distill → apply → verify → export**.
 
-Environment defaults:
+That means:
+- distill: convert changes to structured capsule deltas,
+- apply: update canonical artifacts,
+- verify: attach execution evidence,
+- export: refresh generated docs/agent guidance.
 
-- `OG_DEFAULT_OUTPUT={human|json|jsonl}` sets the default output mode before command parsing.
-- `OG_DEFAULT_PROFILE={analyze|propose|apply}` sets the default worker profile for commands that accept `--profile`.
-- `OG_DEFAULT_MODE={observe|autonomous}` sets the default operating mode for commands that accept `--mode`.
-- `OG_CONFIG_PATH=<path>` overrides the config defaults file location (YAML or JSON). `OG_CONFIG_FILE` is accepted as a legacy alias.
-- `OG_POLICY_PATH=<path>` overrides the policy file location (YAML or JSON). `OG_POLICY_FILE` is accepted as a legacy alias.
-- `OG_CODEX_HOME=<path>` overrides the Codex home/config directory for worker execution. `CODEX_HOME` remains a fallback alias.
-- Relative config/policy paths resolve from the repository root; `safety.policy_file` inside the config file resolves relative to that config file.
-- CLI flags still win: `--json`, `--output`, `--profile`, and `--mode` override env and config defaults.
+## Artifact map (what matters)
 
-Command help contracts also list output modes and exit semantics:
+Tracked in git by default:
+- `.outcomegraph/constitution/**`
+- `.outcomegraph/config.yaml`
+- `.outcomegraph/policy.yaml`
+- `.outcomegraph/export/AGENTS.md`
+- `.outcomegraph/.gitignore`
 
-- `default`: human-readable output
-- `--json`: machine-readable output
-- exit `0`: success
-- exit `1`: runtime failure
-- exit `64`: usage/validation failure
+Ignored as runtime/generated churn by default:
+- `.outcomegraph/work/`, `.outcomegraph/cache/`, `.outcomegraph/events/`, `.outcomegraph/objects/`, `.outcomegraph/traces/`
+- regenerated canon: `.outcomegraph/capsules/`, `.outcomegraph/refs/`, `.outcomegraph/decisions/`, `.outcomegraph/claims/`, `.outcomegraph/certificates/`, `.outcomegraph/materials.lock`, `.outcomegraph/export/*` (except `export/AGENTS.md`)
 
-If you are running from source, prefer:
+## Added-value workflow for AI teams
+
+1. Keep prompt assets in version control:
+   - `prompts/workers/manifest.json`
+   - `prompts/workers/*.txt`
+2. Run `og optimize prompts ...` on a dataset to compare baselines against candidates.
+3. `--approve` only when results pass your confidence bar.
+4. Re-run `og sync` so the rest of the system knows the new active prompt provenance.
+
+## CI / automation defaults (optional)
 
 ```bash
-uv run og <command>
+export OG_DEFAULT_OUTPUT=json
+export OG_DEFAULT_PROFILE=analyze
+export OG_DEFAULT_MODE=observe
+export OG_CONFIG_PATH=.outcomegraph/config.yaml   # optional
+export OG_POLICY_PATH=.outcomegraph/policy.yaml   # optional
+export OG_CODEX_HOME="$HOME/.codex"             # optional
 ```
 
-`og --version` uses the local `pyproject.toml` version in a source checkout and packaged metadata
-when installed elsewhere, so release metadata and runtime version output stay aligned.
+Precedence is always: CLI flags > environment > `.outcomegraph/config.yaml`.
 
-Return contract:
+## Troubleshooting at a glance
 
-- Every command emits this top-level JSON envelope when `--json` is set:
+- Use `--json` first: inspect `status`, `session_id`, `errors`, and `data.steps`.
+- For lock issues, try `og sync --recover-stale-lock --json`.
+- For diagnostics, run `og doctor --json`.
+- Before re-run: `og sync --validate --json`, `og verify --validate --json`, or `og replay --dry-run --json`.
+- For stale daemon/autopilot state, prefer explicit session IDs where supported.
 
-```json
-{
-  "schema_version": 1,
-  "command": "<top-level command id>",
-  "status": "ok|error|warn",
-  "run_id": "<operation identifier or null>",
-  "session_id": "<session identifier or null>",
-  "data": { "...": "..." },
-  "errors": [],
-  "warnings": [],
-  "metrics": {}
-}
-```
+## Optional environment modes and safety defaults
 
-- `command` is the command identifier (`init`, `sync`, `verify`, ...).
-- `status` is the command status.
-- `run_id` carries command correlation ids when available (e.g. sync/replay/verify/explain).
-- `session_id` carries lifecycle ids for explicit runtime sessions (`sync` lock sessions and resumable `daemon` / `autopilot` flows).
-- `data` contains command payload (canonical payload fields and step details).
-- `data.session` is present when the command owns an explicit session lifecycle and includes state, expiry, and resume metadata.
-- `errors` are typed records with:
-  - `error_class`: stable machine class (`usage`, `session`, `policy`, `integrity`, `adapter`, `runtime`)
-  - `error_code`: stable code identifier
-  - `message`: human-readable summary
-  - `retryable`: boolean retryability hint
-  - `hint`: bounded short remediation hint
-- Session resume/expiry/conflict failures are surfaced both in `data` and in the top-level `errors` list.
-- `warnings` are strings and remain informational.
-- `metrics` holds command-level timing/counters plus `agent_reliability` (`observation` + rolling `snapshot`).
-- `data.list_window` advertises list pagination metadata when `--fields`, `--limit`, or `--offset` are used.
-- `--output jsonl` emits one envelope line plus one `event: "item"` line per streamed list entry.
-- In non-JSON mode, command output remains human-readable (`message` is still shown).
-- Exit codes:
-  - `0` success
-  - `1` runtime failure
-  - `64` usage/validation failure
+`og` is safe-by-default (`observe` mode): it can update `.outcomegraph/**` and generated exports but does not edit product code unless you explicitly allow broader modes.
 
-For long lists, stream with `--output jsonl`:
+- `--non-interactive` disables prompts and requires explicit flags for sensitive steps.
+- `--strict` enforces stricter input/output validation.
 
-```bash
-og verify --output jsonl --fields verified_capsules --limit 50 --offset 100
-og explain --output jsonl --fields claims,decisions --limit 25
-og mcp-server --output jsonl --fields tools,resources --limit 100
-```
+## Full Spec and deep reference
 
-## Pipeline overview
-
-### `og sync`
-
-Runs the production reconciliation pipeline:
-
-1. `distill`
-   - Launches the worker adapter contract to produce delta-style capsule updates.
-2. `apply`
-   - Persists new claims/certificates into `.outcomegraph/`.
-3. `verify`
-   - Executes scoped oracle checks and writes verification claims/certificates.
-4. `export`
-   - Regenerates exported summary snapshots under `.outcomegraph/export/`.
-
-Sync uses a work lock and idempotency key:
-
-- if no material changes are detected, sync may short-circuit to `ok`.
-- when short-circuit preconditions are met but certificates/exports are missing, sync records `short_circuit_bypass` and runs full stages.
-- duplicate runs are prevented by lock/pending state.
-- `--recover-stale-lock` attempts one stale-lock recovery + reacquire cycle when contention is detected.
-- failed stages are captured as `status: error` with explicit `message` and `errors`.
-
-### `og verify`
-
-Validates impacted capsules and writes structured verify artifacts for drift and evidence tracing.
-
-- `--changed`: verify only capsules impacted by current working-tree changes.
-- Without `--changed`: verify known capsules (falls back to safe defaults).
-- `--validate` / `--dry-run`: inspect affected capsules, oracle selection, and write targets without mutating artifacts.
-- `--max-retries` / `--timeout`: bound retry and timeout behavior for oracle subprocesses.
-- if checks pass but one or more capsule oracles are advisory-only (`command: null`), verify returns `status: warn`.
-
-### `og replay`
-
-Builds reproducible replay plans and writes replay claims/certificates, including
-execution parity records where applicable.
-
-- `--changed`: replay only impacted capsules based on working-tree deltas.
-- `--validate` / `--dry-run`: inspect replay targets and write intent without mutating artifacts.
-- `--max-retries` / `--timeout`: bound retry and timeout behavior for worker, replay-step, and replay-oracle subprocesses.
-- replay returns `status: warn` when all targets are skipped because replay prerequisites (capsule metadata/executable acceptance oracles) are missing.
-
-### `og doctor`
-
-Runs machine-readable diagnostics for runtime health, drift, integrity, daemon state,
-and remediation hints. Use it before escalation or when `status`/`sync` failures need
-structured operator guidance. `doctor` now includes an `agent_reliability` check and
-echoes the current rolling metric snapshot under `data.agent_reliability`.
-
-### `og explain`
-
-Assembles explainability material (claims, certificates, decisions, deltas) by
-capsule/filter set for troubleshooting and review.
-
-### `og drift`
-
-Runs policy/certificate drift checks and writes a drift report artifact in the
-current event stream.
-
-### `og status`
-
-Builds a runtime/freshness dashboard used by operators and daemons:
-
-- work state (`pending` / `degraded` / `running` / etc.)
-- lock health
-- sync freshness
-- verification freshness
-- certificate freshness
-- drift and integrity status
-- rolling `agent_reliability` metrics for commands-per-successful-task, schema-valid output rate, retry auto-recovery rate, and resumable session churn
-
-`status --json` publishes the same rolling snapshot under `data.agent_reliability`.
-`status --verbose` includes full verification/drift internals; default output keeps compact summaries.
-
-### `og mcp-server`
-
-Generates a control-plane resource payload for MCP clients (`tools`, `resources`,
-`prompts`, counts, and errors when available).
-Each `tools[]` entry now embeds the same command signature object exposed by
-`og schema` and `og describe`, so CLI help/introspection and MCP tool metadata
-are generated from one registry.
-
-### `og optimize prompts`
-
-`--params` submits the full request payload as JSON, either from a file path or
-from stdin with `-`.
-
-- `og optimize prompts --params payload.json`
-- `cat payload.json | og optimize prompts --params -`
-
-Either flag-based input or payload input is supported:
-
-- `--dataset`, `--candidate`, and `--baseline` are required in strict mode even if
-  defaults exist, and `--metric`, `--min-improvement`, and `--approve` are
-  optional.
-- Payload keys `dataset`, `candidate`, `baseline`, `metric`, `min_improvement`, and
-  `approve` may replace the matching flags.
-- `--params` payload values can be overridden by explicit flags.
-- In `--strict` mode, unknown payload keys, missing optional defaults, and lossy
-  type coercions are rejected.
-
-### `og autopilot`
-
-- `autopilot init` wires lifecycle hooks and tracks managed hook state.
-- `autopilot init` emits a resumable `session_id` persisted in `.outcomegraph/autopilot/state.json`.
-- managed `pre-commit` runs the local quality pass and blocks the commit if it fails.
-- `autopilot disable` restores core hook state and removes managed scripts.
-- `autopilot disable --session-id <id>` asserts the installed autopilot session before teardown.
-
-### `og daemon`
-
-Long-running watcher process for autonomous execution:
-
-- `install`: writes wrapper script under `.outcomegraph/work/daemon/run-ogd.sh` and emits a resumable `session_id`
-- `start`: starts the daemon process and keeps the same `session_id` unless the prior session expired
-- `stop`: stops daemon gracefully, escalates if needed, and accepts `--session-id <id>`
-- `status`: prints managed state, current sync trigger state, and accepts `--session-id <id>`
-- `run`: internal loop entrypoint (invoked by script)
-
-The daemon watches file changes and pending work; when triggered it invokes
-`og sync --json` as a child process and persists run results to a structured log.
-
-### Session model
-
-- Session ids use the lowercase shape `<kind>-<yyyymmdd>t<hhmmss>z-<hash>`.
-- `sync` emits an ephemeral lock `session_id`; it is never resumable and expires on release or stale-lock timeout.
-- `sync` carries the active lock `session_id` in command envelopes and sync summary events.
-- Lock contention returns `status: "warn"` with `error_code: "SESSION_CONTENDED"` and the active sync `session_id`.
-- `autopilot` is resumable only across `autopilot init` and `autopilot disable`; `disable --session-id <id>` asserts the currently installed session before teardown.
-- `daemon` is resumable across `install`, `start`, `status`, and `stop`; active daemon sessions expire when the watcher state goes stale.
-- `daemon` and `autopilot` emit resumable session records with `data.session.state`, `data.session.expires_at`, and `data.session.resume_command`.
-- Explicit resume/assert failures return typed session errors: `SESSION_EXPIRED` and `SESSION_RESUME_INVALID`.
-
-## Artifact model (short reference)
-
-Canonical artifact root:
-
-- `.outcomegraph/constitution`
-- `.outcomegraph/capsules`
-- `.outcomegraph/refs`
-- `.outcomegraph/decisions`
-- `.outcomegraph/certificates`
-- `.outcomegraph/claims`
-- `.outcomegraph/datasets`
-- `.outcomegraph/events`
-- `.outcomegraph/objects`
-- `.outcomegraph/export`
-- `.outcomegraph/work`
-
-Most artifacts are JSON with:
-
-- `schema_version`
-- `artifact_type`
-- versioned command/phase context and trace pointers where available
-
-## Integrity and determinism
-
-- Sync and verify transitions are appended as ledger events to `.outcomegraph/events`.
-- Integrity checkpoints help detect chain issues.
-- `_read` operations normalize malformed or missing state where practical and emit
-  explicit degraded/error state when assumptions fail.
-- `run_id`, receipts, hashes, and deterministic payload ordering support replay.
-
-## Troubleshooting
-
-If you see unexpected status or stale diagnostics:
-
-- re-run with `--json` and inspect:
-  - `status`
-  - `session_id`
-  - `errors`
-  - `message`
-  - stage-level `steps` for `sync`
-  - daemon `last_sync_status`
-- check lock state with `og status --json`.
-- use `og sync --recover-stale-lock --json` when lock contention is likely stale/orphaned.
-- run `og doctor --json` to collect consolidated diagnostics and remediation hints.
-- use `og sync --validate --json`, `og verify --validate --json`, or `og replay --dry-run --json` before re-running mutating commands after a failure.
-- treat `verify` warnings as evidence gaps (usually advisory/non-executable oracle coverage), and `replay` warnings as replay-prerequisite gaps.
-- repair ledger state intentionally via sync repair flow if integrity is degraded (the CLI emits repair artifacts when possible).
-- If you receive `SESSION_CONTENDED`, wait for the active session or reuse the emitted `session_id` on resumable `daemon` / `autopilot disable` commands.
-
-## Documentation index
+Use these files when you need exact contracts, schemas, or architecture details:
 
 - [SPEC-v2.md](./SPEC-v2.md)
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [QUICKSTART.md](./QUICKSTART.md)
 - [PLUGIN_API.md](./PLUGIN_API.md)
 - [RUNBOOKS.md](./RUNBOOKS.md)
 - [SECURITY_POLICY.md](./SECURITY_POLICY.md)
 - [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
 - [SPEC_IMPLEMENTATION_MATRIX.md](./SPEC_IMPLEMENTATION_MATRIX.md)
-- [QUICKSTART.md](./QUICKSTART.md)
 
-## Cleanup OutcomeGraph artifacts
+## Advanced details (for operators)
 
-Use `og clean` to remove OutcomeGraph state safely.
+### Worker prompts and capsule quality
+
+- Prompt bodies live in `prompts/workers/`.
+- `prompts/workers/manifest.json` binds role/version/path/variables.
+- Worker startup fails fast if manifest, binding, or template contracts are invalid.
+- Code/runtime changes are tracked as compact recreation capsules (goal/scope/claims/invariants/dependencies/unknowns/oracle evidence).
+- `code` and `test` capsules require executable proof for strong `success`; advisory proof is allowed only where gaps are explicit.
+
+### Command output contract (quick reminder)
+
+When `--json` is used, commands emit a stable envelope (`schema_version`, `command`, `status`, `run_id`, `session_id`, `data`, `errors`, `warnings`, `metrics`).
+
+Exit semantics:
+- `0`: success
+- `1`: runtime failure
+- `64`: usage/validation failure
+
+Session model (important for daemon/autopilot):
+- IDs are resumable where documented,
+- expired/invalid resume attempts produce typed session errors,
+- `sync` lock sessions are ephemeral and scoped to the active run.
+
+### Cleanup
+
+Use `og clean` with `--scope` only when you want to reclaim local state:
 
 ```bash
-# Preview runtime cleanup only (non-destructive)
 og clean --scope runtime --dry-run --json
-
-# Preview generated canonical/export cleanup (non-destructive)
 og clean --scope generated --dry-run --json
-
-# Remove runtime artifacts
-og clean --scope runtime --yes
-
-# Remove generated artifacts
-og clean --scope generated --yes
-
-# Remove all OutcomeGraph artifacts and managed skill/symlink outputs
-# (also attempts daemon stop + autopilot disable first)
 og clean --scope all --yes
 ```
 
-Scopes:
-- `runtime`: `.outcomegraph/work`, `cache`, `events`, `objects`, `traces`
-- `generated`: `.outcomegraph/capsules`, `refs`, `decisions`, `claims`, `certificates`, `export`, `materials.lock`
+Scope meanings:
+- `runtime`: work/cache/events/objects/traces
+- `generated`: capsules/refs/decisions/claims/certificates/export/materials.lock
 - `all`: `.outcomegraph`, `skills/outcome-steward`, `.agents/skills/og`, `.claude/skills/og`
