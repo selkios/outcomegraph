@@ -24,7 +24,7 @@ import shlex
 import tempfile
 import string
 import tomllib
-from typing import Any, TypedDict, cast
+from typing import Any, Callable, TypedDict, cast
 
 import click
 import typer
@@ -455,6 +455,9 @@ WORKER_ADAPTER_BOOTSTRAP_MAX_WORKERS = 2
 WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
 DISTILL_STAGE_PROGRESS_POLL_SECONDS = 1.0
 DISTILL_STAGE_TIMEOUT_GRACE_SECONDS = 30
+WORKER_PROGRESS_HEARTBEAT_SECONDS = 5.0
+DISTILL_CHECKPOINT_SCHEMA_VERSION = 1
+DISTILL_CHECKPOINT_DIR = f"{OG_ROOT}/work/distill"
 WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "workers")
 WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
 WORKER_PROMPT_BINDINGS: dict[str, dict[str, str]] = {
@@ -2360,6 +2363,14 @@ def _run_worker_with_retries(
     retryable_failures: list[dict[str, object]] = []
     while True:
         attempts += 1
+        _emit_worker_progress(
+            {
+                "event": "worker_attempt_start",
+                "role": role,
+                "attempt": attempts,
+                "max_retries": max_retries,
+            }
+        )
         try:
             output, receipts = _run_codex_worker(
                 role,
@@ -2374,6 +2385,15 @@ def _run_worker_with_retries(
             retryable = _is_worker_unavailable_error(error_message)
             error_code = _recovery_error_code_for_message(error_message)
             if retryable and attempts <= max_retries:
+                _emit_worker_progress(
+                    {
+                        "event": "worker_attempt_retry",
+                        "role": role,
+                        "attempt": attempts,
+                        "error_code": error_code,
+                        "message": error_message,
+                    }
+                )
                 retryable_failures.append(
                     {
                         "attempt": attempts,
@@ -2398,6 +2418,13 @@ def _run_worker_with_retries(
             setattr(exc, "recovery", recovery)
             raise
 
+        _emit_worker_progress(
+            {
+                "event": "worker_attempt_success",
+                "role": role,
+                "attempt": attempts,
+            }
+        )
         recovery = _build_recovery_record(
             f"worker:{role}",
             attempts=attempts,
@@ -5504,6 +5531,8 @@ def _run_sync_preflight(repo_root: str, options: dict[str, object]) -> dict[str,
     max_retries = int(options.get("max_retries") or 0)
     snapshot = _collect_sync_snapshot(repo_root, profile, mode, force_full_sync=force_full_sync)
     idempotency_key = _compute_idempotency_key(snapshot, profile, mode)
+    if isinstance(snapshot, dict):
+        snapshot["idempotency_key"] = idempotency_key
     run_id = f"sync-{_utc_timestamp().replace(':', '').replace('-', '')}-{idempotency_key[:10]}"
     changed_files = [str(item) for item in snapshot.get("changed_files", [])] if isinstance(snapshot.get("changed_files"), list) else []
     changed_capsules = _collect_affected_capsules(changed_files)
@@ -6545,7 +6574,7 @@ def _is_sync_managed_generated_path(path: str) -> bool:
 
 def _is_worker_unavailable_error(error: str) -> bool:
     lowered = error.lower()
-    return WORKER_UNAVAILABLE_ERROR in lowered or "timed out" in lowered
+    return WORKER_UNAVAILABLE_ERROR in lowered or "timed out" in lowered or "no progress" in lowered
 
 
 def _safe_slug(value: str) -> str:
@@ -7364,6 +7393,23 @@ def _build_worker_command_variants(entrypoint: str, schema_path: str, last_messa
     ]
 
 
+_WORKER_PROGRESS_LOCAL = threading.local()
+
+
+def _set_worker_progress_callback(callback: Callable[[dict[str, object]], None] | None) -> None:
+    _WORKER_PROGRESS_LOCAL.callback = callback
+
+
+def _emit_worker_progress(event: dict[str, object]) -> None:
+    callback = getattr(_WORKER_PROGRESS_LOCAL, "callback", None)
+    if not callable(callback):
+        return
+    try:
+        callback(event)
+    except Exception:
+        return
+
+
 def _run_codex_worker(
     role: str,
     payload: dict[str, object],
@@ -7426,11 +7472,35 @@ def _run_codex_worker(
         except FileNotFoundError:
             raise WorkerAdapterError("codex executable was not found") from None
 
-        try:
-            output, error_output = proc.communicate(worker_prompt, timeout=timeout_seconds)
-        except subprocess.TimeoutExpired as exc:
-            _terminate_subprocess_tree(proc)
-            raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
+        heartbeat_stop = threading.Event()
+
+        def _heartbeat_loop() -> None:
+            while not heartbeat_stop.wait(WORKER_PROGRESS_HEARTBEAT_SECONDS):
+                _emit_worker_progress(
+                    {
+                        "event": "worker_wait",
+                        "role": role,
+                        "trace_path": trace_path,
+                        "elapsed_seconds": int((time.perf_counter() - start)),
+                    }
+                )
+
+        heartbeat_thread = threading.Thread(
+            target=_heartbeat_loop,
+            name=f"og-worker-heartbeat-{role}",
+            daemon=True,
+        )
+        heartbeat_thread.start()
+        while True:
+            try:
+                output, error_output = proc.communicate(worker_prompt, timeout=timeout_seconds)
+                break
+            except subprocess.TimeoutExpired as exc:
+                _terminate_subprocess_tree(proc)
+                raise WorkerAdapterError(f"codex exec timed out after {timeout_seconds}s ({role})") from exc
+            finally:
+                heartbeat_stop.set()
+                heartbeat_thread.join(timeout=1.0)
 
         duration_ms = int((time.perf_counter() - start) * 1000)
         if proc.returncode != 0:
@@ -14859,6 +14929,132 @@ def _repair_materials_lock(repo_root: str, changed_files: list[str] | None = Non
     return relative_path
 
 
+def _distill_checkpoint_path(repo_root: str, checkpoint_key: str) -> str:
+    safe_key = _safe_slug(checkpoint_key)
+    return os.path.join(repo_root, DISTILL_CHECKPOINT_DIR, f"{safe_key}.json")
+
+
+def _distill_batch_signature(batch_capsules: list[dict[str, object]], batch_changed_files: list[str]) -> str:
+    normalized_capsules: list[dict[str, object]] = []
+    for capsule in batch_capsules:
+        if not isinstance(capsule, dict):
+            continue
+        capsule_id = _safe_slug(str(capsule.get("id") or "default")) or "default"
+        normalized_capsules.append(
+            {
+                "id": capsule_id,
+                "changed_files": sorted(_safe_string_list(capsule.get("changed_files"))),
+            }
+        )
+    signature_payload = {
+        "capsules": sorted(normalized_capsules, key=lambda item: str(item.get("id") or "")),
+        "changed_files": sorted({_normalize_repo_relative_path(item) for item in batch_changed_files if item}),
+    }
+    serialized = json.dumps(signature_payload, sort_keys=True, ensure_ascii=True)
+    return _short_hash(serialized, length=24)
+
+
+def _build_distill_checkpoint_key(
+    snapshot: dict[str, object],
+    profile: str,
+    mode: str,
+    batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]],
+) -> str:
+    baseline = snapshot.get("diff_baseline") if isinstance(snapshot.get("diff_baseline"), dict) else {}
+    batch_signatures = [
+        _distill_batch_signature(batch_capsules, batch_changed_files)
+        for _, batch_capsules, batch_changed_files, _ in batch_specs
+    ]
+    checkpoint_seed = {
+        "profile": profile,
+        "mode": mode,
+        "force_full_sync": bool(snapshot.get("force_full_sync")),
+        "changed_files": sorted(_safe_string_list(snapshot.get("changed_files"))),
+        "repository_head": str(snapshot.get("repository_head") or ""),
+        "diff_baseline_resolved": str(baseline.get("resolved") or ""),
+        "diff_baseline_strategy": str(baseline.get("strategy") or ""),
+        "batch_signatures": batch_signatures,
+    }
+    return _short_hash(json.dumps(checkpoint_seed, sort_keys=True, ensure_ascii=True), length=24)
+
+
+def _load_distill_checkpoint_state(repo_root: str, checkpoint_key: str) -> dict[str, object]:
+    path = _distill_checkpoint_path(repo_root, checkpoint_key)
+    payload = _read_json_file(path)
+    if not isinstance(payload, dict):
+        return {
+            "schema_version": DISTILL_CHECKPOINT_SCHEMA_VERSION,
+            "checkpoint_key": checkpoint_key,
+            "created_at": _utc_timestamp(),
+            "updated_at": _utc_timestamp(),
+            "batch_results": {},
+        }
+    if int(payload.get("schema_version") or 0) != DISTILL_CHECKPOINT_SCHEMA_VERSION:
+        return {
+            "schema_version": DISTILL_CHECKPOINT_SCHEMA_VERSION,
+            "checkpoint_key": checkpoint_key,
+            "created_at": _utc_timestamp(),
+            "updated_at": _utc_timestamp(),
+            "batch_results": {},
+        }
+    if str(payload.get("checkpoint_key") or "") != checkpoint_key:
+        return {
+            "schema_version": DISTILL_CHECKPOINT_SCHEMA_VERSION,
+            "checkpoint_key": checkpoint_key,
+            "created_at": _utc_timestamp(),
+            "updated_at": _utc_timestamp(),
+            "batch_results": {},
+        }
+    batch_results = payload.get("batch_results")
+    if not isinstance(batch_results, dict):
+        batch_results = {}
+    return {
+        "schema_version": DISTILL_CHECKPOINT_SCHEMA_VERSION,
+        "checkpoint_key": checkpoint_key,
+        "created_at": str(payload.get("created_at") or _utc_timestamp()),
+        "updated_at": str(payload.get("updated_at") or _utc_timestamp()),
+        "batch_results": batch_results,
+    }
+
+
+def _write_distill_checkpoint_state(repo_root: str, checkpoint_key: str, state: dict[str, object]) -> None:
+    path = _distill_checkpoint_path(repo_root, checkpoint_key)
+    payload = {
+        "schema_version": DISTILL_CHECKPOINT_SCHEMA_VERSION,
+        "checkpoint_key": checkpoint_key,
+        "created_at": str(state.get("created_at") or _utc_timestamp()),
+        "updated_at": _utc_timestamp(),
+        "batch_results": state.get("batch_results") if isinstance(state.get("batch_results"), dict) else {},
+    }
+    _write_json_file(path, payload)
+
+
+def _clear_distill_checkpoint_state(repo_root: str, checkpoint_key: str) -> None:
+    path = _distill_checkpoint_path(repo_root, checkpoint_key)
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+
+
+def _distill_checkpoint_result_tuple(raw: object) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]] | None:
+    if not isinstance(raw, dict):
+        return None
+    output = raw.get("output")
+    receipts = raw.get("receipts")
+    recovery = raw.get("recovery")
+    if not isinstance(output, dict):
+        return None
+    if not isinstance(receipts, list):
+        return None
+    if not isinstance(recovery, dict):
+        return None
+    normalized_receipts = [item for item in receipts if isinstance(item, dict)]
+    return output, normalized_receipts, recovery
+
+
 def _run_distill_stage(
     repo_root: str,
     snapshot: dict[str, object],
@@ -14963,11 +15159,39 @@ def _run_distill_stage(
             worker_timeout_seconds=distill_timeout_seconds,
             max_retries=max_retries,
         )
+        checkpoint_key = _build_distill_checkpoint_key(snapshot, profile, mode, batch_specs)
+        checkpoint_state = _load_distill_checkpoint_state(repo_root, checkpoint_key)
+        checkpoint_results = checkpoint_state.get("batch_results") if isinstance(checkpoint_state.get("batch_results"), dict) else {}
+        reused_batch_count = 0
+        batch_signatures: dict[int, str] = {}
+        pending_batch_specs: list[tuple[int, list[dict[str, object]], list[str], str]] = []
+        for batch_index, batch_capsules, batch_changed_files, trace_path in batch_specs:
+            signature = _distill_batch_signature(batch_capsules, batch_changed_files)
+            batch_signatures[batch_index] = signature
+            checkpoint_entry = checkpoint_results.get(signature) if isinstance(checkpoint_results, dict) else None
+            cached_tuple = _distill_checkpoint_result_tuple(checkpoint_entry)
+            if cached_tuple is not None:
+                completed_batches[batch_index] = cached_tuple
+                reused_batch_count += 1
+                continue
+            pending_batch_specs.append((batch_index, batch_capsules, batch_changed_files, trace_path))
+
+        checkpoint_state["last_run_id"] = run_id
+        checkpoint_state["last_profile"] = profile
+        checkpoint_state["last_mode"] = mode
+        checkpoint_state["batch_count"] = len(batch_specs)
+        checkpoint_state["reused_batches"] = reused_batch_count
+        checkpoint_state["updated_at"] = _utc_timestamp()
+        _write_distill_checkpoint_state(repo_root, checkpoint_key, checkpoint_state)
+
+        worker_progress_by_batch: dict[int, float] = {
+            index: time.monotonic() for index, _, _, _ in pending_batch_specs
+        }
         executor = ThreadPoolExecutor(max_workers=max_workers)
         timed_out = False
         try:
             future_map = {}
-            for batch_index, batch_capsules, batch_changed_files, trace_path in batch_specs:
+            for batch_index, batch_capsules, batch_changed_files, trace_path in pending_batch_specs:
                 distill_input = _build_distill_input(
                     run_id=run_id,
                     profile=profile,
@@ -14977,21 +15201,43 @@ def _run_distill_stage(
                     policy_ref=f"{OG_ROOT}/policy.yaml",
                     materials_lock_ref=f"{OG_ROOT}/materials.lock",
                 )
+
+                def _run_batch_with_progress(
+                    *,
+                    batch_index: int,
+                    distill_input: dict[str, object],
+                    trace_path: str,
+                ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+                    def _progress_callback(_event: dict[str, object]) -> None:
+                        worker_progress_by_batch[batch_index] = time.monotonic()
+
+                    _set_worker_progress_callback(_progress_callback)
+                    try:
+                        return _run_worker_with_retries(
+                            "distill",
+                            distill_input,
+                            repo_root,
+                            trace_path,
+                            worker_adapter,
+                            timeout_seconds=distill_timeout_seconds,
+                            max_retries=max_retries,
+                        )
+                    finally:
+                        _set_worker_progress_callback(None)
+
                 future = executor.submit(
-                    _run_worker_with_retries,
-                    "distill",
-                    distill_input,
-                    repo_root,
-                    trace_path,
-                    worker_adapter,
-                    timeout_seconds=distill_timeout_seconds,
-                    max_retries=max_retries,
+                    _run_batch_with_progress,
+                    batch_index=batch_index,
+                    distill_input=distill_input,
+                    trace_path=trace_path,
                 )
                 future_map[future] = batch_index
 
             pending_futures = set(future_map)
             last_progress = time.monotonic()
             while pending_futures:
+                if worker_progress_by_batch:
+                    last_progress = max(last_progress, max(worker_progress_by_batch.values()))
                 elapsed_since_progress = time.monotonic() - last_progress
                 remaining = distill_stall_timeout_seconds - elapsed_since_progress
                 if remaining <= 0:
@@ -15002,7 +15248,7 @@ def _run_distill_stage(
                         for index in pending_indices
                     ]
                     raise WorkerAdapterError(
-                        f"distill stage timed out after {distill_stall_timeout_seconds}s waiting for {len(pending_futures)} batch(es): {pending_capsules}"
+                        f"distill stage detected no progress for {distill_stall_timeout_seconds}s with {len(pending_futures)} pending batch(es): {pending_capsules}"
                     )
                 done_futures, pending_futures = wait(
                     pending_futures,
@@ -15012,9 +15258,30 @@ def _run_distill_stage(
                 if not done_futures:
                     continue
                 last_progress = time.monotonic()
+                future_error: Exception | None = None
                 for future in done_futures:
                     batch_index = future_map[future]
-                    completed_batches[batch_index] = future.result()
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        if future_error is None:
+                            future_error = exc
+                        worker_progress_by_batch.pop(batch_index, None)
+                        continue
+                    completed_batches[batch_index] = result
+                    checkpoint_results[batch_signatures[batch_index]] = {
+                        "output": result[0],
+                        "receipts": result[1],
+                        "recovery": result[2],
+                        "completed_at": _utc_timestamp(),
+                    }
+                    checkpoint_state["batch_results"] = checkpoint_results
+                    checkpoint_state["completed_batches"] = len(completed_batches)
+                    checkpoint_state["updated_at"] = _utc_timestamp()
+                    _write_distill_checkpoint_state(repo_root, checkpoint_key, checkpoint_state)
+                    worker_progress_by_batch.pop(batch_index, None)
+                if future_error is not None:
+                    raise future_error
         finally:
             executor.shutdown(wait=not timed_out, cancel_futures=timed_out)
 
@@ -15059,6 +15326,7 @@ def _run_distill_stage(
         adapter_name = str(worker_adapter.get("name", WORKER_ADAPTER_NAME))
         for delta in deltas:
             delta["adapter_name"] = adapter_name
+        _clear_distill_checkpoint_state(repo_root, checkpoint_key)
     except WorkerAdapterError as exc:
         error_message = str(exc)
         recovery = cast(dict[str, object] | None, getattr(exc, "recovery", None))
@@ -15123,6 +15391,11 @@ def _run_distill_stage(
         "affected_capsules": changed_capsules,
         "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
         "generated_deltas": deltas,
+        "checkpoint": {
+            "key": checkpoint_key,
+            "reused_batches": reused_batch_count,
+            "total_batches": len(batch_specs),
+        },
         "recovery": _summarize_recovery_records(recovery_records),
         **({"prompt_provenance": distill_prompt_provenance} if distill_prompt_provenance is not None else {}),
     }

@@ -2983,8 +2983,174 @@ safety:
 
         self.assertEqual(payload["status"], "pending")
         self.assertEqual(payload["code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
-        self.assertIn("distill stage timed out", payload["message"])
+        self.assertIn("detected no progress", payload["message"])
         set_pending.assert_called_once()
+
+    def test_run_distill_stage_resumes_unfinished_batches_from_checkpoint(self) -> None:
+        snapshot = {
+            "changed_files": ["app.py", "docs/guide.md"],
+            "diff_baseline": {"strategy": "head~1", "resolved": "HEAD"},
+            "force_full_sync": False,
+        }
+        batch_specs = [
+            (
+                0,
+                [{"id": "app", "changed_files": ["app.py"]}],
+                ["app.py"],
+                ".outcomegraph/traces/distill-app.json",
+            ),
+            (
+                1,
+                [{"id": "docs", "changed_files": ["docs/guide.md"]}],
+                ["docs/guide.md"],
+                ".outcomegraph/traces/distill-docs.json",
+            ),
+        ]
+
+        first_calls: list[list[str]] = []
+
+        def first_pass_worker(
+            role: str,
+            input_payload: dict[str, object],
+            repo_root: str,
+            trace_path: str,
+            worker_adapter: dict[str, object],
+            *,
+            timeout_seconds: int,
+            max_retries: int,
+        ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+            capsule_ids = [str(item.get("id") or "") for item in input_payload.get("target_capsules", []) if isinstance(item, dict)]
+            first_calls.append(capsule_ids)
+            if capsule_ids == ["docs"]:
+                raise og.WorkerAdapterError("codex executable was not found")
+            output_payload = {
+                "schema_version": og.WORKER_SCHEMA_VERSION,
+                "interface_version": og.WORKER_INTERFACE_VERSION,
+                "run_id": str(input_payload["run_id"]),
+                "capsule_updates": [_distill_update("app", ["app.py"])],
+            }
+            recovery = og._build_recovery_record(
+                "worker:distill",
+                attempts=1,
+                max_retries=max_retries,
+                timeout_seconds=timeout_seconds,
+                retryable=False,
+            )
+            return output_payload, [], recovery
+
+        with self.git_root_patch(), patch.object(
+            og,
+            "_initialize_adapter_runtime",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_collect_affected_capsules",
+            return_value=["app", "docs"],
+        ), patch.object(
+            og,
+            "_collect_changed_materials",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_group_changed_files_by_capsule",
+            return_value={"app": ["app.py"], "docs": ["docs/guide.md"]},
+        ), patch.object(
+            og,
+            "adapter_get",
+            return_value={"type": "worker", "name": "codex", "manifest": {"name": "codex"}},
+        ), patch.object(
+            og,
+            "_build_distill_target_capsules",
+            return_value=[{"id": "app", "changed_files": ["app.py"]}, {"id": "docs", "changed_files": ["docs/guide.md"]}],
+        ), patch.object(
+            og,
+            "_build_distill_batch_specs",
+            return_value=batch_specs,
+        ), patch.object(
+            og,
+            "_run_worker_with_retries",
+            side_effect=first_pass_worker,
+        ), patch.object(og, "_set_pending_state", return_value={"status": "ok"}) as set_pending:
+            first_payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
+
+        self.assertEqual(first_payload["status"], "pending")
+        self.assertEqual(first_payload["code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertCountEqual(first_calls, [["app"], ["docs"]])
+        set_pending.assert_called_once()
+
+        checkpoint_key = og._build_distill_checkpoint_key(snapshot, "analyze", "observe", batch_specs)
+        checkpoint_path = Path(og._distill_checkpoint_path(str(self.repo), checkpoint_key))
+        self.assertTrue(checkpoint_path.exists())
+
+        second_calls: list[list[str]] = []
+
+        def second_pass_worker(
+            role: str,
+            input_payload: dict[str, object],
+            repo_root: str,
+            trace_path: str,
+            worker_adapter: dict[str, object],
+            *,
+            timeout_seconds: int,
+            max_retries: int,
+        ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+            capsule_ids = [str(item.get("id") or "") for item in input_payload.get("target_capsules", []) if isinstance(item, dict)]
+            second_calls.append(capsule_ids)
+            output_payload = {
+                "schema_version": og.WORKER_SCHEMA_VERSION,
+                "interface_version": og.WORKER_INTERFACE_VERSION,
+                "run_id": str(input_payload["run_id"]),
+                "capsule_updates": [_distill_update("docs", ["docs/guide.md"])],
+            }
+            recovery = og._build_recovery_record(
+                "worker:distill",
+                attempts=1,
+                max_retries=max_retries,
+                timeout_seconds=timeout_seconds,
+                retryable=False,
+            )
+            return output_payload, [], recovery
+
+        with self.git_root_patch(), patch.object(
+            og,
+            "_initialize_adapter_runtime",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_collect_affected_capsules",
+            return_value=["app", "docs"],
+        ), patch.object(
+            og,
+            "_collect_changed_materials",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_group_changed_files_by_capsule",
+            return_value={"app": ["app.py"], "docs": ["docs/guide.md"]},
+        ), patch.object(
+            og,
+            "adapter_get",
+            return_value={"type": "worker", "name": "codex", "manifest": {"name": "codex"}},
+        ), patch.object(
+            og,
+            "_build_distill_target_capsules",
+            return_value=[{"id": "app", "changed_files": ["app.py"]}, {"id": "docs", "changed_files": ["docs/guide.md"]}],
+        ), patch.object(
+            og,
+            "_build_distill_batch_specs",
+            return_value=batch_specs,
+        ), patch.object(
+            og,
+            "_run_worker_with_retries",
+            side_effect=second_pass_worker,
+        ):
+            second_payload = og._run_distill_stage(str(self.repo), snapshot, "run-2", "analyze", "observe")
+
+        self.assertEqual(second_payload["status"], "ok")
+        self.assertEqual(second_payload["checkpoint"]["reused_batches"], 1)
+        self.assertEqual(second_calls, [["docs"]])
+        self.assertEqual(len(second_payload["generated_deltas"]), 2)
+        self.assertFalse(checkpoint_path.exists())
 
     def test_run_distill_stage_marks_pending_when_worker_is_unavailable(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
