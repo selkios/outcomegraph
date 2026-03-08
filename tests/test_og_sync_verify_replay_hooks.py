@@ -3552,6 +3552,65 @@ class TestReplayWorkflows(_RepoTestCase):
             " ".join(payload["replay_results"][0]["failures"]),
         )
         self.assertEqual(payload["certificate_ids"], [])
+        self.assertEqual(payload["failed_capsules"], ["default"])
+
+    def test_run_replay_stage_skips_missing_capsule_metadata_in_observe_mode(self) -> None:
+        snapshot = {"changed_files": ["src/main.py"]}
+        source_file = self.repo / "src" / "main.py"
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+        source_file.write_text("print('hello')\n", encoding="utf-8")
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["src"]
+        ), patch.object(
+            og,
+            "_run_worker_with_retries",
+        ) as run_worker:
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "observe",
+                changed_only=True,
+            )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["failed_capsules"], [])
+        self.assertEqual(payload["replay_results"][0]["status"], "skipped")
+        self.assertEqual(payload["replay_results"][0]["plan_status"], "pending")
+        self.assertTrue(payload["replay_results"][0]["bootstrap_missing_capsule"])
+        self.assertIn("Run `og sync --json`", " ".join(payload["replay_results"][0]["failures"]))
+        run_worker.assert_not_called()
+
+    def test_run_replay_stage_fails_missing_capsule_metadata_in_enforce_mode(self) -> None:
+        snapshot = {"changed_files": ["src/main.py"]}
+        source_file = self.repo / "src" / "main.py"
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+        source_file.write_text("print('hello')\n", encoding="utf-8")
+
+        with self.git_root_patch(), patch.object(
+            og, "_collect_affected_capsules", return_value=["src"]
+        ), patch.object(
+            og,
+            "_run_worker_with_retries",
+        ) as run_worker:
+            payload = og._run_replay_stage(
+                str(self.repo),
+                snapshot,
+                "run-1",
+                "analyze",
+                "enforce",
+                changed_only=True,
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["failed_capsules"], ["src"])
+        self.assertEqual(payload["replay_results"][0]["status"], "failed")
+        self.assertEqual(payload["replay_results"][0]["plan_status"], "pending")
+        self.assertTrue(payload["replay_results"][0]["bootstrap_missing_capsule"])
+        self.assertIn("Run `og sync --json`", " ".join(payload["replay_results"][0]["failures"]))
+        run_worker.assert_not_called()
 
     def test_run_replay_stage_skips_doc_capsule_without_executable_oracles(self) -> None:
         snapshot = {"changed_files": ["README.md"]}
@@ -3740,6 +3799,7 @@ class TestReplayWorkflows(_RepoTestCase):
 
     def test_run_replay_stage_errors_on_adapter_interface_mismatch(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
+        _write_replayable_capsule_fixture(self.repo)
         bad_replay_plan = {
             "schema_version": 1,
             "interface_version": 99,
@@ -3774,6 +3834,7 @@ class TestReplayWorkflows(_RepoTestCase):
 
     def test_run_replay_stage_worker_unavailable_errors_are_retryable_in_envelope(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
+        _write_replayable_capsule_fixture(self.repo)
 
         with self.git_root_patch(), patch.object(
             og, "_collect_affected_capsules", return_value=["default"]
@@ -3797,6 +3858,7 @@ class TestReplayWorkflows(_RepoTestCase):
 
     def test_run_replay_stage_runtime_errors_are_not_retryable_in_envelope(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}
+        _write_replayable_capsule_fixture(self.repo)
 
         with self.git_root_patch(), patch.object(
             og, "_collect_affected_capsules", return_value=["default"]
@@ -5586,7 +5648,7 @@ class TestSpecComplianceGates(_RepoTestCase):
             "sha256:baseline-equivalence-hash",
         )
         self.assertEqual(payload["certificate_ids"], [])
-        self.assertEqual(payload["certificate_refs"], [])
+        self.assertEqual(payload["certificate_refs"], [".outcomegraph/certificates/cert-default-replay-baseline.json"])
 
     def test_build_status_payload_marks_runtime_degraded_state(self) -> None:
         with self.git_root_patch():

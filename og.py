@@ -11968,9 +11968,10 @@ def _collect_capsule_scope_materials(
     repo_root: str,
     capsule_id: str,
     changed_materials: list[dict[str, object]],
+    capsule_payload: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
-    capsule_payload = _load_capsule_payload(repo_root, capsule_id)
-    scope = _safe_string_list(capsule_payload.get("scope"))
+    resolved_capsule_payload = capsule_payload if isinstance(capsule_payload, dict) else _load_capsule_payload(repo_root, capsule_id)
+    scope = _safe_string_list(resolved_capsule_payload.get("scope"))
     material_records, _ = _read_material_lock_records(repo_root)
     selected: dict[str, dict[str, object]] = {}
     for path, record in material_records.items():
@@ -12016,6 +12017,18 @@ def _capsule_is_advisory_for_replay(capsule_payload: dict[str, object]) -> bool:
 
 def _capsule_can_skip_replay_without_executable_oracles(capsule_payload: dict[str, object]) -> bool:
     return _capsule_is_advisory_for_replay(capsule_payload)
+
+
+def _build_replay_bootstrap_capsule_payload(capsule_id: str, changed_files: list[str], mode: str) -> dict[str, object]:
+    inferred_scope = _merge_repo_relative_paths(changed_files)
+    inferred_kind = _classify_capsule_kind(capsule_id, inferred_scope, inferred_scope)
+    inferred_status = "pending" if str(mode or "").strip().lower() == "observe" else "active"
+    return {
+        "id": capsule_id,
+        "kind": inferred_kind,
+        "status": inferred_status,
+        "scope": inferred_scope,
+    }
 
 
 def _validate_replay_plan_contract(
@@ -15634,6 +15647,7 @@ def _run_replay_stage(
         changed_files = []
 
     changed_files = [str(item) for item in changed_files]
+    changed_files_by_capsule = _group_changed_files_by_capsule(changed_files)
     targets = _collect_affected_capsules(changed_files) if changed_only else _list_known_capsules(repo_root)
     if not targets:
         targets = ["default"]
@@ -15683,11 +15697,75 @@ def _run_replay_stage(
 
     for capsule in targets:
         trace_path = _build_trace_path(capsule, run_id, "replay")
-        capsule_payload = _load_capsule_payload(repo_root, capsule)
-        scope_materials = _collect_capsule_scope_materials(repo_root, capsule, changed_materials)
+        normalized_capsule = _safe_slug(capsule) or "default"
+        capsule_changed_files = changed_files_by_capsule.get(normalized_capsule, [])
+        raw_capsule_payload = _load_capsule_payload(repo_root, capsule)
+        capsule_payload_missing = not raw_capsule_payload
+        capsule_payload = (
+            _build_replay_bootstrap_capsule_payload(capsule, capsule_changed_files, mode)
+            if capsule_payload_missing
+            else raw_capsule_payload
+        )
+        scope_materials = _collect_capsule_scope_materials(
+            repo_root,
+            capsule,
+            changed_materials,
+            capsule_payload=capsule_payload,
+        )
         capsule_oracles = _load_capsule_oracles(repo_root, capsule)
         baseline_equivalence = _collect_replay_equivalence_baseline_payload(repo_root, capsule)
         executable_oracles = _collect_executable_oracle_map(capsule_oracles)
+        if (
+            capsule_payload_missing
+            and not executable_oracles
+            and not _capsule_can_skip_replay_without_executable_oracles(capsule_payload)
+        ):
+            material_paths = [
+                str(item.get("path") or "").strip()
+                for item in scope_materials
+                if isinstance(item, dict) and str(item.get("path") or "").strip()
+            ]
+            failure_reason = (
+                f"Replay blocked for {capsule} because capsule metadata is missing and no executable acceptance oracles are available."
+            )
+            remediation = "Run `og sync --json` to materialize capsule metadata before replay."
+            replay_results.append(
+                {
+                    "capsule_id": capsule,
+                    "status": "failed",
+                    "plan_status": "pending",
+                    "certificate_id": None,
+                    "trace": trace_path,
+                    "failures": [failure_reason, remediation],
+                    "capsule_scope": _safe_string_list(capsule_payload.get("scope")),
+                    "material_inputs": scope_materials,
+                    "acceptance_checks": [],
+                    "equivalence_inputs": {
+                        "baseline_hash": None,
+                        "oracle_names": [],
+                        "material_paths": material_paths,
+                        "notes": [failure_reason, remediation],
+                    },
+                    "parity_results": {
+                        "match": None,
+                        "details": failure_reason,
+                        "baseline_hash": None,
+                        "observed_hash": None,
+                        "oracle_digest": None,
+                        "trace_count": 0,
+                    },
+                    "replay_steps": [],
+                    "equivalence": None,
+                    "materialized_paths": material_paths,
+                    "oracle_results": [],
+                    "remediation": [remediation],
+                    "bootstrap_missing_capsule": True,
+                }
+            )
+            overall_failed = True
+            if capsule not in failed_capsules:
+                failed_capsules.append(capsule)
+            continue
         if not executable_oracles and _capsule_can_skip_replay_without_executable_oracles(capsule_payload):
             material_paths = [
                 str(item.get("path") or "").strip()
@@ -15700,16 +15778,29 @@ def _run_replay_stage(
                 else None
             )
             skip_reason = (
-                f"Replay skipped for {capsule} because the capsule is advisory-only without executable acceptance oracles."
+                f"Replay deferred for {capsule} because capsule metadata is missing and no executable acceptance oracles are available."
+                if capsule_payload_missing
+                else f"Replay skipped for {capsule} because the capsule is advisory-only without executable acceptance oracles."
             )
+            remediation = (
+                "Run `og sync --json` to materialize capsule metadata before replay."
+                if capsule_payload_missing
+                else None
+            )
+            notes = [skip_reason]
+            if remediation is not None:
+                notes.append(remediation)
+            failures = [skip_reason]
+            if remediation is not None:
+                failures.append(remediation)
             replay_results.append(
                 {
                     "capsule_id": capsule,
                     "status": "skipped",
-                    "plan_status": "skipped",
+                    "plan_status": "pending" if capsule_payload_missing else "skipped",
                     "certificate_id": None,
                     "trace": None,
-                    "failures": [skip_reason],
+                    "failures": failures,
                     "capsule_scope": _safe_string_list(capsule_payload.get("scope")),
                     "material_inputs": scope_materials,
                     "acceptance_checks": [],
@@ -15717,7 +15808,7 @@ def _run_replay_stage(
                         "baseline_hash": baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None,
                         "oracle_names": [],
                         "material_paths": material_paths,
-                        "notes": [skip_reason],
+                        "notes": notes,
                     },
                     "parity_results": {
                         "match": None,
@@ -15731,6 +15822,8 @@ def _run_replay_stage(
                     "equivalence": None,
                     "materialized_paths": material_paths,
                     "oracle_results": [],
+                    **({"remediation": [remediation]} if remediation is not None else {}),
+                    **({"bootstrap_missing_capsule": True} if capsule_payload_missing else {}),
                 }
             )
             continue
@@ -16038,6 +16131,8 @@ def _run_replay_stage(
             continue
 
         if replay_status != "success":
+            if capsule not in failed_capsules:
+                failed_capsules.append(capsule)
             replay_results.append(replay_result)
             continue
 
@@ -16087,9 +16182,6 @@ def _run_replay_stage(
             replay_failures.append(f"certificate persistence failed: {exc}")
             replay_result["failures"] = replay_failures
         replay_results.append(replay_result)
-
-        if replay_status != "success" and capsule not in failed_capsules:
-            failed_capsules.append(capsule)
 
     final_certificate_refs = set(certificate_refs)
     if overall_failed:
