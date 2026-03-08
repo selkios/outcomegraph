@@ -1,0 +1,2228 @@
+{
+  "schema_version": 1,
+  "command": "verify",
+  "status": "ok",
+  "run_id": "verify-20260308T120647Z-a1789787d4",
+  "session_id": null,
+  "data": {
+    "status": "ok",
+    "command": "verify",
+    "code": null,
+    "options": {
+      "changed": true,
+      "profile": "analyze",
+      "mode": "observe",
+      "force_hooks_path": false,
+      "force_full_sync": false,
+      "output_mode": "json",
+      "output_json": true,
+      "strict": false,
+      "non_interactive": false,
+      "validate": false,
+      "dry_run": false,
+      "max_retries": 0,
+      "timeout": 1800,
+      "configuration": {
+        "config_file": ".outcomegraph/config.yaml",
+        "config_source": "built-in",
+        "policy_file": ".outcomegraph/policy.yaml",
+        "policy_source": "config:.outcomegraph/config.yaml",
+        "codex_home": null,
+        "resolved_from": {
+          "output_mode": "flag:--json",
+          "profile": "config:.outcomegraph/config.yaml",
+          "mode": "config:.outcomegraph/config.yaml"
+        }
+      }
+    },
+    "run_id": "verify-20260308T120647Z-a1789787d4",
+    "snapshot": {
+      "repository_head": "7870cbce65f4452deefacf44ce2a031e5cae59c5",
+      "branch": "main",
+      "changed_files": [
+        ".outcomegraph/config.yaml",
+        ".outcomegraph/constitution/default.yaml",
+        ".outcomegraph/policy.yaml",
+        "README.md",
+        "dogfood-status-pre-sync.json.tmp.tvwgLV",
+        "dogfood-verify.json.tmp.xkp4xR",
+        "og.py",
+        "outcomegraph.egg-info/PKG-INFO",
+        "skills/og-dogfood/scripts/run_dogfood.sh",
+        "tests/test_og_sync_verify_replay_hooks.py"
+      ],
+      "changed_count": 10,
+      "has_changes": true,
+      "force_full_sync": false,
+      "diff_baseline": {
+        "strategy": "head~1",
+        "reference": "HEAD~1",
+        "resolved": "2d32a555510c651c5617eb820c27c441aaa2c250",
+        "details": "using previous commit parent"
+      },
+      "profile": "analyze",
+      "mode": "observe",
+      "captured_at": "2026-03-08T12:06:47Z"
+    },
+    "steps": [
+      {
+        "name": "verify",
+        "status": "ok",
+        "code": null,
+        "message": "Oracle-driven verify loop completed for affected capsules.",
+        "mode": "observe",
+        "verified_capsules": [
+          "config",
+          "constitution",
+          "dogfood-status-pre-sync-json-tmp",
+          "dogfood-verify-json-tmp",
+          "og",
+          "outcomegraph-egg-info",
+          "policy",
+          "readme",
+          "skill-og-dogfood",
+          "tests"
+        ],
+        "oracle_count": 11,
+        "certificate_refs": [
+          ".outcomegraph/certificates/cert-config-cc1d7bfc34.json",
+          ".outcomegraph/certificates/cert-constitution-c56a3e6aa5.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-ec824f06cd.json",
+          ".outcomegraph/certificates/cert-dogfood-verify-json-tmp-52a0f800c9.json",
+          ".outcomegraph/certificates/cert-og-14a21ef92c.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-6f92267c94.json",
+          ".outcomegraph/certificates/cert-policy-86301c7457.json",
+          ".outcomegraph/certificates/cert-readme-504fa51493.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-b15bf901e3.json",
+          ".outcomegraph/certificates/cert-tests-3dddf080c9.json"
+        ],
+        "oracle_results": {
+          "config": [
+            {
+              "schema_version": 2,
+              "oracle_name": "Config parses and applies defaults/safety",
+              "capsule_id": "config",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:06:47Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:Config parses and applies defaults/safety",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json",
+                  "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+                  "media_type": "application/json",
+                  "size": 850
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+                  "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+                  "media_type": "application/json",
+                  "size": 850
+                }
+              ],
+              "trace": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json"
+            }
+          ],
+          "constitution": [
+            {
+              "schema_version": 2,
+              "oracle_name": "Constitution enforced for observe-mode boundary",
+              "capsule_id": "constitution",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:06:47Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:Constitution enforced for observe-mode boundary",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json",
+                  "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+                  "media_type": "application/json",
+                  "size": 868
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+                  "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+                  "media_type": "application/json",
+                  "size": 868
+                }
+              ],
+              "trace": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json"
+            }
+          ],
+          "dogfood-status-pre-sync-json-tmp": [
+            {
+              "schema_version": 2,
+              "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+              "capsule_id": "dogfood-status-pre-sync-json-tmp",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:06:47Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+              "observed_code": 0,
+              "stdout": [
+                "................................................................. [ 36%]",
+                "................................................................ [ 72%]",
+                "..................................................                       [100%]"
+              ],
+              "stderr": [],
+              "message": "oracle command executed.",
+              "recovery": {
+                "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 15355,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json",
+                  "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+                  "media_type": "application/json",
+                  "size": 1193
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+                  "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+                  "media_type": "application/json",
+                  "size": 1193
+                }
+              ],
+              "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json"
+            }
+          ],
+          "dogfood-verify-json-tmp": [
+            {
+              "schema_version": 2,
+              "oracle_name": "dogfood-verify-json-tmp-verify",
+              "capsule_id": "dogfood-verify-json-tmp",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:dogfood-verify-json-tmp-verify",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json",
+                  "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+                  "media_type": "application/json",
+                  "size": 845
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+                  "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+                  "media_type": "application/json",
+                  "size": 845
+                }
+              ],
+              "trace": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json"
+            }
+          ],
+          "og": [
+            {
+              "schema_version": 2,
+              "oracle_name": "og-distill-tests",
+              "capsule_id": "og",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+              "observed_code": 0,
+              "stdout": [
+                ".......                                                                  [100%]"
+              ],
+              "stderr": [],
+              "message": "oracle command executed.",
+              "recovery": {
+                "operation": "oracle:og-distill-tests",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 301,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json",
+                  "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+                  "media_type": "application/json",
+                  "size": 1000
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+                  "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+                  "media_type": "application/json",
+                  "size": 1000
+                }
+              ],
+              "trace": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json"
+            }
+          ],
+          "outcomegraph-egg-info": [
+            {
+              "schema_version": 2,
+              "oracle_name": "metadata-advisory",
+              "capsule_id": "outcomegraph-egg-info",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:metadata-advisory",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json",
+                  "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+                  "media_type": "application/json",
+                  "size": 817
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+                  "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+                  "media_type": "application/json",
+                  "size": 817
+                }
+              ],
+              "trace": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json"
+            }
+          ],
+          "policy": [
+            {
+              "schema_version": 2,
+              "oracle_name": "policy-consistency-audit",
+              "capsule_id": "policy",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:policy-consistency-audit",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json",
+                  "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+                  "media_type": "application/json",
+                  "size": 816
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+                  "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+                  "media_type": "application/json",
+                  "size": 816
+                }
+              ],
+              "trace": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json"
+            }
+          ],
+          "readme": [
+            {
+              "schema_version": 2,
+              "oracle_name": "CLI doc contract",
+              "capsule_id": "readme",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:CLI doc contract",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json",
+                  "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+                  "media_type": "application/json",
+                  "size": 800
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+                  "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+                  "media_type": "application/json",
+                  "size": 800
+                }
+              ],
+              "trace": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json"
+            }
+          ],
+          "skill-og-dogfood": [
+            {
+              "schema_version": 2,
+              "oracle_name": "dogfood-run (advisory only in observe mode)",
+              "capsule_id": "skill-og-dogfood",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "",
+              "observed_code": 0,
+              "message": "No oracle command configured; marked pass.",
+              "recovery": {
+                "operation": "oracle:dogfood-run (advisory only in observe mode)",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 0,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json",
+                  "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+                  "media_type": "application/json",
+                  "size": 864
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+                  "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+                  "media_type": "application/json",
+                  "size": 864
+                }
+              ],
+              "trace": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json"
+            },
+            {
+              "schema_version": 2,
+              "oracle_name": "og-cli-regression",
+              "capsule_id": "skill-og-dogfood",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:02Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+              "observed_code": 0,
+              "stdout": [
+                "................................................................. [ 36%]",
+                "................................................................ [ 72%]",
+                "..................................................                       [100%]"
+              ],
+              "stderr": [],
+              "message": "oracle command executed.",
+              "recovery": {
+                "operation": "oracle:og-cli-regression",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 15305,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json",
+                  "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+                  "media_type": "application/json",
+                  "size": 1133
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+                  "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+                  "media_type": "application/json",
+                  "size": 1133
+                }
+              ],
+              "trace": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json"
+            }
+          ],
+          "tests": [
+            {
+              "schema_version": 2,
+              "oracle_name": "pytest-sync-verify-replay-hooks",
+              "capsule_id": "tests",
+              "run_id": "verify-20260308T120647Z-a1789787d4",
+              "mode": "observe",
+              "status": "pass",
+              "checked_at": "2026-03-08T12:07:18Z",
+              "changed_paths": [
+                ".outcomegraph/config.yaml",
+                ".outcomegraph/constitution/default.yaml",
+                ".outcomegraph/policy.yaml",
+                "README.md",
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "dogfood-verify.json.tmp.xkp4xR",
+                "og.py",
+                "outcomegraph.egg-info/PKG-INFO",
+                "skills/og-dogfood/scripts/run_dogfood.sh",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+              "observed_code": 0,
+              "stdout": [
+                "................................................................. [ 36%]",
+                "................................................................ [ 72%]",
+                "..................................................                       [100%]"
+              ],
+              "stderr": [],
+              "message": "oracle command executed.",
+              "recovery": {
+                "operation": "oracle:pytest-sync-verify-replay-hooks",
+                "attempts": 1,
+                "max_retries": 0,
+                "retries_used": 0,
+                "recovered": false,
+                "exhausted": false,
+                "retryable": false,
+                "timed_out": false,
+                "timeout_seconds": 1800
+              },
+              "duration_ms": 15377,
+              "receipt_pointers": [
+                {
+                  "schema_version": 2,
+                  "type": "file",
+                  "target": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json",
+                  "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+                  "media_type": "application/json",
+                  "size": 1150
+                },
+                {
+                  "schema_version": 2,
+                  "type": "cas",
+                  "target": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+                  "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+                  "media_type": "application/json",
+                  "size": 1150
+                }
+              ],
+              "trace": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json"
+            }
+          ]
+        },
+        "receipt_pointers": {
+          "config": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json",
+              "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "media_type": "application/json",
+              "size": 850
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "media_type": "application/json",
+              "size": 850
+            }
+          ],
+          "constitution": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json",
+              "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "media_type": "application/json",
+              "size": 868
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "media_type": "application/json",
+              "size": 868
+            }
+          ],
+          "dogfood-status-pre-sync-json-tmp": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json",
+              "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "media_type": "application/json",
+              "size": 1193
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "media_type": "application/json",
+              "size": 1193
+            }
+          ],
+          "dogfood-verify-json-tmp": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json",
+              "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "media_type": "application/json",
+              "size": 845
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "media_type": "application/json",
+              "size": 845
+            }
+          ],
+          "og": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json",
+              "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "media_type": "application/json",
+              "size": 1000
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "media_type": "application/json",
+              "size": 1000
+            }
+          ],
+          "outcomegraph-egg-info": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json",
+              "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "media_type": "application/json",
+              "size": 817
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "media_type": "application/json",
+              "size": 817
+            }
+          ],
+          "policy": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json",
+              "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "media_type": "application/json",
+              "size": 816
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "media_type": "application/json",
+              "size": 816
+            }
+          ],
+          "readme": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json",
+              "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "media_type": "application/json",
+              "size": 800
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "media_type": "application/json",
+              "size": 800
+            }
+          ],
+          "skill-og-dogfood": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json",
+              "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "media_type": "application/json",
+              "size": 864
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "media_type": "application/json",
+              "size": 864
+            },
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json",
+              "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "media_type": "application/json",
+              "size": 1133
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "media_type": "application/json",
+              "size": 1133
+            }
+          ],
+          "tests": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json",
+              "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "media_type": "application/json",
+              "size": 1150
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "media_type": "application/json",
+              "size": 1150
+            }
+          ]
+        },
+        "failed_capsules": [],
+        "errors": [],
+        "warnings": [],
+        "recovery": {
+          "operations": 11,
+          "retried_operations": 0,
+          "recovered_operations": 0,
+          "exhausted_operations": 0,
+          "timeout_operations": 0,
+          "total_retries_used": 0,
+          "details": [
+            {
+              "operation": "oracle:Config parses and applies defaults/safety",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:Constitution enforced for observe-mode boundary",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:dogfood-verify-json-tmp-verify",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:og-distill-tests",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:metadata-advisory",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:policy-consistency-audit",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:CLI doc contract",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:dogfood-run (advisory only in observe mode)",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:og-cli-regression",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:pytest-sync-verify-replay-hooks",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            }
+          ]
+        }
+      },
+      {
+        "name": "export",
+        "status": "ok",
+        "message": "Export refresh completed.",
+        "mode": "observe",
+        "updated_exports": [
+          ".outcomegraph/export/AGENTS.md",
+          ".outcomegraph/export/README_OUTCOMES.md",
+          ".outcomegraph/export/mcp-resources.json",
+          "skills/outcome-steward/SKILL.md"
+        ],
+        "unchanged_exports": [],
+        "artifact_total": 285,
+        "artifact_counts": {
+          "capsules": 32,
+          "certificates": 74,
+          "claims": 113,
+          "constitution": 1,
+          "decisions": 32,
+          "materials.lock": 1,
+          "refs": 32
+        },
+        "snapshot_generated_at": "2026-03-08T12:07:33Z"
+      }
+    ],
+    "message": "Oracle-driven verify loop completed for affected capsules.",
+    "changed_only": true,
+    "changed_files": [
+      ".outcomegraph/config.yaml",
+      ".outcomegraph/constitution/default.yaml",
+      ".outcomegraph/policy.yaml",
+      "README.md",
+      "dogfood-status-pre-sync.json.tmp.tvwgLV",
+      "dogfood-verify.json.tmp.xkp4xR",
+      "og.py",
+      "outcomegraph.egg-info/PKG-INFO",
+      "skills/og-dogfood/scripts/run_dogfood.sh",
+      "tests/test_og_sync_verify_replay_hooks.py"
+    ],
+    "verified_capsules": [
+      "config",
+      "constitution",
+      "dogfood-status-pre-sync-json-tmp",
+      "dogfood-verify-json-tmp",
+      "og",
+      "outcomegraph-egg-info",
+      "policy",
+      "readme",
+      "skill-og-dogfood",
+      "tests"
+    ],
+    "oracle_count": 11,
+    "certificate_refs": [
+      ".outcomegraph/certificates/cert-config-cc1d7bfc34.json",
+      ".outcomegraph/certificates/cert-constitution-c56a3e6aa5.json",
+      ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-ec824f06cd.json",
+      ".outcomegraph/certificates/cert-dogfood-verify-json-tmp-52a0f800c9.json",
+      ".outcomegraph/certificates/cert-og-14a21ef92c.json",
+      ".outcomegraph/certificates/cert-outcomegraph-egg-info-6f92267c94.json",
+      ".outcomegraph/certificates/cert-policy-86301c7457.json",
+      ".outcomegraph/certificates/cert-readme-504fa51493.json",
+      ".outcomegraph/certificates/cert-skill-og-dogfood-b15bf901e3.json",
+      ".outcomegraph/certificates/cert-tests-3dddf080c9.json"
+    ],
+    "receipt_pointers": {
+      "config": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json",
+          "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+          "media_type": "application/json",
+          "size": 850
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+          "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+          "media_type": "application/json",
+          "size": 850
+        }
+      ],
+      "constitution": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json",
+          "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+          "media_type": "application/json",
+          "size": 868
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+          "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+          "media_type": "application/json",
+          "size": 868
+        }
+      ],
+      "dogfood-status-pre-sync-json-tmp": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json",
+          "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+          "media_type": "application/json",
+          "size": 1193
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+          "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+          "media_type": "application/json",
+          "size": 1193
+        }
+      ],
+      "dogfood-verify-json-tmp": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json",
+          "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+          "media_type": "application/json",
+          "size": 845
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+          "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+          "media_type": "application/json",
+          "size": 845
+        }
+      ],
+      "og": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json",
+          "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+          "media_type": "application/json",
+          "size": 1000
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+          "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+          "media_type": "application/json",
+          "size": 1000
+        }
+      ],
+      "outcomegraph-egg-info": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json",
+          "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+          "media_type": "application/json",
+          "size": 817
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+          "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+          "media_type": "application/json",
+          "size": 817
+        }
+      ],
+      "policy": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json",
+          "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+          "media_type": "application/json",
+          "size": 816
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+          "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+          "media_type": "application/json",
+          "size": 816
+        }
+      ],
+      "readme": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json",
+          "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+          "media_type": "application/json",
+          "size": 800
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+          "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+          "media_type": "application/json",
+          "size": 800
+        }
+      ],
+      "skill-og-dogfood": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json",
+          "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+          "media_type": "application/json",
+          "size": 864
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+          "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+          "media_type": "application/json",
+          "size": 864
+        },
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json",
+          "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+          "media_type": "application/json",
+          "size": 1133
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+          "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+          "media_type": "application/json",
+          "size": 1133
+        }
+      ],
+      "tests": [
+        {
+          "schema_version": 2,
+          "type": "file",
+          "target": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json",
+          "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+          "media_type": "application/json",
+          "size": 1150
+        },
+        {
+          "schema_version": 2,
+          "type": "cas",
+          "target": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+          "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+          "media_type": "application/json",
+          "size": 1150
+        }
+      ]
+    },
+    "oracle_results": {
+      "config": [
+        {
+          "schema_version": 2,
+          "oracle_name": "Config parses and applies defaults/safety",
+          "capsule_id": "config",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:06:47Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:Config parses and applies defaults/safety",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json",
+              "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "media_type": "application/json",
+              "size": 850
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "hash": "sha256:80061acc0ae50c09c8e43e4f55f622aa0d7cbc77727a2e97c742931e476f9d0e",
+              "media_type": "application/json",
+              "size": 850
+            }
+          ],
+          "trace": ".outcomegraph/traces/config-verify-20260308t120647z-a1789787d4-config-parses-and-applies-defaults-safety-verify.json"
+        }
+      ],
+      "constitution": [
+        {
+          "schema_version": 2,
+          "oracle_name": "Constitution enforced for observe-mode boundary",
+          "capsule_id": "constitution",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:06:47Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:Constitution enforced for observe-mode boundary",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json",
+              "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "media_type": "application/json",
+              "size": 868
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "hash": "sha256:779bde69db3d231c0c3767130b4623aa7f131d6c8768a38e33ec9319f400f1fd",
+              "media_type": "application/json",
+              "size": 868
+            }
+          ],
+          "trace": ".outcomegraph/traces/constitution-verify-20260308t120647z-a1789787d4-constitution-enforced-for-observe-mode-boundary-verify.json"
+        }
+      ],
+      "dogfood-status-pre-sync-json-tmp": [
+        {
+          "schema_version": 2,
+          "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+          "capsule_id": "dogfood-status-pre-sync-json-tmp",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:06:47Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+          "observed_code": 0,
+          "stdout": [
+            "................................................................. [ 36%]",
+            "................................................................ [ 72%]",
+            "..................................................                       [100%]"
+          ],
+          "stderr": [],
+          "message": "oracle command executed.",
+          "recovery": {
+            "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 15355,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json",
+              "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "media_type": "application/json",
+              "size": 1193
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "hash": "sha256:9fbcf549c87c3018fee2e0261e894577c14f42f8d1a8b865f079421b94ab9ff0",
+              "media_type": "application/json",
+              "size": 1193
+            }
+          ],
+          "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-status-pre-sync-json-tmp-verify-verify.json"
+        }
+      ],
+      "dogfood-verify-json-tmp": [
+        {
+          "schema_version": 2,
+          "oracle_name": "dogfood-verify-json-tmp-verify",
+          "capsule_id": "dogfood-verify-json-tmp",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:dogfood-verify-json-tmp-verify",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json",
+              "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "media_type": "application/json",
+              "size": 845
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "hash": "sha256:3fee7a3c06c60a02a76250adea9a43f3b1278825116eda19c94e900ce98f95d6",
+              "media_type": "application/json",
+              "size": 845
+            }
+          ],
+          "trace": ".outcomegraph/traces/dogfood-verify-json-tmp-verify-20260308t120647z-a1789787d4-dogfood-verify-json-tmp-verify-verify.json"
+        }
+      ],
+      "og": [
+        {
+          "schema_version": 2,
+          "oracle_name": "og-distill-tests",
+          "capsule_id": "og",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+          "observed_code": 0,
+          "stdout": [
+            ".......                                                                  [100%]"
+          ],
+          "stderr": [],
+          "message": "oracle command executed.",
+          "recovery": {
+            "operation": "oracle:og-distill-tests",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 301,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json",
+              "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "media_type": "application/json",
+              "size": 1000
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "hash": "sha256:69bac82fc7e5ff8cedd55977d83262dc95957a32e69897e373e82e77f015734a",
+              "media_type": "application/json",
+              "size": 1000
+            }
+          ],
+          "trace": ".outcomegraph/traces/og-verify-20260308t120647z-a1789787d4-og-distill-tests-verify.json"
+        }
+      ],
+      "outcomegraph-egg-info": [
+        {
+          "schema_version": 2,
+          "oracle_name": "metadata-advisory",
+          "capsule_id": "outcomegraph-egg-info",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:metadata-advisory",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json",
+              "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "media_type": "application/json",
+              "size": 817
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "hash": "sha256:4239c8ddb6e3a785380c80e97946f2afcea581d0e61851963339bdb20fbe9164",
+              "media_type": "application/json",
+              "size": 817
+            }
+          ],
+          "trace": ".outcomegraph/traces/outcomegraph-egg-info-verify-20260308t120647z-a1789787d4-metadata-advisory-verify.json"
+        }
+      ],
+      "policy": [
+        {
+          "schema_version": 2,
+          "oracle_name": "policy-consistency-audit",
+          "capsule_id": "policy",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:policy-consistency-audit",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json",
+              "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "media_type": "application/json",
+              "size": 816
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "hash": "sha256:2d6fffd86502decae56b1935b974b27dfa4d43bfeb621ca2f12971423956c301",
+              "media_type": "application/json",
+              "size": 816
+            }
+          ],
+          "trace": ".outcomegraph/traces/policy-verify-20260308t120647z-a1789787d4-policy-consistency-audit-verify.json"
+        }
+      ],
+      "readme": [
+        {
+          "schema_version": 2,
+          "oracle_name": "CLI doc contract",
+          "capsule_id": "readme",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:CLI doc contract",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json",
+              "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "media_type": "application/json",
+              "size": 800
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "hash": "sha256:2af385eac7d52801ce7a79a1dbdf326f28c74203f97e5912267b14c40aa9dcc2",
+              "media_type": "application/json",
+              "size": 800
+            }
+          ],
+          "trace": ".outcomegraph/traces/readme-verify-20260308t120647z-a1789787d4-cli-doc-contract-verify.json"
+        }
+      ],
+      "skill-og-dogfood": [
+        {
+          "schema_version": 2,
+          "oracle_name": "dogfood-run (advisory only in observe mode)",
+          "capsule_id": "skill-og-dogfood",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "",
+          "observed_code": 0,
+          "message": "No oracle command configured; marked pass.",
+          "recovery": {
+            "operation": "oracle:dogfood-run (advisory only in observe mode)",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 0,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json",
+              "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "media_type": "application/json",
+              "size": 864
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "hash": "sha256:81e47f2ae6019e1eea1d08bdee084c90bcd52f6ab4cdfc888e2c50637426e578",
+              "media_type": "application/json",
+              "size": 864
+            }
+          ],
+          "trace": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-dogfood-run--advisory-only-in-observe-mode-verify.json"
+        },
+        {
+          "schema_version": 2,
+          "oracle_name": "og-cli-regression",
+          "capsule_id": "skill-og-dogfood",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:02Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+          "observed_code": 0,
+          "stdout": [
+            "................................................................. [ 36%]",
+            "................................................................ [ 72%]",
+            "..................................................                       [100%]"
+          ],
+          "stderr": [],
+          "message": "oracle command executed.",
+          "recovery": {
+            "operation": "oracle:og-cli-regression",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 15305,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json",
+              "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "media_type": "application/json",
+              "size": 1133
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "hash": "sha256:c0fbcf8a6b6ce07f4ea554aee12ce734a18ba9ece011335191d876b0d3536a0c",
+              "media_type": "application/json",
+              "size": 1133
+            }
+          ],
+          "trace": ".outcomegraph/traces/skill-og-dogfood-verify-20260308t120647z-a1789787d4-og-cli-regression-verify.json"
+        }
+      ],
+      "tests": [
+        {
+          "schema_version": 2,
+          "oracle_name": "pytest-sync-verify-replay-hooks",
+          "capsule_id": "tests",
+          "run_id": "verify-20260308T120647Z-a1789787d4",
+          "mode": "observe",
+          "status": "pass",
+          "checked_at": "2026-03-08T12:07:18Z",
+          "changed_paths": [
+            ".outcomegraph/config.yaml",
+            ".outcomegraph/constitution/default.yaml",
+            ".outcomegraph/policy.yaml",
+            "README.md",
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "dogfood-verify.json.tmp.xkp4xR",
+            "og.py",
+            "outcomegraph.egg-info/PKG-INFO",
+            "skills/og-dogfood/scripts/run_dogfood.sh",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+          "observed_code": 0,
+          "stdout": [
+            "................................................................. [ 36%]",
+            "................................................................ [ 72%]",
+            "..................................................                       [100%]"
+          ],
+          "stderr": [],
+          "message": "oracle command executed.",
+          "recovery": {
+            "operation": "oracle:pytest-sync-verify-replay-hooks",
+            "attempts": 1,
+            "max_retries": 0,
+            "retries_used": 0,
+            "recovered": false,
+            "exhausted": false,
+            "retryable": false,
+            "timed_out": false,
+            "timeout_seconds": 1800
+          },
+          "duration_ms": 15377,
+          "receipt_pointers": [
+            {
+              "schema_version": 2,
+              "type": "file",
+              "target": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json",
+              "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "media_type": "application/json",
+              "size": 1150
+            },
+            {
+              "schema_version": 2,
+              "type": "cas",
+              "target": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "hash": "sha256:1d77c29b7bf892865c50afb9025fffc38a6310b13beb79f57a01e59b9e9e4744",
+              "media_type": "application/json",
+              "size": 1150
+            }
+          ],
+          "trace": ".outcomegraph/traces/tests-verify-20260308t120647z-a1789787d4-pytest-sync-verify-replay-hooks-verify.json"
+        }
+      ]
+    },
+    "failed_capsules": [],
+    "errors": [],
+    "warnings": [],
+    "recovery": {
+      "operations": 11,
+      "retried_operations": 0,
+      "recovered_operations": 0,
+      "exhausted_operations": 0,
+      "timeout_operations": 0,
+      "total_retries_used": 0,
+      "details": [
+        {
+          "operation": "oracle:Config parses and applies defaults/safety",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:Constitution enforced for observe-mode boundary",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:dogfood-verify-json-tmp-verify",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:og-distill-tests",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:metadata-advisory",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:policy-consistency-audit",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:CLI doc contract",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:dogfood-run (advisory only in observe mode)",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:og-cli-regression",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:pytest-sync-verify-replay-hooks",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    "duration_ms": 46356,
+    "summary_event": "/tmp/outcomegraph-dogfood-20260308-nY1wfy/.outcomegraph/events/verify-20260308T120647Z-a1789787d4.json"
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "agent_reliability": {
+      "observation": {
+        "observed_at": "2026-03-08T12:07:33Z",
+        "command": "verify",
+        "subcommand": null,
+        "status": "ok",
+        "successful_task": true,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_tracked": false,
+        "session_transition": "none",
+        "commands_since_successful_task": 0
+      },
+      "snapshot": {
+        "schema_version": 1,
+        "tracked_at": "2026-03-08T12:07:33Z",
+        "status": "warn",
+        "message": "agent reliability metrics need attention: commands_per_successful_task",
+        "warn_metrics": [
+          "commands_per_successful_task"
+        ],
+        "unknown_metrics": [
+          "retry_auto_recovery_rate",
+          "session_churn"
+        ],
+        "totals": {
+          "commands": 382,
+          "successful_tasks": 92,
+          "schema_valid_outputs": 382,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "resumable_session_starts": 0,
+          "resumable_session_reuses": 0,
+          "resumable_session_rotations": 0
+        },
+        "current": {
+          "commands_since_successful_task": 0
+        },
+        "latest_command": {
+          "command": "verify",
+          "subcommand": null,
+          "status": "ok",
+          "observed_at": "2026-03-08T12:07:33Z",
+          "successful_task": true,
+          "schema_valid_output": true,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "session_kind": null,
+          "session_id": null,
+          "session_transition": "none",
+          "commands_since_successful_task": 0
+        },
+        "commands_per_successful_task": {
+          "value": 4.152,
+          "units": "commands/task",
+          "direction": "lower_is_better",
+          "status": "warn",
+          "total_commands": 382,
+          "successful_tasks": 92
+        },
+        "schema_valid_output_rate": {
+          "value": 1.0,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "ok",
+          "valid_outputs": 382,
+          "total_outputs": 382
+        },
+        "retry_auto_recovery_rate": {
+          "value": null,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "unknown",
+          "retryable_operations": 0,
+          "recovered_operations": 0
+        },
+        "session_churn": {
+          "value": null,
+          "units": "ratio",
+          "direction": "lower_is_better",
+          "status": "unknown",
+          "tracked_session_kinds": [
+            "autopilot",
+            "daemon"
+          ],
+          "session_starts": 0,
+          "reused_sessions": 0,
+          "rotated_sessions": 0,
+          "repeat_observations": 0
+        }
+      }
+    }
+  }
+}

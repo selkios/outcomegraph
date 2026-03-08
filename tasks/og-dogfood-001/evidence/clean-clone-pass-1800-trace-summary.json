@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "task_id": "OG-DOGFOOD-001",
+  "clone_path": "/tmp/outcomegraph-dogfood-20260308-nY1wfy",
+  "timeout_seconds": 1800,
+  "result": "pass",
+  "run_ids": {
+    "sync": "sync-20260308T115630Z-a64f2e4d8c",
+    "verify": "verify-20260308T120647Z-a1789787d4",
+    "replay": "replay-20260308T120733Z-bed78dc4"
+  },
+  "status_matrix": {
+    "dogfood-status-pre-sync.json": "warn",
+    "dogfood-sync.json": "ok",
+    "dogfood-verify.json": "ok",
+    "dogfood-replay.json": "ok",
+    "dogfood-status-final.json": "ok",
+    "dogfood-status.json": "ok",
+    "dogfood-drift.txt_contains": "drift: ok"
+  },
+  "capsule_review": [
+    {
+      "capsule_id": "og",
+      "status": "success",
+      "oracle_mode": "executable"
+    },
+    {
+      "capsule_id": "tests",
+      "status": "success",
+      "oracle_mode": "executable"
+    },
+    {
+      "capsule_id": "runbooks",
+      "status": "success",
+      "oracle_mode": "advisory"
+    },
+    {
+      "capsule_id": "spec-v2",
+      "status": "success",
+      "oracle_mode": "advisory"
+    },
+    {
+      "capsule_id": "uv",
+      "status": "success",
+      "oracle_mode": "advisory"
+    }
+  ],
+  "evidence_files": [
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status-pre-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-verify.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-replay.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status-final.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-drift.txt",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-sync-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-verify-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-replay-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-review.md"
+  ],
+  "captured_at": "2026-03-08T12:12:30Z"
+}

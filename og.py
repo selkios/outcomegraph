@@ -18,6 +18,7 @@ import sys
 import socket
 import hashlib
 import signal
+import threading
 import time
 import shlex
 import tempfile
@@ -406,6 +407,7 @@ MCP_CONTROL_RESOURCE_NAMES = tuple(str(item["name"]) for item in MCP_CONTROL_RES
 MCP_CONTROL_PROMPT_NAMES = tuple(MCP_CONTROL_PROMPTS)
 CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certificates", "datasets", "constitution")
 WORK_LOCK_STALE_SECONDS = 300
+WORK_LOCK_HEARTBEAT_SECONDS = 60
 OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
 OPTIMIZATION_SUPPORTED_METRICS = ("contains", "exact")
 LOCK_STATUS_LOCKED = "locked"
@@ -1398,7 +1400,7 @@ def _command_usage_contract(
     for raw_field in request_fields:
         if not isinstance(raw_field, dict):
             continue
-        field = cast(dict[str, object], raw_field)
+        field = raw_field
         name = str(field.get("name") or "").strip()
         if not name or name in _COMMAND_USAGE_OMIT_FIELDS:
             continue
@@ -9001,6 +9003,38 @@ def _release_work_lock(repo_root: str, holder: dict) -> None:
     _write_json_file(lock_path, payload)
 
 
+def _refresh_work_lock(repo_root: str, holder: dict) -> bool:
+    lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    lock_payload = _read_json_file(lock_path)
+    if not isinstance(lock_payload, dict):
+        return False
+    if str(lock_payload.get("status") or "") != LOCK_STATUS_LOCKED:
+        return False
+    holder_payload = lock_payload.get("holder")
+    if not isinstance(holder_payload, dict):
+        return False
+    if holder_payload.get("pid") != holder.get("pid") or holder_payload.get("host") != holder.get("host"):
+        return False
+
+    refreshed_holder = {"pid": holder.get("pid"), "host": holder.get("host"), "command": holder.get("command")}
+    refreshed_session = _session_from_payload(lock_payload.get("session"))
+    if isinstance(refreshed_session, dict):
+        refreshed_session = _set_session_state(
+            refreshed_session,
+            SESSION_STATE_ACTIVE,
+            ttl_seconds=WORK_LOCK_STALE_SECONDS,
+            refresh_expiry=True,
+        )
+    refreshed_payload = dict(lock_payload)
+    refreshed_payload["status"] = LOCK_STATUS_LOCKED
+    refreshed_payload["holder"] = refreshed_holder
+    refreshed_payload["updated_at"] = _utc_timestamp()
+    if isinstance(refreshed_session, dict):
+        refreshed_payload["session"] = refreshed_session
+    _write_json_file(lock_path, refreshed_payload)
+    return True
+
+
 def _set_pending_state(repo_root: str, source: str) -> dict:
     state = _build_work_payload(repo_root, pending=True)
     state["pending_source"] = source
@@ -9730,8 +9764,8 @@ def _daemon_write_run_log(repo_root: str, payload: dict[str, object]) -> None:
     try:
         with open(log_path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, sort_keys=True) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        print(f"warning: daemon log write failed: {exc}", file=sys.stderr)
 
 
 def _daemon_run_sync(repo_root: str) -> dict[str, object]:
@@ -11766,9 +11800,15 @@ def _run_oracle_check(
         while True:
             attempts += 1
             try:
+                parsed_command: list[str] | None = None
+                try:
+                    parsed_command = shlex.split(command_text)
+                except ValueError as exc:
+                    raise ValueError(f"oracle command contains invalid shell-like quoting: {exc}") from exc
+                if not parsed_command:
+                    raise ValueError("oracle command is empty after parsing")
                 executed = subprocess.run(
-                    command_text,
-                    shell=True,
+                    parsed_command,
                     cwd=exec_root or repo_root,
                     capture_output=True,
                     text=True,
@@ -12007,6 +12047,10 @@ def _collect_executable_oracle_map(oracles: list[dict[str, object]]) -> dict[str
 
 
 def _capsule_is_advisory_for_replay(capsule_payload: dict[str, object]) -> bool:
+    capsule_id = _safe_slug(str(capsule_payload.get("id") or ""))
+    if capsule_id.startswith("skill-"):
+        return True
+
     capsule_kind = _normalize_capsule_kind(capsule_payload.get("kind"))
     if capsule_kind in {CAPSULE_KIND_DOC, CAPSULE_KIND_CONFIG, CAPSULE_KIND_RUNTIME}:
         return True
@@ -12082,12 +12126,14 @@ def _validate_replay_plan_contract(
     material_inputs = _safe_object_list(plan.get("material_inputs"))
     if not material_inputs:
         failures.append(f"Replay plan for {capsule_id} must declare material_inputs.")
+    planned_material_set: set[str] = set()
     for material in material_inputs:
         path = str(material.get("path") or "").strip()
         digest = str(material.get("digest") or "").strip()
         if not path or not digest:
             failures.append(f"Replay plan for {capsule_id} includes an incomplete material input.")
             continue
+        planned_material_set.add(path)
         expected_material = scope_materials_by_path.get(path)
         if expected_material is None:
             failures.append(f"Replay plan for {capsule_id} references scoped material '{path}' that was not materialized.")
@@ -12145,11 +12191,29 @@ def _validate_replay_plan_contract(
                     f"Replay plan for {capsule_id} equivalence_inputs.material_paths references '{path}' outside material_inputs."
                 )
 
+    for index, step in enumerate(_safe_object_list(plan.get("steps"))):
+        command = str(step.get("command") or "").strip()
+        if not command:
+            continue
+        for referenced_path in sorted(set(re.findall(r"tests/[a-zA-Z0-9_./-]+\.py", command))):
+            if referenced_path in planned_material_set:
+                continue
+            if referenced_path in scope_materials_by_path:
+                continue
+            if expected_scope and _path_matches_capsule_scope(referenced_path, expected_scope):
+                continue
+            failures.append(
+                f"Replay plan for {capsule_id} step {index} references test path '{referenced_path}' outside capsule scope/material inputs."
+            )
+
     planned_oracle_names = _safe_string_list(equivalence_inputs.get("oracle_names"))
     baseline_hash = equivalence_inputs.get("baseline_hash")
     expected_baseline_hash = baseline_equivalence.get("oracle_digest") or baseline_equivalence.get("observed_hash")
     normalized_expected_baseline = expected_baseline_hash if isinstance(expected_baseline_hash, str) and expected_baseline_hash else None
     normalized_planned_baseline = baseline_hash if isinstance(baseline_hash, str) and baseline_hash else None
+    if normalized_expected_baseline is not None and normalized_planned_baseline is None:
+        normalized_planned_baseline = normalized_expected_baseline
+        equivalence_inputs["baseline_hash"] = normalized_expected_baseline
     if normalized_expected_baseline is not None and normalized_planned_baseline != normalized_expected_baseline:
         failures.append(
             f"Replay plan for {capsule_id} must carry baseline hash '{normalized_expected_baseline}' in equivalence_inputs."
@@ -12380,8 +12444,18 @@ def _run_replay_step(
         while True:
             attempts += 1
             try:
+                command_is_complex = any(
+                    marker in command for marker in ("\n", "&", "|", ";", "<", ">", "`", "$", "(", ")", "{", "}")
+                )
+                if command_is_complex:
+                    command_args = ["bash", "-lc", command]
+                else:
+                    try:
+                        command_args = shlex.split(command)
+                    except ValueError:
+                        command_args = ["bash", "-lc", command]
                 executed = subprocess.run(
-                    ["bash", "-lc", command],
+                    command_args,
                     cwd=step_cwd,
                     capture_output=True,
                     text=True,
@@ -14059,7 +14133,7 @@ def _build_partial_file_snapshot(
         "digest": _file_sha256(normalized_path, repo_root),
         "kind": "symlink_file" if os.path.islink(full_path) else "file",
         "content": "\n\n".join(rendered_sections),
-        "truncated": False,
+        "truncated": truncated,
         "partial": True,
         "selection": "diff_hunks",
         "line_count": len(lines),
@@ -14637,8 +14711,22 @@ def _run_distill_stage(
             ],
             **({"remediation": first_error.get("remediation", [])} if isinstance(first_error.get("remediation"), list) else {}),
         }
-    changed = snapshot["changed_files"]
-    changed_capsules = _collect_affected_capsules(changed if isinstance(changed, list) else [])
+    if not isinstance(snapshot, dict):
+        return {
+            "name": "distill",
+            "status": "error",
+            "code": RUNTIME_ERROR_CODE,
+            "message": "invalid snapshot payload",
+            "profile": profile,
+            "mode": mode,
+            "affected_capsules": [],
+            "generated_deltas": [],
+            "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": "invalid snapshot payload"}],
+        }
+
+    changed = snapshot.get("changed_files")
+    changed_files = [str(entry) for entry in changed] if isinstance(changed, list) else []
+    changed_capsules = _collect_affected_capsules(changed_files)
     if not changed_capsules:
         return {
             "name": "distill",
@@ -14649,10 +14737,6 @@ def _run_distill_stage(
             "affected_capsules": [],
             "generated_deltas": [],
         }
-
-    if not isinstance(changed, list):
-        changed = []
-    changed_files = [str(entry) for entry in changed]
     changed_materials = _collect_changed_materials(repo_root, changed_files)
     changed_files_by_capsule = _group_changed_files_by_capsule(changed_files)
     try:
@@ -14797,6 +14881,29 @@ def _run_distill_stage(
                 timeout_seconds=distill_timeout_seconds,
                 retryable=_is_worker_unavailable_error(error_message),
                 error_code=_recovery_error_code_for_message(error_message),
+                message=error_message,
+            ),
+        }
+    except Exception as exc:
+        error_message = f"distill stage failed unexpectedly: {exc}"
+        return {
+            "name": "distill",
+            "status": "error",
+            "code": RUNTIME_ERROR_CODE,
+            "message": error_message,
+            "profile": profile,
+            "mode": mode,
+            "affected_capsules": changed_capsules,
+            "generated_deltas": [],
+            "errors": [{"error_code": RUNTIME_ERROR_CODE, "message": error_message}],
+            "adapter_name": str(worker_adapter.get("name", WORKER_ADAPTER_NAME)),
+            "recovery": _build_recovery_record(
+                "worker:distill",
+                attempts=1,
+                max_retries=max_retries,
+                timeout_seconds=distill_timeout_seconds,
+                retryable=False,
+                error_code=RUNTIME_ERROR_CODE,
                 message=error_message,
             ),
         }
@@ -18005,10 +18112,29 @@ def run_command(
             return _command_exit_code(contended_payload)
         try:
             active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
-            payload = _run_sync_job(repo_root, options, active_session)
-            payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload, "session": active_session}
-            emit_command_result(payload, output_json)
-            return _command_exit_code(payload)
+            heartbeat_stop = threading.Event()
+
+            def _heartbeat_loop() -> None:
+                while not heartbeat_stop.wait(WORK_LOCK_HEARTBEAT_SECONDS):
+                    try:
+                        _refresh_work_lock(repo_root, holder)
+                    except Exception:
+                        continue
+
+            heartbeat_thread = threading.Thread(
+                target=_heartbeat_loop,
+                name="og-sync-lock-heartbeat",
+                daemon=True,
+            )
+            heartbeat_thread.start()
+            try:
+                payload = _run_sync_job(repo_root, options, active_session)
+                payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload, "session": active_session}
+                emit_command_result(payload, output_json)
+                return _command_exit_code(payload)
+            finally:
+                heartbeat_stop.set()
+                heartbeat_thread.join(timeout=1.0)
         finally:
             _release_work_lock(repo_root, holder)
         return EXIT_SUCCESS

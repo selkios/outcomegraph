@@ -195,7 +195,7 @@ Common flags:
 - `--strict` / `--strict=true|false`
 - `--profile {analyze|propose|apply}`
 - `--mode {observe|autonomous}`
-- `--changed` (for focused sync/verify/replay behavior)
+- `--changed` (for focused verify/replay behavior)
 - `--validate` / `--validate=true|false` (preflight mutating commands without writing)
 - `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
 - `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)

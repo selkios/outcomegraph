@@ -1,7 +1,7 @@
 {
   "task_id": "OG-DOGFOOD-001",
   "title": "Dogfood the refactor with a clean full-repo rebuild and capsule review",
-  "status": "blocked",
+  "status": "completed",
   "read_files": [
     ".outcomegraph/events/sync-20260307T151022Z-df8698e4e8.json",
     "AGENT_FIRST_CLI_REVIEW.md",
@@ -17,16 +17,40 @@
     "skills/og-quality-pass/SKILL.md",
     "skills/outcome-steward/SKILL.md",
     "tasks/og-dogfood-001/TASK.md",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-verify.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-replay.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status.json",
     "tasks/og-dogfood-001/evidence/clean-clone-3600-review.md",
     "tasks/og-dogfood-001/evidence/clean-clone-3600-trace-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-1800-dogfood-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-3600-dogfood-sync.json",
     "tests/test_og_sync_verify_replay_hooks.py",
     "to-do.json",
     "to-do.schema.json",
-    "/tmp/outcomegraph-dogfood-final-Nwve/.outcomegraph/events/dogfood-sync.json"
+    "/tmp/outcomegraph-dogfood-final-Nwve/.outcomegraph/events/dogfood-sync.json",
+    "/tmp/outcomegraph-dogfood-20260308-nY1wfy/.outcomegraph/events/dogfood-sync.json",
+    "/tmp/outcomegraph-dogfood-20260308-nY1wfy-1800.log",
+    "/tmp/outcomegraph-dogfood-20260308-nY1wfy-3600.log"
   ],
   "write_files": [
     "og.py",
+    "skills/og-dogfood/scripts/run_dogfood.sh",
     "tasks/og-dogfood-001/TASK.md",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status-pre-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-verify.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-replay.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-drift.txt",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status-final.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-dogfood-status.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-sync-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-verify-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-replay-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-review.md",
+    "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-trace-summary.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-1800-dogfood-sync.json",
+    "tasks/og-dogfood-001/evidence/clean-clone-3600-dogfood-sync.json",
     "tasks/og-dogfood-001/evidence/clean-clone-corrected-review.md",
     "tasks/og-dogfood-001/evidence/clean-clone-corrected-trace-summary.json",
     "tasks/og-dogfood-001/task-plan.json",
@@ -40,23 +64,22 @@
     },
     {
       "step": "Capture a stable full clean-clone dogfood loop with sync, verify, replay, and drift acceptance artifacts",
-      "status": "blocked"
+      "status": "completed"
     },
     {
       "step": "Review regenerated `og`, `tests`, `runbooks`, `spec-v2`, and `uv` capsules after a successful stable clean-clone loop",
-      "status": "blocked"
+      "status": "completed"
     }
   ],
   "verification": [
     "uv run pytest -q tests/test_og_sync_verify_replay_hooks.py -k \"run_distill_stage_batches_complex_snapshot_capsules or run_distill_stage_splits_oversized_bootstrap_prompt_batches or run_distill_stage_uses_bootstrap_timeout_for_full_snapshot or run_distill_stage_uses_bootstrap_timeout_for_source_heavy_snapshot or run_codex_worker_kills_process_group_on_timeout or run_codex_worker_uses_configured_codex_home\"",
     "bash skills/og-quality-pass/scripts/run_quality_pass.sh /home/agent/outcomegraph",
     "OG_DOGFOOD_TIMEOUT_SECONDS=3600 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-final-Nwve",
-    "OG_DOGFOOD_TIMEOUT_SECONDS=3600 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-final-Nwve"
+    "OG_DOGFOOD_TIMEOUT_SECONDS=3600 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-final-Nwve",
+    "OG_DOGFOOD_TIMEOUT_SECONDS=1800 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-20260308-nY1wfy",
+    "OG_DOGFOOD_TIMEOUT_SECONDS=3600 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-20260308-nY1wfy",
+    "uv run og replay --changed --json --timeout 1800 (in /tmp/outcomegraph-dogfood-20260308-nY1wfy)",
+    "OG_DOGFOOD_TIMEOUT_SECONDS=1800 bash skills/og-dogfood/scripts/run_dogfood.sh /tmp/outcomegraph-dogfood-20260308-nY1wfy (pass)"
   ],
-  "blockers": [
-    "Direct repo reruns in this checkout are still externally rate-limited. .outcomegraph/events/sync-20260307T151022Z-df8698e4e8.json records a Codex usage-limit failure before distill starts.",
-    "The first corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve failed verify because clone-generated oracles still used bare uv run pytest, and the clean-clone runtime could not spawn pytest.",
-    "The second corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve advanced only through distill batches 0 to 3 in about 25 minutes, with dogfood-sync.json still at 0 bytes and no terminal sync envelope.",
-    "The workspace copy of og.py drifted during the second rerun while the clean clone stayed on an older hash, so the dogfood source baseline was no longer stable enough for acceptance-quality capsule review."
-  ]
+  "blockers": []
 }

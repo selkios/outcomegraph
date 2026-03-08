@@ -2025,8 +2025,8 @@
       "id": "OG-DOGFOOD-001",
       "title": "Dogfood the refactor with a clean full-repo rebuild and capsule review",
       "priority": 2,
-      "status": "doing",
-      "details": "Added size-aware bootstrap distill batching and regression coverage, but dogfood remains blocked: the direct repo rerun is still usage-limited, the first corrected clean-clone rerun failed verify on bare uv run pytest oracles, and the second corrected rerun serialized distill to batches 0-3 before the source baseline drifted again.",
+      "status": "done",
+      "details": "Completed clean-clone dogfood acceptance after replay baseline/hash backfill and dogfood JSON-capture hardening. Captured passing sync/verify/replay/drift evidence and reviewed target capsules (`og`, `tests`, `runbooks`, `spec-v2`, `uv`).",
       "steps": [
         "Follow `WORKER_CAPSULE_REFACTOR_PLAN.md` Phase 8 and run a clean bootstrap plus full sync/review loop against this repo after the refactor lands",
         "Review target capsules called out in the plan (`og`, `tests`, `runbooks`, `spec-v2`, and `uv`) for recreation quality, executable oracle coverage, and stale-doc contradictions",
@@ -2048,6 +2048,8 @@
         "og.py",
         "skills/og-dogfood/scripts/run_dogfood.sh",
         "tasks/og-dogfood-001/TASK.md",
+        "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-review.md",
+        "tasks/og-dogfood-001/evidence/clean-clone-pass-1800-trace-summary.json",
         "tasks/og-dogfood-001/evidence/clean-clone-corrected-review.md",
         "tasks/og-dogfood-001/evidence/clean-clone-corrected-trace-summary.json",
         "tasks/og-dogfood-001/task-plan.json",
@@ -2055,13 +2057,7 @@
         "to-do.json"
       ],
       "created_at": "2026-03-07T05:47:03Z",
-      "updated_at": "2026-03-07T17:52:35Z",
-      "blockers": [
-        "Direct repo reruns are still externally rate-limited: .outcomegraph/events/sync-20260307T151022Z-df8698e4e8.json fails before distill with a Codex usage-limit error.",
-        "The first corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve failed verify because clone-generated oracles still used bare uv run pytest, and the clean-clone runtime could not spawn pytest.",
-        "The second corrected clean-clone rerun from /tmp/outcomegraph-dogfood-final-Nwve advanced only through distill batches 0-3 in about 25 minutes, with dogfood-sync.json still at 0 bytes and no terminal sync envelope.",
-        "The workspace copy of og.py drifted during the second rerun while the clean clone stayed on an older hash, so the dogfood source baseline was no longer stable enough for acceptance-quality capsule review."
-      ]
+      "updated_at": "2026-03-08T12:12:30Z"
     },
     {
       "id": "OG-DOC-003",

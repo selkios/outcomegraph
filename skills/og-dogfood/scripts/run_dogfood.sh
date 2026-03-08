@@ -14,18 +14,72 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-export OG_WORKER_MODEL="${OG_WORKER_MODEL:-gpt-5.4}"
+export OG_WORKER_MODEL="${OG_WORKER_MODEL:-${OG_DEFAULT_WORKER_MODEL:-gpt-5}}"
 export OG_DOGFOOD_TIMEOUT_SECONDS="${OG_DOGFOOD_TIMEOUT_SECONDS:-900}"
+
+write_json_failure_envelope() {
+  local label="$1"
+  local outfile="$2"
+  local exit_code="$3"
+  local raw_output_ref="$4"
+  local command_slug
+  command_slug="$(echo "$label" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+  if [[ -z "$command_slug" ]]; then
+    command_slug="dogfood-step"
+  fi
+  cat >"$outfile" <<EOF
+{
+  "schema_version": 1,
+  "status": "error",
+  "command": "${command_slug}",
+  "run_id": "dogfood-${command_slug}-error",
+  "message": "Dogfood step failed before producing valid JSON output.",
+  "data": {
+    "status": "command_failed",
+    "exit_code": ${exit_code},
+    "raw_output_ref": "${raw_output_ref}"
+  },
+  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+}
 
 run_json() {
   local label="$1"
   local outfile="$2"
   shift 2
+  local tmpfile
+  local raw_outfile
+  local exit_code=0
+  tmpfile="$(mktemp "${outfile##*/}.tmp.XXXXXX")"
+  raw_outfile="${outfile%.json}.raw.txt"
   echo "==> $label"
-  (
+  if (
     cd "$repo_root"
-    "$@" | tee "$outfile"
-  )
+    "$@" 2>&1 | tee "$tmpfile"
+  ); then
+    if python3 - "$tmpfile" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+json.loads(path.read_text(encoding="utf-8"))
+PY
+    then
+      mkdir -p "$(dirname "$outfile")"
+      mv "$tmpfile" "$outfile"
+      return 0
+    fi
+    exit_code=1
+  else
+    exit_code=$?
+  fi
+
+  mkdir -p "$(dirname "$outfile")"
+  mv "$tmpfile" "$raw_outfile"
+  write_json_failure_envelope "$label" "$outfile" "$exit_code" "$(basename "$raw_outfile")"
+  return "$exit_code"
 }
 
 run_stdout() {

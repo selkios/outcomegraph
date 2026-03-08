@@ -1382,6 +1382,43 @@ class TestDaemonLifecycle(_RepoTestCase):
         self.assertEqual(payload["errors"][0]["error_code"], og.SESSION_CONTENDED_CODE)
         self.assertEqual(payload["data"]["lock"]["session"]["session_id"], session_id)
 
+    def test_refresh_work_lock_updates_timestamp_for_current_holder(self) -> None:
+        holder = {"pid": 12345, "host": "test-host", "command": "og sync"}
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            acquired, _ = og._acquire_work_lock(str(self.repo), holder)
+            self.assertTrue(acquired)
+            try:
+                with patch.object(og, "_utc_timestamp", return_value="2026-03-08T00:10:00Z"):
+                    refreshed = og._refresh_work_lock(str(self.repo), holder)
+                lock_payload = json.loads((self.repo / ".outcomegraph" / "work" / "lock").read_text(encoding="utf-8"))
+            finally:
+                og._release_work_lock(str(self.repo), holder)
+
+        self.assertTrue(refreshed)
+        self.assertEqual(lock_payload["updated_at"], "2026-03-08T00:10:00Z")
+        self.assertEqual(lock_payload["session"]["updated_at"], "2026-03-08T00:10:00Z")
+        self.assertEqual(lock_payload["session"]["state"], og.SESSION_STATE_ACTIVE)
+
+    def test_refresh_work_lock_rejects_non_holder(self) -> None:
+        holder = {"pid": 12345, "host": "test-host", "command": "og sync"}
+        other_holder = {"pid": 99999, "host": "other-host", "command": "og sync"}
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            acquired, _ = og._acquire_work_lock(str(self.repo), holder)
+            self.assertTrue(acquired)
+            try:
+                original_payload = json.loads((self.repo / ".outcomegraph" / "work" / "lock").read_text(encoding="utf-8"))
+                with patch.object(og, "_utc_timestamp", return_value="2026-03-08T00:12:00Z"):
+                    refreshed = og._refresh_work_lock(str(self.repo), other_holder)
+                updated_payload = json.loads((self.repo / ".outcomegraph" / "work" / "lock").read_text(encoding="utf-8"))
+            finally:
+                og._release_work_lock(str(self.repo), holder)
+
+        self.assertFalse(refreshed)
+        self.assertEqual(updated_payload["updated_at"], original_payload["updated_at"])
+        self.assertEqual(updated_payload["holder"]["pid"], holder["pid"])
+
 
 class TestSyncWorkflows(_RepoTestCase):
     def test_sync_snapshot_falls_back_when_git_baseline_is_unavailable(self) -> None:
@@ -1757,6 +1794,13 @@ class TestSyncWorkflows(_RepoTestCase):
         self.assertEqual(changed_by_capsule["materials"], [".outcomegraph/materials.lock"])
         self.assertEqual(result["prompt_provenance"], prompt_provenance)
         self.assertTrue(all(item["prompt_provenance"] == prompt_provenance for item in result["generated_deltas"]))
+
+    def test_run_distill_stage_skips_when_snapshot_has_no_changed_files(self) -> None:
+        with self.git_root_patch():
+            payload = og._run_distill_stage(str(self.repo), {}, "sync-1", profile="analyze", mode="observe")
+
+        self.assertEqual(payload["status"], "skipped")
+        self.assertEqual(payload["generated_deltas"], [])
 
     def test_record_sync_summary_event_collects_worker_prompt_provenance(self) -> None:
         prompt_provenance = {
@@ -2850,6 +2894,17 @@ safety:
         self.assertEqual(distill_error["error_code"], og.RUNTIME_ERROR_CODE)
         self.assertFalse(bool(distill_error["retryable"]))
 
+    def test_run_distill_stage_returns_runtime_error_for_unexpected_worker_exception(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        with self.git_root_patch(), patch.object(og, "_run_codex_worker", side_effect=RuntimeError("boom")):
+            payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["code"], og.RUNTIME_ERROR_CODE)
+        self.assertIn("distill stage failed unexpectedly: boom", payload["message"])
+        self.assertEqual(payload["errors"][0]["error_code"], og.RUNTIME_ERROR_CODE)
+
     def test_build_envelope_normalizes_legacy_string_errors(self) -> None:
         envelope = og._build_command_result_envelope(
             "sync",
@@ -3366,6 +3421,70 @@ class TestVerifyWorkflows(_RepoTestCase):
 
 
 class TestReplayWorkflows(_RepoTestCase):
+    def test_capsule_is_advisory_for_replay_for_skill_capsules(self) -> None:
+        capsule_payload = {
+            "id": "skill-og-dogfood",
+            "kind": "code",
+            "status": "success",
+            "scope": ["skills/og-dogfood/SKILL.md"],
+        }
+
+        self.assertTrue(og._capsule_is_advisory_for_replay(capsule_payload))
+
+    def test_validate_replay_plan_contract_rejects_out_of_scope_test_step_paths(self) -> None:
+        fixture = _write_replayable_capsule_fixture(
+            self.repo,
+            capsule_id="skill-og-dogfood",
+            source_path="skills/og-dogfood/SKILL.md",
+            oracle_command="uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            capsule_kind="code",
+        )
+        plan = _build_replay_plan_fixture(
+            "run-1",
+            fixture,
+            steps=[
+                {
+                    "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                    "cwd": ".",
+                    "expected_exit_code": 0,
+                    "timeout_s": 900,
+                }
+            ],
+            status="ok",
+        )
+
+        failures = og._validate_replay_plan_contract(
+            "run-1",
+            "skill-og-dogfood",
+            plan,
+            fixture["capsule_payload"],
+            fixture["scope_materials"],
+            fixture["oracles"],
+            {},
+        )
+
+        self.assertTrue(any("outside capsule scope/material inputs" in failure for failure in failures))
+
+    def test_validate_replay_plan_contract_backfills_missing_baseline_hash(self) -> None:
+        fixture = _write_replayable_capsule_fixture(self.repo)
+        plan = _build_replay_plan_fixture("run-1", fixture, baseline_hash=None)
+
+        failures = og._validate_replay_plan_contract(
+            "run-1",
+            "default",
+            plan,
+            fixture["capsule_payload"],
+            fixture["scope_materials"],
+            fixture["oracles"],
+            {"oracle_digest": "sha256:baseline-equivalence-hash"},
+        )
+
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            plan["equivalence_inputs"]["baseline_hash"],
+            "sha256:baseline-equivalence-hash",
+        )
+
     def test_run_replay_step_rejects_prefix_based_cwd_escape(self) -> None:
         sandbox_root = f"{og.OG_ROOT}/work/replay/run-1/default"
         observed: dict[str, object] = {}
@@ -3396,7 +3515,7 @@ class TestReplayWorkflows(_RepoTestCase):
             )
 
         expected_cwd = str((self.repo / sandbox_root).resolve())
-        self.assertEqual(observed["command"], ["bash", "-lc", "echo ok"])
+        self.assertEqual(observed["command"], ["echo", "ok"])
         self.assertEqual(observed["cwd"], expected_cwd)
         self.assertEqual(payload["status"], "pass")
         self.assertEqual(payload["resolved_cwd"], ".")
@@ -3431,7 +3550,7 @@ class TestReplayWorkflows(_RepoTestCase):
             )
 
         expected_cwd = str((self.repo / sandbox_root).resolve())
-        self.assertEqual(observed["command"], ["bash", "-lc", step["command"]])
+        self.assertEqual(observed["command"], ["bash", "-lc", "set -euo pipefail\nprintf 'ok\\n'"])
         self.assertEqual(observed["cwd"], expected_cwd)
         self.assertEqual(payload["status"], "pass")
 

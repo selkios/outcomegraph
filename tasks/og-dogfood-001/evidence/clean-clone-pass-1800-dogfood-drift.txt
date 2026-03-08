@@ -1,0 +1,4 @@
+drift: ok
+
+- [policy_certificates] ok — drift checks for policy and certificates passed
+

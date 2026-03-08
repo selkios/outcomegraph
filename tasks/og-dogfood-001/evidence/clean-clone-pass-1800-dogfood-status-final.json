@@ -1,0 +1,608 @@
+{
+  "schema_version": 1,
+  "command": "status",
+  "status": "ok",
+  "run_id": null,
+  "session_id": null,
+  "data": {
+    "status_schema_version": 1,
+    "status": "ok",
+    "command": "status",
+    "options": {
+      "changed": false,
+      "profile": null,
+      "mode": null,
+      "force_hooks_path": false,
+      "force_full_sync": false,
+      "output_mode": "json",
+      "output_json": true,
+      "strict": false,
+      "non_interactive": false,
+      "validate": false,
+      "dry_run": false,
+      "max_retries": 0,
+      "timeout": null,
+      "configuration": {
+        "config_file": ".outcomegraph/config.yaml",
+        "config_source": "built-in",
+        "policy_file": ".outcomegraph/policy.yaml",
+        "policy_source": "config:.outcomegraph/config.yaml",
+        "codex_home": null,
+        "resolved_from": {
+          "output_mode": "flag:--json"
+        }
+      }
+    },
+    "generated_at": "2026-03-08T12:11:46Z",
+    "message": "status dashboard computed",
+    "issues": [],
+    "freshness": {
+      "sync": {
+        "state": "fresh",
+        "status": "ok",
+        "run_id": "sync-20260308T115630Z-a64f2e4d8c",
+        "age_seconds": null,
+        "age_human": "unknown",
+        "message": "latest sync is recent",
+        "last_sync_at": null,
+        "threshold_seconds": 3600
+      },
+      "certificates": {
+        "state": "fresh",
+        "count": 77,
+        "age_seconds": 0,
+        "age_human": "0s",
+        "newest": ".outcomegraph/certificates/cert-tests-f87f2d9b78.json",
+        "oldest": ".outcomegraph/certificates/cert-agent_first_cli_review-2883f63de1.json",
+        "message": "certificates are within freshness window",
+        "paths": [
+          ".outcomegraph/certificates/cert-agent_first_cli_review-2883f63de1.json",
+          ".outcomegraph/certificates/cert-agent_first_cli_review-56b0c24d42.json",
+          ".outcomegraph/certificates/cert-agents-d99b386716.json",
+          ".outcomegraph/certificates/cert-agents-da0a23579e.json",
+          ".outcomegraph/certificates/cert-architecture-24e2a8fcab.json",
+          ".outcomegraph/certificates/cert-architecture-b8324c19aa.json",
+          ".outcomegraph/certificates/cert-config-2caa502fc5.json",
+          ".outcomegraph/certificates/cert-config-c1078cf61e.json",
+          ".outcomegraph/certificates/cert-config-cc1d7bfc34.json",
+          ".outcomegraph/certificates/cert-constitution-24582a353a.json",
+          ".outcomegraph/certificates/cert-constitution-c56a3e6aa5.json",
+          ".outcomegraph/certificates/cert-constitution-ef02f476c7.json",
+          ".outcomegraph/certificates/cert-context-1404ebb26b.json",
+          ".outcomegraph/certificates/cert-context-d098189593.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-52a1fc6a88.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-77a48c15d6.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-a59c9f8946.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-ec824f06cd.json",
+          ".outcomegraph/certificates/cert-dogfood-sync-json-tmp-37d0ccebac.json",
+          ".outcomegraph/certificates/cert-dogfood-sync-json-tmp-7c156ae969.json",
+          ".outcomegraph/certificates/cert-dogfood-verify-json-tmp-52a0f800c9.json",
+          ".outcomegraph/certificates/cert-migration_guide-90e7a8aafc.json",
+          ".outcomegraph/certificates/cert-migration_guide-9e6025d70c.json",
+          ".outcomegraph/certificates/cert-og-14a21ef92c.json",
+          ".outcomegraph/certificates/cert-og-b4ad1bef03.json",
+          ".outcomegraph/certificates/cert-og-c72ef7fc7d.json",
+          ".outcomegraph/certificates/cert-og-fc1ae4d915.json",
+          ".outcomegraph/certificates/cert-ogd-4c81b66559.json",
+          ".outcomegraph/certificates/cert-ogd-e17766156c.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-6f92267c94.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-ceb9fb6636.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-f637f50cf7.json",
+          ".outcomegraph/certificates/cert-plugin_api-f959f8c5e4.json",
+          ".outcomegraph/certificates/cert-plugin_api-fdf21a5b92.json",
+          ".outcomegraph/certificates/cert-policy-343cad164c.json",
+          ".outcomegraph/certificates/cert-policy-7d29956023.json",
+          ".outcomegraph/certificates/cert-policy-86301c7457.json",
+          ".outcomegraph/certificates/cert-prompts-306f4f9cea.json",
+          ".outcomegraph/certificates/cert-prompts-51f349b5c8.json",
+          ".outcomegraph/certificates/cert-pyproject-2a3610052c.json",
+          ".outcomegraph/certificates/cert-pyproject-5e050f504d.json",
+          ".outcomegraph/certificates/cert-quickstart-88d7ba16fa.json",
+          ".outcomegraph/certificates/cert-quickstart-93f360f0e8.json",
+          ".outcomegraph/certificates/cert-readme-37d78618bf.json",
+          ".outcomegraph/certificates/cert-readme-504fa51493.json",
+          ".outcomegraph/certificates/cert-readme-8b4203267f.json",
+          ".outcomegraph/certificates/cert-runbooks-cfcc3b5b46.json",
+          ".outcomegraph/certificates/cert-runbooks-d6c70ae45c.json",
+          ".outcomegraph/certificates/cert-runtime-601181dd41.json",
+          ".outcomegraph/certificates/cert-runtime-8207498b60.json",
+          ".outcomegraph/certificates/cert-security_policy-be1d711867.json",
+          ".outcomegraph/certificates/cert-security_policy-ca348b0651.json",
+          ".outcomegraph/certificates/cert-skill-og-609e43e937.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-8cef2d87d6.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-b15bf901e3.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-d74565ab0a.json",
+          ".outcomegraph/certificates/cert-skill-og-ff3a32cee1.json",
+          ".outcomegraph/certificates/cert-skill-og-quality-pass-1aaa945a83.json",
+          ".outcomegraph/certificates/cert-skill-og-quality-pass-e262ca0c59.json",
+          ".outcomegraph/certificates/cert-spec-v2-1741daf2af.json",
+          ".outcomegraph/certificates/cert-spec-v2-84885ac908.json",
+          ".outcomegraph/certificates/cert-spec_implementation_matrix-81825d44a5.json",
+          ".outcomegraph/certificates/cert-spec_implementation_matrix-8a9dbc4742.json",
+          ".outcomegraph/certificates/cert-tasks-1d2b2b957b.json",
+          ".outcomegraph/certificates/cert-tasks-3cdab1880b.json",
+          ".outcomegraph/certificates/cert-tests-1b1940da96.json",
+          ".outcomegraph/certificates/cert-tests-3dddf080c9.json",
+          ".outcomegraph/certificates/cert-tests-5325c98510.json",
+          ".outcomegraph/certificates/cert-tests-f87f2d9b78.json",
+          ".outcomegraph/certificates/cert-to-do-0c33d9ea95.json",
+          ".outcomegraph/certificates/cert-to-do-e048f396ac.json",
+          ".outcomegraph/certificates/cert-to-do-schema-69aab2dff4.json",
+          ".outcomegraph/certificates/cert-to-do-schema-f17c8fa4b1.json",
+          ".outcomegraph/certificates/cert-uv-35377aa651.json",
+          ".outcomegraph/certificates/cert-uv-7f033af040.json",
+          ".outcomegraph/certificates/cert-worker_capsule_refactor_plan-9130e539ea.json",
+          ".outcomegraph/certificates/cert-worker_capsule_refactor_plan-e50eee7d53.json"
+        ],
+        "recent_paths": [
+          ".outcomegraph/certificates/cert-tests-f87f2d9b78.json"
+        ],
+        "stale_threshold_seconds": 86400
+      },
+      "message": "sync=fresh, certificates=fresh"
+    },
+    "drift": {
+      "status_schema_version": 1,
+      "state": "ok",
+      "status": "ok",
+      "checks": [
+        {
+          "type": "policy_certificates",
+          "status": "ok",
+          "message": "drift checks for policy and certificates passed"
+        }
+      ],
+      "remediation": [],
+      "certificates": {
+        "state": "fresh",
+        "count": 77,
+        "age_seconds": 0,
+        "age_human": "0s",
+        "newest": ".outcomegraph/certificates/cert-tests-f87f2d9b78.json",
+        "oldest": ".outcomegraph/certificates/cert-agent_first_cli_review-2883f63de1.json",
+        "message": "certificates are within freshness window",
+        "paths": [
+          ".outcomegraph/certificates/cert-agent_first_cli_review-2883f63de1.json",
+          ".outcomegraph/certificates/cert-agent_first_cli_review-56b0c24d42.json",
+          ".outcomegraph/certificates/cert-agents-d99b386716.json",
+          ".outcomegraph/certificates/cert-agents-da0a23579e.json",
+          ".outcomegraph/certificates/cert-architecture-24e2a8fcab.json",
+          ".outcomegraph/certificates/cert-architecture-b8324c19aa.json",
+          ".outcomegraph/certificates/cert-config-2caa502fc5.json",
+          ".outcomegraph/certificates/cert-config-c1078cf61e.json",
+          ".outcomegraph/certificates/cert-config-cc1d7bfc34.json",
+          ".outcomegraph/certificates/cert-constitution-24582a353a.json",
+          ".outcomegraph/certificates/cert-constitution-c56a3e6aa5.json",
+          ".outcomegraph/certificates/cert-constitution-ef02f476c7.json",
+          ".outcomegraph/certificates/cert-context-1404ebb26b.json",
+          ".outcomegraph/certificates/cert-context-d098189593.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-52a1fc6a88.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-77a48c15d6.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-a59c9f8946.json",
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-ec824f06cd.json",
+          ".outcomegraph/certificates/cert-dogfood-sync-json-tmp-37d0ccebac.json",
+          ".outcomegraph/certificates/cert-dogfood-sync-json-tmp-7c156ae969.json",
+          ".outcomegraph/certificates/cert-dogfood-verify-json-tmp-52a0f800c9.json",
+          ".outcomegraph/certificates/cert-migration_guide-90e7a8aafc.json",
+          ".outcomegraph/certificates/cert-migration_guide-9e6025d70c.json",
+          ".outcomegraph/certificates/cert-og-14a21ef92c.json",
+          ".outcomegraph/certificates/cert-og-b4ad1bef03.json",
+          ".outcomegraph/certificates/cert-og-c72ef7fc7d.json",
+          ".outcomegraph/certificates/cert-og-fc1ae4d915.json",
+          ".outcomegraph/certificates/cert-ogd-4c81b66559.json",
+          ".outcomegraph/certificates/cert-ogd-e17766156c.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-6f92267c94.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-ceb9fb6636.json",
+          ".outcomegraph/certificates/cert-outcomegraph-egg-info-f637f50cf7.json",
+          ".outcomegraph/certificates/cert-plugin_api-f959f8c5e4.json",
+          ".outcomegraph/certificates/cert-plugin_api-fdf21a5b92.json",
+          ".outcomegraph/certificates/cert-policy-343cad164c.json",
+          ".outcomegraph/certificates/cert-policy-7d29956023.json",
+          ".outcomegraph/certificates/cert-policy-86301c7457.json",
+          ".outcomegraph/certificates/cert-prompts-306f4f9cea.json",
+          ".outcomegraph/certificates/cert-prompts-51f349b5c8.json",
+          ".outcomegraph/certificates/cert-pyproject-2a3610052c.json",
+          ".outcomegraph/certificates/cert-pyproject-5e050f504d.json",
+          ".outcomegraph/certificates/cert-quickstart-88d7ba16fa.json",
+          ".outcomegraph/certificates/cert-quickstart-93f360f0e8.json",
+          ".outcomegraph/certificates/cert-readme-37d78618bf.json",
+          ".outcomegraph/certificates/cert-readme-504fa51493.json",
+          ".outcomegraph/certificates/cert-readme-8b4203267f.json",
+          ".outcomegraph/certificates/cert-runbooks-cfcc3b5b46.json",
+          ".outcomegraph/certificates/cert-runbooks-d6c70ae45c.json",
+          ".outcomegraph/certificates/cert-runtime-601181dd41.json",
+          ".outcomegraph/certificates/cert-runtime-8207498b60.json",
+          ".outcomegraph/certificates/cert-security_policy-be1d711867.json",
+          ".outcomegraph/certificates/cert-security_policy-ca348b0651.json",
+          ".outcomegraph/certificates/cert-skill-og-609e43e937.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-8cef2d87d6.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-b15bf901e3.json",
+          ".outcomegraph/certificates/cert-skill-og-dogfood-d74565ab0a.json",
+          ".outcomegraph/certificates/cert-skill-og-ff3a32cee1.json",
+          ".outcomegraph/certificates/cert-skill-og-quality-pass-1aaa945a83.json",
+          ".outcomegraph/certificates/cert-skill-og-quality-pass-e262ca0c59.json",
+          ".outcomegraph/certificates/cert-spec-v2-1741daf2af.json",
+          ".outcomegraph/certificates/cert-spec-v2-84885ac908.json",
+          ".outcomegraph/certificates/cert-spec_implementation_matrix-81825d44a5.json",
+          ".outcomegraph/certificates/cert-spec_implementation_matrix-8a9dbc4742.json",
+          ".outcomegraph/certificates/cert-tasks-1d2b2b957b.json",
+          ".outcomegraph/certificates/cert-tasks-3cdab1880b.json",
+          ".outcomegraph/certificates/cert-tests-1b1940da96.json",
+          ".outcomegraph/certificates/cert-tests-3dddf080c9.json",
+          ".outcomegraph/certificates/cert-tests-5325c98510.json",
+          ".outcomegraph/certificates/cert-tests-f87f2d9b78.json",
+          ".outcomegraph/certificates/cert-to-do-0c33d9ea95.json",
+          ".outcomegraph/certificates/cert-to-do-e048f396ac.json",
+          ".outcomegraph/certificates/cert-to-do-schema-69aab2dff4.json",
+          ".outcomegraph/certificates/cert-to-do-schema-f17c8fa4b1.json",
+          ".outcomegraph/certificates/cert-uv-35377aa651.json",
+          ".outcomegraph/certificates/cert-uv-7f033af040.json",
+          ".outcomegraph/certificates/cert-worker_capsule_refactor_plan-9130e539ea.json",
+          ".outcomegraph/certificates/cert-worker_capsule_refactor_plan-e50eee7d53.json"
+        ],
+        "recent_paths": [
+          ".outcomegraph/certificates/cert-tests-f87f2d9b78.json"
+        ],
+        "stale_threshold_seconds": 86400
+      },
+      "policy": {
+        "path": ".outcomegraph/policy.yaml",
+        "present": true,
+        "status": "ok",
+        "message": "policy file validated",
+        "checks": [],
+        "policy": {
+          "schema_version": 2,
+          "mode": "observe",
+          "policy_id": "observe-default-v1",
+          "allow": {
+            "file_writes": [
+              ".outcomegraph/**",
+              "export/**",
+              "skills/outcome-steward/**",
+              "AGENTS.md",
+              "CONTEXT.md"
+            ],
+            "verify_commands": [
+              "npm test --listTests",
+              "npm test",
+              "npm test*",
+              "go test ./...",
+              "go test ./...*",
+              "pytest -q",
+              "pytest -q*",
+              "uv run --with pytest --no-project pytest -q*",
+              "uv run --with pytest pytest -q*",
+              "uv run pytest -q*",
+              "python -m unittest -q*",
+              "python3 -m unittest -q*"
+            ],
+            "sandbox_operations": [
+              "create_isolated_worktree",
+              "read_repo_state",
+              "read_artifacts"
+            ]
+          },
+          "deny": {
+            "file_writes": [
+              "src/**",
+              "lib/**",
+              "app/**",
+              "packages/**"
+            ],
+            "network": [
+              "unrestricted"
+            ],
+            "dependencies": [
+              "npm install",
+              "pip install",
+              "cargo add",
+              "go mod tidy"
+            ],
+            "deployment": [
+              "push",
+              "git commit --amend",
+              "github pr create",
+              "gha workflow_dispatch"
+            ]
+          }
+        },
+        "status_counts": {
+          "error": 0,
+          "warn": 0
+        },
+        "parsed": {
+          "schema_version": "2",
+          "created_at": "2026-03-08T11:56:30Z",
+          "name": "observe-policy",
+          "mode": "observe",
+          "allow": {
+            "file_writes": [
+              ".outcomegraph/**",
+              "export/**",
+              "skills/outcome-steward/**",
+              "AGENTS.md",
+              "CONTEXT.md"
+            ],
+            "verify_commands": [
+              "npm test --listTests",
+              "npm test",
+              "npm test*",
+              "go test ./...",
+              "go test ./...*",
+              "pytest -q",
+              "pytest -q*",
+              "uv run --with pytest --no-project pytest -q*",
+              "uv run --with pytest pytest -q*",
+              "uv run pytest -q*",
+              "python -m unittest -q*",
+              "python3 -m unittest -q*"
+            ],
+            "sandbox_operations": [
+              "create_isolated_worktree",
+              "read_repo_state",
+              "read_artifacts"
+            ]
+          },
+          "deny": {
+            "file_writes": [
+              "src/**",
+              "lib/**",
+              "app/**",
+              "packages/**"
+            ],
+            "network": [
+              "unrestricted"
+            ],
+            "dependencies": [
+              "npm install",
+              "pip install",
+              "cargo add",
+              "go mod tidy"
+            ],
+            "deployment": [
+              "push",
+              "git commit --amend",
+              "github pr create",
+              "gha workflow_dispatch"
+            ]
+          }
+        }
+      },
+      "latest_event": {
+        "run_id": null,
+        "status": "ok",
+        "created_at": "2026-03-08T12:11:46Z",
+        "path": "/tmp/outcomegraph-dogfood-20260308-nY1wfy/.outcomegraph/events/drift-20260308T121146Z-b2837f6afd.json"
+      }
+    },
+    "integrity": {
+      "state": "ok",
+      "status": "ok",
+      "message": "integrity ledger verified",
+      "valid": true,
+      "event_count": 4,
+      "event_sequence": 4,
+      "event_hash": "sha256:a2b4c5bad4b91811ecbe59fce4e0f36900f68b4b276a4bdf05dfc9afef0bff67",
+      "checkpoint": null
+    },
+    "verification": {
+      "state": "fresh",
+      "status": "ok",
+      "run_id": "sync-20260308T115630Z-a64f2e4d8c",
+      "age_seconds": null,
+      "age_human": "unknown",
+      "message": "verification recently completed",
+      "last_verified_at": null,
+      "sync_status": "ok",
+      "steps": [],
+      "threshold_seconds": 86400,
+      "event_created_at": null,
+      "command": "sync"
+    },
+    "remediation": [],
+    "runtime": {
+      "status": "idle",
+      "pending": false,
+      "pending_source": null,
+      "pending_file": {
+        "present": false,
+        "source": null
+      },
+      "last_message": "sync finished (ok)",
+      "lock": {
+        "status": "unlocked",
+        "age_human": "4m 59s",
+        "holder": null,
+        "session": {
+          "session_id": "sync-20260308t115630z-46c7de9cb4",
+          "kind": "sync",
+          "lifecycle": "ephemeral",
+          "state": "released",
+          "resume_supported": false,
+          "created_at": "2026-03-08T11:56:30Z",
+          "updated_at": "2026-03-08T12:06:47Z",
+          "expires_at": null
+        }
+      },
+      "message": "runtime is idle"
+    },
+    "agent_reliability": {
+      "schema_version": 1,
+      "tracked_at": "2026-03-08T12:11:46Z",
+      "status": "warn",
+      "message": "agent reliability metrics need attention: commands_per_successful_task",
+      "warn_metrics": [
+        "commands_per_successful_task"
+      ],
+      "unknown_metrics": [
+        "retry_auto_recovery_rate",
+        "session_churn"
+      ],
+      "totals": {
+        "commands": 575,
+        "successful_tasks": 138,
+        "schema_valid_outputs": 575,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "resumable_session_starts": 0,
+        "resumable_session_reuses": 0,
+        "resumable_session_rotations": 0
+      },
+      "current": {
+        "commands_since_successful_task": 1
+      },
+      "latest_command": {
+        "command": "status",
+        "subcommand": null,
+        "status": "ok",
+        "observed_at": "2026-03-08T12:11:46Z",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_transition": "none",
+        "commands_since_successful_task": 1
+      },
+      "commands_per_successful_task": {
+        "value": 4.167,
+        "units": "commands/task",
+        "direction": "lower_is_better",
+        "status": "warn",
+        "total_commands": 575,
+        "successful_tasks": 138
+      },
+      "schema_valid_output_rate": {
+        "value": 1.0,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "ok",
+        "valid_outputs": 575,
+        "total_outputs": 575
+      },
+      "retry_auto_recovery_rate": {
+        "value": null,
+        "units": "ratio",
+        "direction": "higher_is_better",
+        "status": "unknown",
+        "retryable_operations": 0,
+        "recovered_operations": 0
+      },
+      "session_churn": {
+        "value": null,
+        "units": "ratio",
+        "direction": "lower_is_better",
+        "status": "unknown",
+        "tracked_session_kinds": [
+          "autopilot",
+          "daemon"
+        ],
+        "session_starts": 0,
+        "reused_sessions": 0,
+        "rotated_sessions": 0,
+        "repeat_observations": 0
+      }
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "agent_reliability": {
+      "observation": {
+        "observed_at": "2026-03-08T12:11:46Z",
+        "command": "status",
+        "subcommand": null,
+        "status": "ok",
+        "successful_task": false,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_tracked": false,
+        "session_transition": "none",
+        "commands_since_successful_task": 1
+      },
+      "snapshot": {
+        "schema_version": 1,
+        "tracked_at": "2026-03-08T12:11:46Z",
+        "status": "warn",
+        "message": "agent reliability metrics need attention: commands_per_successful_task",
+        "warn_metrics": [
+          "commands_per_successful_task"
+        ],
+        "unknown_metrics": [
+          "retry_auto_recovery_rate",
+          "session_churn"
+        ],
+        "totals": {
+          "commands": 575,
+          "successful_tasks": 138,
+          "schema_valid_outputs": 575,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "resumable_session_starts": 0,
+          "resumable_session_reuses": 0,
+          "resumable_session_rotations": 0
+        },
+        "current": {
+          "commands_since_successful_task": 1
+        },
+        "latest_command": {
+          "command": "status",
+          "subcommand": null,
+          "status": "ok",
+          "observed_at": "2026-03-08T12:11:46Z",
+          "successful_task": false,
+          "schema_valid_output": true,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "session_kind": null,
+          "session_id": null,
+          "session_transition": "none",
+          "commands_since_successful_task": 1
+        },
+        "commands_per_successful_task": {
+          "value": 4.167,
+          "units": "commands/task",
+          "direction": "lower_is_better",
+          "status": "warn",
+          "total_commands": 575,
+          "successful_tasks": 138
+        },
+        "schema_valid_output_rate": {
+          "value": 1.0,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "ok",
+          "valid_outputs": 575,
+          "total_outputs": 575
+        },
+        "retry_auto_recovery_rate": {
+          "value": null,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "unknown",
+          "retryable_operations": 0,
+          "recovered_operations": 0
+        },
+        "session_churn": {
+          "value": null,
+          "units": "ratio",
+          "direction": "lower_is_better",
+          "status": "unknown",
+          "tracked_session_kinds": [
+            "autopilot",
+            "daemon"
+          ],
+          "session_starts": 0,
+          "reused_sessions": 0,
+          "rotated_sessions": 0,
+          "repeat_observations": 0
+        }
+      }
+    }
+  }
+}

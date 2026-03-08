@@ -1,0 +1,4307 @@
+{
+  "schema_version": 1,
+  "command": "replay",
+  "status": "ok",
+  "run_id": "replay-20260308T120733Z-bed78dc4",
+  "session_id": null,
+  "data": {
+    "status": "ok",
+    "command": "replay",
+    "code": null,
+    "options": {
+      "changed": true,
+      "profile": "analyze",
+      "mode": "observe",
+      "force_hooks_path": false,
+      "force_full_sync": false,
+      "output_mode": "json",
+      "output_json": true,
+      "strict": false,
+      "non_interactive": false,
+      "validate": false,
+      "dry_run": false,
+      "max_retries": 0,
+      "timeout": 1800,
+      "configuration": {
+        "config_file": ".outcomegraph/config.yaml",
+        "config_source": "built-in",
+        "policy_file": ".outcomegraph/policy.yaml",
+        "policy_source": "config:.outcomegraph/config.yaml",
+        "codex_home": null,
+        "resolved_from": {
+          "output_mode": "flag:--json",
+          "profile": "config:.outcomegraph/config.yaml",
+          "mode": "config:.outcomegraph/config.yaml"
+        }
+      }
+    },
+    "run_id": "replay-20260308T120733Z-bed78dc4",
+    "steps": [
+      {
+        "name": "replay",
+        "status": "ok",
+        "code": null,
+        "message": "Replay adapter produced executable plans.",
+        "mode": "observe",
+        "replay_plans": [
+          {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "dogfood-status-pre-sync-json-tmp",
+            "capsule_scope": [
+              "dogfood-status-pre-sync.json.tmp.tvwgLV",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "digest": "sha256:f32a1ca5871a070de1d7c6f659e9d0ee8bd2bae750bfc1709d74a10c4c0e9068",
+                "kind": null,
+                "size": null
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "steps": [
+              {
+                "command": "test -f dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "expected_exit_code": 0,
+                "timeout_s": 10,
+                "cwd": "."
+              },
+              {
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_exit_code": 0,
+                "timeout_s": 600,
+                "cwd": "."
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+                "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_signal": "exit_code:0",
+                "reason": "Validate snapshot invariants and drift status via repository-native oracle."
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "dogfood-status-pre-sync-json-tmp-verify"
+              ],
+              "material_paths": [
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Proof basis: pytest oracle asserts snapshot invariants: schema_version=1, command='status', and data.status=='warn' with issues unknown_verification, unknown_certificates, drift_error.",
+                "Freshness sync state remains 'unknown' with message 'no sync summary available' and certificates.count=0.",
+                "Drift policy present=true with status='ok'; export_control_surface warns about missing export artifacts listed in invariants.",
+                "Verification uses only scoped materials and avoids network/destructive actions."
+              ]
+            },
+            "status": "ok",
+            "message": "Prepared replay plan using scoped materials and pytest oracle.",
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "failures": [],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            },
+            "adapter_receipts": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay-input.json",
+                "hash": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+                "media_type": "application/json",
+                "size": 10548
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+                "hash": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+                "media_type": "application/json",
+                "size": 10548
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay.json",
+                "hash": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+                "media_type": "application/x-ndjson",
+                "size": 7461
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+                "hash": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+                "media_type": "application/x-ndjson",
+                "size": 7461
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay-result.json",
+                "hash": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+                "media_type": "application/json",
+                "size": 3326
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+                "hash": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+                "media_type": "application/json",
+                "size": 3326
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "og",
+            "capsule_scope": [
+              "og",
+              "og.py",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "og",
+                "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
+                "kind": "file",
+                "size": 225
+              },
+              {
+                "path": "og.py",
+                "digest": "sha256:ea31a1226f6ae1c5dea027ffb6c56dcdf014e67f32b81583bc5613946c2376f6",
+                "kind": null,
+                "size": null
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "steps": [
+              {
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+                "expected_exit_code": 0,
+                "timeout_s": 120,
+                "cwd": "."
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "distill-tests-pass",
+                "oracle_name": "og-distill-tests",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+                "expected_signal": "exit_code:0",
+                "reason": "Repository-native distill snapshot tests validate distill snapshot selection without mutating project metadata."
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "og-distill-tests"
+              ],
+              "material_paths": [
+                "og",
+                "og.py",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Equivalence is proven by oracle tests passing against the scoped materials only.",
+                "Invariants: WORKER_INTERFACE_VERSION=1 and WORKER_SCHEMA_VERSION=2 remain stable; CLI help semantics unchanged.",
+                "Oracle execution uses shlex.split; empty command semantics preserved (status=pass, observed_code=0).",
+                "Replay runs offline/non-destructive; uv/pytest operate within sandbox and avoid network and metadata changes."
+              ]
+            },
+            "status": "ok",
+            "message": "Capsule-scoped replay plan prepared for isolated sandbox validation.",
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "failures": [],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            },
+            "adapter_receipts": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay-input.json",
+                "hash": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+                "media_type": "application/json",
+                "size": 10527
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+                "hash": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+                "media_type": "application/json",
+                "size": 10527
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay.json",
+                "hash": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+                "media_type": "application/x-ndjson",
+                "size": 6125
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+                "hash": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+                "media_type": "application/x-ndjson",
+                "size": 6125
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay-result.json",
+                "hash": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+                "media_type": "application/json",
+                "size": 3171
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+                "hash": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+                "media_type": "application/json",
+                "size": 3171
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "skill-og-dogfood",
+            "capsule_scope": [
+              "skills/og-dogfood/SKILL.md",
+              "skills/og-dogfood/agents/openai.yaml",
+              "skills/og-dogfood/scripts/run_dogfood.sh"
+            ],
+            "material_inputs": [
+              {
+                "path": "skills/og-dogfood/SKILL.md",
+                "digest": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+                "kind": "file",
+                "size": 3629
+              },
+              {
+                "path": "skills/og-dogfood/agents/openai.yaml",
+                "digest": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+                "kind": "file",
+                "size": 224
+              },
+              {
+                "path": "skills/og-dogfood/scripts/run_dogfood.sh",
+                "digest": "sha256:e31cef8c7afa18dbd35ae3aaa0efee0c8ca6ba826c89e1be472d2c6c67626279",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "steps": [],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "og-cli-regression",
+                "dogfood-run (advisory only in observe mode)"
+              ],
+              "material_paths": [
+                "skills/og-dogfood/SKILL.md",
+                "skills/og-dogfood/agents/openai.yaml",
+                "skills/og-dogfood/scripts/run_dogfood.sh"
+              ],
+              "notes": [
+                "Primary oracle 'dogfood-run' is advisory and disallowed in observe mode; no executable command is available for it within policy.",
+                "Runnable oracle 'og-cli-regression' depends on files outside capsule scope (tests/test_og_sync_verify_replay_hooks.py, og.py) and thus cannot execute with scoped materials only.",
+                "Capsule constraints require repo root with pyproject.toml and og present; these are not in capsule.scope or scope_materials, so regeneration cannot satisfy constraints inside a sandbox limited to scope.",
+                "Networkless sandbox and unknown 'uv' environment prevent resolving dependencies via 'uv run' without additional materials/locks.",
+                "Materials lock (.outcomegraph/materials.lock) not in scope; dependency drift cannot be bounded for a proof."
+              ]
+            },
+            "status": "pending",
+            "message": "Pending: capsule scope lacks executable acceptance and required repo materials; provide repo root materials or permit the dogfood oracle to enable a provable replay.",
+            "parity_results": null,
+            "failures": [
+              "No executable acceptance oracle is available inside capsule scope under observe-mode policy.",
+              "Required repo-level materials (pyproject.toml, og/og.py, tests/*) are outside capsule.scope and cannot be included as inputs.",
+              "Cannot guarantee 'uv' environment or dependency resolution without network or locks; constraints mandate 'uv run'.",
+              "Deterministic evidence under .outcomegraph/events cannot be generated or verified without running the disallowed dogfood script."
+            ],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            },
+            "adapter_receipts": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay-input.json",
+                "hash": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+                "media_type": "application/json",
+                "size": 12832
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+                "hash": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+                "media_type": "application/json",
+                "size": 12832
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay.json",
+                "hash": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+                "media_type": "application/x-ndjson",
+                "size": 7952
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+                "hash": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+                "media_type": "application/x-ndjson",
+                "size": 7952
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay-result.json",
+                "hash": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+                "media_type": "application/json",
+                "size": 3550
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+                "hash": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+                "media_type": "application/json",
+                "size": 3550
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "interface_version": 1,
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "tests",
+            "capsule_scope": [
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "tests/conftest.py",
+                "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+                "kind": "file",
+                "size": 240
+              },
+              {
+                "path": "tests/test_capsule_quality_eval.py",
+                "digest": "sha256:91b69d54576f54d939b4d3a3f074e0041abb0fdb5508c32503888d3adb853e61",
+                "kind": "file",
+                "size": 13809
+              },
+              {
+                "path": "tests/test_cli_mcp_contracts.py",
+                "digest": "sha256:02dfa740f223cdeede56cb8ad137cd6cf8f419b70ca98aa588e3355ef8c26c3a",
+                "kind": "file",
+                "size": 4442
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "steps": [
+              {
+                "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1200,
+                "cwd": "."
+              },
+              {
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1200,
+                "cwd": "."
+              },
+              {
+                "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1200,
+                "cwd": "."
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "cli-mcp-contracts-pass",
+                "oracle_name": "pytest-cli-mcp-contracts",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              },
+              {
+                "name": "sync-verify-replay-hooks-pass",
+                "oracle_name": "pytest-sync-verify-replay-hooks",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              },
+              {
+                "name": "capsule-quality-eval-pass",
+                "oracle_name": "pytest-capsule-quality-eval",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "pytest-cli-mcp-contracts",
+                "pytest-sync-verify-replay-hooks",
+                "pytest-capsule-quality-eval"
+              ],
+              "material_paths": [
+                "tests/conftest.py",
+                "tests/test_capsule_quality_eval.py",
+                "tests/test_cli_mcp_contracts.py",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Passing all oracle pytest commands constitutes capsule equivalence for CLI/MCP, distill/replay, and quality evaluation behaviors.",
+                "Scope includes tests/conftest.py to enable repo-root import for local og module during replay.",
+                "Replay sandbox constraints (bash -lc, no network, cwd confinement) are validated by the sync/replay hooks oracle.",
+                "uv run with --no-project avoids project metadata mutation; tests may require git in PATH but no network access."
+              ]
+            },
+            "status": "ok",
+            "message": "Replay plan uses uv+pytest oracles to validate CLI/MCP contracts, distill/replay hooks, and quality evaluation within a networkless sandbox using only scoped test materials.",
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "failures": [],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            },
+            "adapter_receipts": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay-input.json",
+                "hash": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+                "media_type": "application/json",
+                "size": 13800
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+                "hash": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+                "media_type": "application/json",
+                "size": 13800
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay.json",
+                "hash": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+                "media_type": "application/x-ndjson",
+                "size": 8908
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+                "hash": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+                "media_type": "application/x-ndjson",
+                "size": 8908
+              },
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay-result.json",
+                "hash": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+                "media_type": "application/json",
+                "size": 4641
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+                "hash": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+                "media_type": "application/json",
+                "size": 4641
+              }
+            ]
+          }
+        ],
+        "replay_results": [
+          {
+            "capsule_id": "config",
+            "status": "skipped",
+            "plan_status": "skipped",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles."
+            ],
+            "capsule_scope": [
+              "Default run profile/output/mode for OG sessions.",
+              "Worker path resolution (codex_home hint).",
+              "Safety policy linkage and write ceiling."
+            ],
+            "material_inputs": [],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [],
+              "notes": [
+                "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [],
+            "oracle_results": []
+          },
+          {
+            "capsule_id": "constitution",
+            "status": "skipped",
+            "plan_status": "skipped",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles."
+            ],
+            "capsule_scope": [
+              "Default OG automation boundary (observe).",
+              "Read allowlist and denylist for side-effecting actions."
+            ],
+            "material_inputs": [],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [],
+              "notes": [
+                "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [],
+            "oracle_results": []
+          },
+          {
+            "capsule_id": "dogfood-replay-json-tmp",
+            "status": "skipped",
+            "plan_status": "pending",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+              "Run `og sync --json` to materialize capsule metadata before replay."
+            ],
+            "capsule_scope": [
+              "dogfood-replay.json.tmp.sqFMiP"
+            ],
+            "material_inputs": [
+              {
+                "path": "dogfood-replay.json.tmp.sqFMiP",
+                "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            ],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [
+                "dogfood-replay.json.tmp.sqFMiP"
+              ],
+              "notes": [
+                "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+                "Run `og sync --json` to materialize capsule metadata before replay."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [
+              "dogfood-replay.json.tmp.sqFMiP"
+            ],
+            "oracle_results": [],
+            "remediation": [
+              "Run `og sync --json` to materialize capsule metadata before replay."
+            ],
+            "bootstrap_missing_capsule": true
+          },
+          {
+            "capsule_id": "dogfood-status-pre-sync-json-tmp",
+            "status": "success",
+            "plan_status": "ok",
+            "certificate_id": "cert-dogfood-status-pre-sync-json-tmp-77a48c15d6",
+            "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay.json",
+            "failures": [],
+            "capsule_scope": [
+              "dogfood-status-pre-sync.json.tmp.tvwgLV",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "digest": "sha256:f32a1ca5871a070de1d7c6f659e9d0ee8bd2bae750bfc1709d74a10c4c0e9068",
+                "kind": null,
+                "size": null
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+                "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_signal": "exit_code:0",
+                "reason": "Validate snapshot invariants and drift status via repository-native oracle."
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "dogfood-status-pre-sync-json-tmp-verify"
+              ],
+              "material_paths": [
+                "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Proof basis: pytest oracle asserts snapshot invariants: schema_version=1, command='status', and data.status=='warn' with issues unknown_verification, unknown_certificates, drift_error.",
+                "Freshness sync state remains 'unknown' with message 'no sync summary available' and certificates.count=0.",
+                "Drift policy present=true with status='ok'; export_control_surface warns about missing export artifacts listed in invariants.",
+                "Verification uses only scoped materials and avoids network/destructive actions."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "replay_steps": [
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "dogfood-status-pre-sync-json-tmp",
+                "step": 0,
+                "command": "test -f dogfood-status-pre-sync.json.tmp.tvwgLV",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:dogfood-status-pre-sync-json-tmp:0",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 2,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-0.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-0.json",
+                    "hash": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                    "media_type": "application/json",
+                    "size": 618
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                    "hash": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                    "media_type": "application/json",
+                    "size": 618
+                  }
+                ]
+              },
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "dogfood-status-pre-sync-json-tmp",
+                "step": 1,
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [
+                  "................................................................. [ 36%]",
+                  "................................................................ [ 72%]",
+                  "..................................................                       [100%]"
+                ],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:dogfood-status-pre-sync-json-tmp:1",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 15477,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-1.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-1.json",
+                    "hash": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                    "media_type": "application/json",
+                    "size": 890
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                    "hash": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                    "media_type": "application/json",
+                    "size": 890
+                  }
+                ]
+              }
+            ],
+            "equivalence": {
+              "baseline_hash": null,
+              "observed_hash": "sha256:d5b523506b0a2a93c41d61aa49dec5c3a466e651ef4c1c164eaa359c75993edf",
+              "oracle_digest": "sha256:d5b523506b0a2a93c41d61aa49dec5c3a466e651ef4c1c164eaa359c75993edf",
+              "plan_digest": "sha256:01ee66046445c7e98263f69f3a96f2e0bc783b743534946ad6df91cbcb4465a1",
+              "match": true,
+              "materialized_path_count": 11,
+              "trace_count": 2,
+              "oracle_count": 1
+            },
+            "materialized_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "dogfood-status-pre-sync.json.tmp.tvwgLV",
+              "pyproject.toml",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "oracle_results": [
+              {
+                "schema_version": 2,
+                "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+                "capsule_id": "dogfood-status-pre-sync-json-tmp",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "mode": "observe",
+                "status": "pass",
+                "checked_at": "2026-03-08T12:08:42Z",
+                "changed_paths": [
+                  ".outcomegraph/constitution/default.yaml",
+                  ".outcomegraph/materials.lock",
+                  ".outcomegraph/policy.yaml",
+                  "CONTEXT.md",
+                  "README.md",
+                  "RUNBOOKS.md",
+                  "SPEC-v2.md",
+                  "dogfood-status-pre-sync.json.tmp.tvwgLV",
+                  "pyproject.toml",
+                  "tests/test_og_sync_verify_replay_hooks.py",
+                  "to-do.json"
+                ],
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "observed_code": 0,
+                "stdout": [
+                  "................................................................. [ 36%]",
+                  "................................................................ [ 72%]",
+                  "..................................................                       [100%]"
+                ],
+                "stderr": [],
+                "message": "oracle command executed.",
+                "recovery": {
+                  "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 15361,
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-verify-replay.json",
+                    "hash": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                    "media_type": "application/json",
+                    "size": 1147
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                    "hash": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                    "media_type": "application/json",
+                    "size": 1147
+                  }
+                ],
+                "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-verify-replay.json"
+              }
+            ],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            }
+          },
+          {
+            "capsule_id": "og",
+            "status": "success",
+            "plan_status": "ok",
+            "certificate_id": "cert-og-fc1ae4d915",
+            "trace": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay.json",
+            "failures": [],
+            "capsule_scope": [
+              "og",
+              "og.py",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "og",
+                "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
+                "kind": "file",
+                "size": 225
+              },
+              {
+                "path": "og.py",
+                "digest": "sha256:ea31a1226f6ae1c5dea027ffb6c56dcdf014e67f32b81583bc5613946c2376f6",
+                "kind": null,
+                "size": null
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "distill-tests-pass",
+                "oracle_name": "og-distill-tests",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+                "expected_signal": "exit_code:0",
+                "reason": "Repository-native distill snapshot tests validate distill snapshot selection without mutating project metadata."
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "og-distill-tests"
+              ],
+              "material_paths": [
+                "og",
+                "og.py",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Equivalence is proven by oracle tests passing against the scoped materials only.",
+                "Invariants: WORKER_INTERFACE_VERSION=1 and WORKER_SCHEMA_VERSION=2 remain stable; CLI help semantics unchanged.",
+                "Oracle execution uses shlex.split; empty command semantics preserved (status=pass, observed_code=0).",
+                "Replay runs offline/non-destructive; uv/pytest operate within sandbox and avoid network and metadata changes."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "replay_steps": [
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "og",
+                "step": 0,
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [
+                  ".......                                                                  [100%]"
+                ],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:og:0",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 346,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-og-replay-step-0.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-og-replay-step-0.json",
+                    "hash": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                    "media_type": "application/json",
+                    "size": 711
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                    "hash": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                    "media_type": "application/json",
+                    "size": 711
+                  }
+                ]
+              }
+            ],
+            "equivalence": {
+              "baseline_hash": null,
+              "observed_hash": "sha256:1c6c7f65af995cc959396ffc5e75d4d5bf00cc73aa7f60b5ebad14a39536e711",
+              "oracle_digest": "sha256:1c6c7f65af995cc959396ffc5e75d4d5bf00cc73aa7f60b5ebad14a39536e711",
+              "plan_digest": "sha256:48f190bd7126c6bb52e37af49d9d1866b142cd878600e1ae3fda936d788a2c78",
+              "match": true,
+              "materialized_path_count": 14,
+              "trace_count": 1,
+              "oracle_count": 1
+            },
+            "materialized_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SECURITY_POLICY.md",
+              "SPEC-v2.md",
+              "og",
+              "og.py",
+              "pyproject.toml",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json",
+              "to-do.schema.json"
+            ],
+            "oracle_results": [
+              {
+                "schema_version": 2,
+                "oracle_name": "og-distill-tests",
+                "capsule_id": "og",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "mode": "observe",
+                "status": "pass",
+                "checked_at": "2026-03-08T12:09:36Z",
+                "changed_paths": [
+                  ".outcomegraph/constitution/default.yaml",
+                  ".outcomegraph/materials.lock",
+                  ".outcomegraph/policy.yaml",
+                  "CONTEXT.md",
+                  "README.md",
+                  "RUNBOOKS.md",
+                  "SECURITY_POLICY.md",
+                  "SPEC-v2.md",
+                  "og",
+                  "og.py",
+                  "pyproject.toml",
+                  "tests/test_og_sync_verify_replay_hooks.py",
+                  "to-do.json",
+                  "to-do.schema.json"
+                ],
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+                "observed_code": 0,
+                "stdout": [
+                  ".......                                                                  [100%]"
+                ],
+                "stderr": [],
+                "message": "oracle command executed.",
+                "recovery": {
+                  "operation": "oracle:og-distill-tests",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 307,
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-og-distill-tests-replay.json",
+                    "hash": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                    "media_type": "application/json",
+                    "size": 966
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                    "hash": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                    "media_type": "application/json",
+                    "size": 966
+                  }
+                ],
+                "trace": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-og-distill-tests-replay.json"
+              }
+            ],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            }
+          },
+          {
+            "capsule_id": "outcomegraph-egg-info",
+            "status": "skipped",
+            "plan_status": "skipped",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles."
+            ],
+            "capsule_scope": [
+              "outcomegraph.egg-info/PKG-INFO",
+              "outcomegraph.egg-info/SOURCES.txt",
+              "outcomegraph.egg-info/dependency_links.txt",
+              "outcomegraph.egg-info/entry_points.txt",
+              "outcomegraph.egg-info/requires.txt",
+              "outcomegraph.egg-info/top_level.txt"
+            ],
+            "material_inputs": [
+              {
+                "path": "outcomegraph.egg-info/PKG-INFO",
+                "digest": "sha256:45a74e269f2265882d7338832d225941d0f5d16aa396f6af97ccc28e30ca937c"
+              },
+              {
+                "path": "outcomegraph.egg-info/SOURCES.txt",
+                "digest": "sha256:44e1721c4543e86651d89c0fff131c1039fe94c0721356062c7eca2552a02212",
+                "kind": "file",
+                "size": 357
+              },
+              {
+                "path": "outcomegraph.egg-info/dependency_links.txt",
+                "digest": "sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+                "kind": "file",
+                "size": 1
+              },
+              {
+                "path": "outcomegraph.egg-info/entry_points.txt",
+                "digest": "sha256:163be6ea35724e504389876490338e064620fe67d384d679df4d2431cacdf7e1",
+                "kind": "file",
+                "size": 50
+              },
+              {
+                "path": "outcomegraph.egg-info/requires.txt",
+                "digest": "sha256:806706bc16da804481f5daf0177349dfca395db663ce15d223d141370d4b361c",
+                "kind": "file",
+                "size": 30
+              },
+              {
+                "path": "outcomegraph.egg-info/top_level.txt",
+                "digest": "sha256:f4e7e93c5250ba951138f232fc40cf5b90a4fac589bf1634be9fd6f3c280dc00",
+                "kind": "file",
+                "size": 3
+              }
+            ],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [
+                "outcomegraph.egg-info/PKG-INFO",
+                "outcomegraph.egg-info/SOURCES.txt",
+                "outcomegraph.egg-info/dependency_links.txt",
+                "outcomegraph.egg-info/entry_points.txt",
+                "outcomegraph.egg-info/requires.txt",
+                "outcomegraph.egg-info/top_level.txt"
+              ],
+              "notes": [
+                "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [
+              "outcomegraph.egg-info/PKG-INFO",
+              "outcomegraph.egg-info/SOURCES.txt",
+              "outcomegraph.egg-info/dependency_links.txt",
+              "outcomegraph.egg-info/entry_points.txt",
+              "outcomegraph.egg-info/requires.txt",
+              "outcomegraph.egg-info/top_level.txt"
+            ],
+            "oracle_results": []
+          },
+          {
+            "capsule_id": "policy",
+            "status": "skipped",
+            "plan_status": "skipped",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles."
+            ],
+            "capsule_scope": [
+              ".outcomegraph/policy.yaml",
+              "SECURITY_POLICY.md"
+            ],
+            "material_inputs": [
+              {
+                "path": ".outcomegraph/policy.yaml",
+                "digest": "sha256:60fd52f19d088cf44da9ad8df5d88dce822929cc4b2ca938a075b85aae1ba1d0"
+              },
+              {
+                "path": "SECURITY_POLICY.md",
+                "digest": "sha256:9399b998aaa6efebb34650ac6158ff3c1117ff104b0da35d058ed3a34e1ab9ed",
+                "kind": "file",
+                "size": 3292
+              }
+            ],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [
+                ".outcomegraph/policy.yaml",
+                "SECURITY_POLICY.md"
+              ],
+              "notes": [
+                "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [
+              ".outcomegraph/policy.yaml",
+              "SECURITY_POLICY.md"
+            ],
+            "oracle_results": []
+          },
+          {
+            "capsule_id": "readme",
+            "status": "skipped",
+            "plan_status": "skipped",
+            "certificate_id": null,
+            "trace": null,
+            "failures": [
+              "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles."
+            ],
+            "capsule_scope": [
+              "CLI commands/help surface",
+              "Common flags and env defaults",
+              "Exit semantics and source-run guidance"
+            ],
+            "material_inputs": [],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [],
+              "material_paths": [],
+              "notes": [
+                "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [],
+            "oracle_results": []
+          },
+          {
+            "capsule_id": "skill-og-dogfood",
+            "status": "skipped",
+            "plan_status": "pending",
+            "certificate_id": null,
+            "trace": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay.json",
+            "failures": [
+              "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+              "No executable acceptance oracle is available inside capsule scope under observe-mode policy.",
+              "Required repo-level materials (pyproject.toml, og/og.py, tests/*) are outside capsule.scope and cannot be included as inputs.",
+              "Cannot guarantee 'uv' environment or dependency resolution without network or locks; constraints mandate 'uv run'.",
+              "Deterministic evidence under .outcomegraph/events cannot be generated or verified without running the disallowed dogfood script.",
+              "Replay plan for skill-og-dogfood must declare acceptance_checks.",
+              "Replay plan for skill-og-dogfood equivalence_inputs.oracle_names must match declared acceptance checks."
+            ],
+            "capsule_scope": [
+              "skills/og-dogfood/SKILL.md",
+              "skills/og-dogfood/agents/openai.yaml",
+              "skills/og-dogfood/scripts/run_dogfood.sh"
+            ],
+            "material_inputs": [
+              {
+                "path": "skills/og-dogfood/SKILL.md",
+                "digest": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+                "kind": "file",
+                "size": 3629
+              },
+              {
+                "path": "skills/og-dogfood/agents/openai.yaml",
+                "digest": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+                "kind": "file",
+                "size": 224
+              },
+              {
+                "path": "skills/og-dogfood/scripts/run_dogfood.sh",
+                "digest": "sha256:e31cef8c7afa18dbd35ae3aaa0efee0c8ca6ba826c89e1be472d2c6c67626279",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "acceptance_checks": [],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "og-cli-regression",
+                "dogfood-run (advisory only in observe mode)"
+              ],
+              "material_paths": [
+                "skills/og-dogfood/SKILL.md",
+                "skills/og-dogfood/agents/openai.yaml",
+                "skills/og-dogfood/scripts/run_dogfood.sh"
+              ],
+              "notes": [
+                "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+                "Primary oracle 'dogfood-run' is advisory and disallowed in observe mode; no executable command is available for it within policy.",
+                "Runnable oracle 'og-cli-regression' depends on files outside capsule scope (tests/test_og_sync_verify_replay_hooks.py, og.py) and thus cannot execute with scoped materials only.",
+                "Capsule constraints require repo root with pyproject.toml and og present; these are not in capsule.scope or scope_materials, so regeneration cannot satisfy constraints inside a sandbox limited to scope.",
+                "Networkless sandbox and unknown 'uv' environment prevent resolving dependencies via 'uv run' without additional materials/locks.",
+                "Materials lock (.outcomegraph/materials.lock) not in scope; dependency drift cannot be bounded for a proof."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": 0
+            },
+            "replay_steps": [],
+            "equivalence": null,
+            "materialized_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "README.md",
+              "RUNBOOKS.md",
+              "pyproject.toml",
+              "skills/og-dogfood/SKILL.md",
+              "skills/og-dogfood/agents/openai.yaml",
+              "skills/og-dogfood/scripts/run_dogfood.sh"
+            ],
+            "oracle_results": [],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            }
+          },
+          {
+            "capsule_id": "tests",
+            "status": "success",
+            "plan_status": "ok",
+            "certificate_id": "cert-tests-f87f2d9b78",
+            "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay.json",
+            "failures": [],
+            "capsule_scope": [
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py"
+            ],
+            "material_inputs": [
+              {
+                "path": "tests/conftest.py",
+                "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+                "kind": "file",
+                "size": 240
+              },
+              {
+                "path": "tests/test_capsule_quality_eval.py",
+                "digest": "sha256:91b69d54576f54d939b4d3a3f074e0041abb0fdb5508c32503888d3adb853e61",
+                "kind": "file",
+                "size": 13809
+              },
+              {
+                "path": "tests/test_cli_mcp_contracts.py",
+                "digest": "sha256:02dfa740f223cdeede56cb8ad137cd6cf8f419b70ca98aa588e3355ef8c26c3a",
+                "kind": "file",
+                "size": 4442
+              },
+              {
+                "path": "tests/test_og_sync_verify_replay_hooks.py",
+                "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+                "kind": null,
+                "size": null
+              }
+            ],
+            "acceptance_checks": [
+              {
+                "name": "cli-mcp-contracts-pass",
+                "oracle_name": "pytest-cli-mcp-contracts",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              },
+              {
+                "name": "sync-verify-replay-hooks-pass",
+                "oracle_name": "pytest-sync-verify-replay-hooks",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              },
+              {
+                "name": "capsule-quality-eval-pass",
+                "oracle_name": "pytest-capsule-quality-eval",
+                "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+                "expected_signal": "exit_code:0",
+                "reason": null
+              }
+            ],
+            "equivalence_inputs": {
+              "baseline_hash": null,
+              "oracle_names": [
+                "pytest-cli-mcp-contracts",
+                "pytest-sync-verify-replay-hooks",
+                "pytest-capsule-quality-eval"
+              ],
+              "material_paths": [
+                "tests/conftest.py",
+                "tests/test_capsule_quality_eval.py",
+                "tests/test_cli_mcp_contracts.py",
+                "tests/test_og_sync_verify_replay_hooks.py"
+              ],
+              "notes": [
+                "Passing all oracle pytest commands constitutes capsule equivalence for CLI/MCP, distill/replay, and quality evaluation behaviors.",
+                "Scope includes tests/conftest.py to enable repo-root import for local og module during replay.",
+                "Replay sandbox constraints (bash -lc, no network, cwd confinement) are validated by the sync/replay hooks oracle.",
+                "uv run with --no-project avoids project metadata mutation; tests may require git in PATH but no network access."
+              ]
+            },
+            "parity_results": {
+              "match": null,
+              "details": null,
+              "baseline_hash": null,
+              "observed_hash": null,
+              "oracle_digest": null,
+              "trace_count": null
+            },
+            "replay_steps": [
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "tests",
+                "step": 0,
+                "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [
+                  "....                                                                     [100%]"
+                ],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:tests:0",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 288,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-0.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-0.json",
+                    "hash": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                    "media_type": "application/json",
+                    "size": 675
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                    "hash": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                    "media_type": "application/json",
+                    "size": 675
+                  }
+                ]
+              },
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "tests",
+                "step": 1,
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [
+                  "................................................................. [ 36%]",
+                  "................................................................ [ 72%]",
+                  "..................................................                       [100%]"
+                ],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:tests:1",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 15379,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-1.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-1.json",
+                    "hash": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                    "media_type": "application/json",
+                    "size": 836
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                    "hash": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                    "media_type": "application/json",
+                    "size": 836
+                  }
+                ]
+              },
+              {
+                "schema_version": 2,
+                "role": "replay",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "capsule_id": "tests",
+                "step": 2,
+                "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+                "expected_exit_code": 0,
+                "timeout_s": 1800,
+                "requested_cwd": ".",
+                "resolved_cwd": ".",
+                "observed_exit_code": 0,
+                "status": "pass",
+                "stdout": [
+                  ".....                                                                    [100%]"
+                ],
+                "stderr": [],
+                "message": "replay step executed.",
+                "failures": [],
+                "recovery": {
+                  "operation": "replay-step:tests:2",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 265,
+                "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-2.json",
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-2.json",
+                    "hash": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                    "media_type": "application/json",
+                    "size": 678
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                    "hash": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                    "media_type": "application/json",
+                    "size": 678
+                  }
+                ]
+              }
+            ],
+            "equivalence": {
+              "baseline_hash": null,
+              "observed_hash": "sha256:c3bdfbc48cef294487f4269ae2c284d2c5ed871fd0e2f9ba61c9e9624729b0a5",
+              "oracle_digest": "sha256:c3bdfbc48cef294487f4269ae2c284d2c5ed871fd0e2f9ba61c9e9624729b0a5",
+              "plan_digest": "sha256:cb66fa0e5f8de87043655dc88e8d6aa12d7fb98d2d4f84d386910908f920972a",
+              "match": true,
+              "materialized_path_count": 13,
+              "trace_count": 3,
+              "oracle_count": 3
+            },
+            "materialized_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "pyproject.toml",
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "oracle_results": [
+              {
+                "schema_version": 2,
+                "oracle_name": "pytest-cli-mcp-contracts",
+                "capsule_id": "tests",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "mode": "observe",
+                "status": "pass",
+                "checked_at": "2026-03-08T12:11:30Z",
+                "changed_paths": [
+                  ".outcomegraph/constitution/default.yaml",
+                  ".outcomegraph/materials.lock",
+                  ".outcomegraph/policy.yaml",
+                  "CONTEXT.md",
+                  "README.md",
+                  "RUNBOOKS.md",
+                  "SPEC-v2.md",
+                  "pyproject.toml",
+                  "tests/conftest.py",
+                  "tests/test_capsule_quality_eval.py",
+                  "tests/test_cli_mcp_contracts.py",
+                  "tests/test_og_sync_verify_replay_hooks.py",
+                  "to-do.json"
+                ],
+                "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+                "observed_code": 0,
+                "stdout": [
+                  "....                                                                     [100%]"
+                ],
+                "stderr": [],
+                "message": "oracle command executed.",
+                "recovery": {
+                  "operation": "oracle:pytest-cli-mcp-contracts",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 251,
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-cli-mcp-contracts-replay.json",
+                    "hash": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                    "media_type": "application/json",
+                    "size": 980
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                    "hash": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                    "media_type": "application/json",
+                    "size": 980
+                  }
+                ],
+                "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-cli-mcp-contracts-replay.json"
+              },
+              {
+                "schema_version": 2,
+                "oracle_name": "pytest-sync-verify-replay-hooks",
+                "capsule_id": "tests",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "mode": "observe",
+                "status": "pass",
+                "checked_at": "2026-03-08T12:11:30Z",
+                "changed_paths": [
+                  ".outcomegraph/constitution/default.yaml",
+                  ".outcomegraph/materials.lock",
+                  ".outcomegraph/policy.yaml",
+                  "CONTEXT.md",
+                  "README.md",
+                  "RUNBOOKS.md",
+                  "SPEC-v2.md",
+                  "pyproject.toml",
+                  "tests/conftest.py",
+                  "tests/test_capsule_quality_eval.py",
+                  "tests/test_cli_mcp_contracts.py",
+                  "tests/test_og_sync_verify_replay_hooks.py",
+                  "to-do.json"
+                ],
+                "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+                "observed_code": 0,
+                "stdout": [
+                  "................................................................. [ 36%]",
+                  "................................................................ [ 72%]",
+                  "..................................................                       [100%]"
+                ],
+                "stderr": [],
+                "message": "oracle command executed.",
+                "recovery": {
+                  "operation": "oracle:pytest-sync-verify-replay-hooks",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 15330,
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-sync-verify-replay-hooks-replay.json",
+                    "hash": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                    "media_type": "application/json",
+                    "size": 1153
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                    "hash": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                    "media_type": "application/json",
+                    "size": 1153
+                  }
+                ],
+                "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-sync-verify-replay-hooks-replay.json"
+              },
+              {
+                "schema_version": 2,
+                "oracle_name": "pytest-capsule-quality-eval",
+                "capsule_id": "tests",
+                "run_id": "replay-20260308T120733Z-bed78dc4",
+                "mode": "observe",
+                "status": "pass",
+                "checked_at": "2026-03-08T12:11:45Z",
+                "changed_paths": [
+                  ".outcomegraph/constitution/default.yaml",
+                  ".outcomegraph/materials.lock",
+                  ".outcomegraph/policy.yaml",
+                  "CONTEXT.md",
+                  "README.md",
+                  "RUNBOOKS.md",
+                  "SPEC-v2.md",
+                  "pyproject.toml",
+                  "tests/conftest.py",
+                  "tests/test_capsule_quality_eval.py",
+                  "tests/test_cli_mcp_contracts.py",
+                  "tests/test_og_sync_verify_replay_hooks.py",
+                  "to-do.json"
+                ],
+                "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+                "observed_code": 0,
+                "stdout": [
+                  ".....                                                                    [100%]"
+                ],
+                "stderr": [],
+                "message": "oracle command executed.",
+                "recovery": {
+                  "operation": "oracle:pytest-capsule-quality-eval",
+                  "attempts": 1,
+                  "max_retries": 0,
+                  "retries_used": 0,
+                  "recovered": false,
+                  "exhausted": false,
+                  "retryable": false,
+                  "timed_out": false,
+                  "timeout_seconds": 1800
+                },
+                "duration_ms": 266,
+                "receipt_pointers": [
+                  {
+                    "schema_version": 2,
+                    "type": "file",
+                    "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-capsule-quality-eval-replay.json",
+                    "hash": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                    "media_type": "application/json",
+                    "size": 989
+                  },
+                  {
+                    "schema_version": 2,
+                    "type": "cas",
+                    "target": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                    "hash": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                    "media_type": "application/json",
+                    "size": 989
+                  }
+                ],
+                "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-capsule-quality-eval-replay.json"
+              }
+            ],
+            "prompt_provenance": {
+              "id": "worker-replay",
+              "version": "1.0.1",
+              "source_path": "prompts/workers/replay-v1.txt"
+            }
+          }
+        ],
+        "certificate_ids": [
+          "cert-dogfood-status-pre-sync-json-tmp-77a48c15d6",
+          "cert-og-fc1ae4d915",
+          "cert-tests-f87f2d9b78"
+        ],
+        "certificate_refs": [
+          ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-77a48c15d6.json",
+          ".outcomegraph/certificates/cert-og-fc1ae4d915.json",
+          ".outcomegraph/certificates/cert-tests-f87f2d9b78.json"
+        ],
+        "failed_capsules": [],
+        "errors": [],
+        "recovery": {
+          "operations": 15,
+          "retried_operations": 0,
+          "recovered_operations": 0,
+          "exhausted_operations": 0,
+          "timeout_operations": 0,
+          "total_retries_used": 0,
+          "details": [
+            {
+              "operation": "worker:replay",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:dogfood-status-pre-sync-json-tmp:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:dogfood-status-pre-sync-json-tmp:1",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "worker:replay",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:og:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:og-distill-tests",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "worker:replay",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "worker:replay",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:tests:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:tests:1",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "replay-step:tests:2",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:pytest-cli-mcp-contracts",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:pytest-sync-verify-replay-hooks",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            {
+              "operation": "oracle:pytest-capsule-quality-eval",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            }
+          ]
+        },
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        }
+      },
+      {
+        "name": "export",
+        "status": "ok",
+        "message": "Export refresh completed.",
+        "mode": "observe",
+        "updated_exports": [
+          ".outcomegraph/export/AGENTS.md",
+          ".outcomegraph/export/README_OUTCOMES.md",
+          ".outcomegraph/export/mcp-resources.json",
+          "skills/outcome-steward/SKILL.md"
+        ],
+        "unchanged_exports": [],
+        "artifact_total": 291,
+        "artifact_counts": {
+          "capsules": 32,
+          "certificates": 77,
+          "claims": 116,
+          "constitution": 1,
+          "decisions": 32,
+          "materials.lock": 1,
+          "refs": 32
+        },
+        "snapshot_generated_at": "2026-03-08T12:11:46Z"
+      }
+    ],
+    "message": "Replay adapter produced executable plans.",
+    "replay_plans": [
+      {
+        "schema_version": 2,
+        "interface_version": 1,
+        "run_id": "replay-20260308T120733Z-bed78dc4",
+        "capsule_id": "dogfood-status-pre-sync-json-tmp",
+        "capsule_scope": [
+          "dogfood-status-pre-sync.json.tmp.tvwgLV",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "digest": "sha256:f32a1ca5871a070de1d7c6f659e9d0ee8bd2bae750bfc1709d74a10c4c0e9068",
+            "kind": null,
+            "size": null
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "steps": [
+          {
+            "command": "test -f dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "expected_exit_code": 0,
+            "timeout_s": 10,
+            "cwd": "."
+          },
+          {
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_exit_code": 0,
+            "timeout_s": 600,
+            "cwd": "."
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+            "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_signal": "exit_code:0",
+            "reason": "Validate snapshot invariants and drift status via repository-native oracle."
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "dogfood-status-pre-sync-json-tmp-verify"
+          ],
+          "material_paths": [
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Proof basis: pytest oracle asserts snapshot invariants: schema_version=1, command='status', and data.status=='warn' with issues unknown_verification, unknown_certificates, drift_error.",
+            "Freshness sync state remains 'unknown' with message 'no sync summary available' and certificates.count=0.",
+            "Drift policy present=true with status='ok'; export_control_surface warns about missing export artifacts listed in invariants.",
+            "Verification uses only scoped materials and avoids network/destructive actions."
+          ]
+        },
+        "status": "ok",
+        "message": "Prepared replay plan using scoped materials and pytest oracle.",
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "failures": [],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        },
+        "adapter_receipts": [
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay-input.json",
+            "hash": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+            "media_type": "application/json",
+            "size": 10548
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+            "hash": "sha256:61787806c6aca4b95d5405415208100ef0ec3a9cd8de7c1838f468b920e09b80",
+            "media_type": "application/json",
+            "size": 10548
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay.json",
+            "hash": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+            "media_type": "application/x-ndjson",
+            "size": 7461
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+            "hash": "sha256:c54c04f5dcdb4ff9cd0b2f780f2a8fb2818bd183cc507fb17556fcb804fae85f",
+            "media_type": "application/x-ndjson",
+            "size": 7461
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay-result.json",
+            "hash": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+            "media_type": "application/json",
+            "size": 3326
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+            "hash": "sha256:e0e99b9afff3c8b37002b5ef597ef0279d8f63331e7ffc6171af9bd59c7defb4",
+            "media_type": "application/json",
+            "size": 3326
+          }
+        ]
+      },
+      {
+        "schema_version": 2,
+        "interface_version": 1,
+        "run_id": "replay-20260308T120733Z-bed78dc4",
+        "capsule_id": "og",
+        "capsule_scope": [
+          "og",
+          "og.py",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "og",
+            "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
+            "kind": "file",
+            "size": 225
+          },
+          {
+            "path": "og.py",
+            "digest": "sha256:ea31a1226f6ae1c5dea027ffb6c56dcdf014e67f32b81583bc5613946c2376f6",
+            "kind": null,
+            "size": null
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "steps": [
+          {
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+            "expected_exit_code": 0,
+            "timeout_s": 120,
+            "cwd": "."
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "distill-tests-pass",
+            "oracle_name": "og-distill-tests",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+            "expected_signal": "exit_code:0",
+            "reason": "Repository-native distill snapshot tests validate distill snapshot selection without mutating project metadata."
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "og-distill-tests"
+          ],
+          "material_paths": [
+            "og",
+            "og.py",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Equivalence is proven by oracle tests passing against the scoped materials only.",
+            "Invariants: WORKER_INTERFACE_VERSION=1 and WORKER_SCHEMA_VERSION=2 remain stable; CLI help semantics unchanged.",
+            "Oracle execution uses shlex.split; empty command semantics preserved (status=pass, observed_code=0).",
+            "Replay runs offline/non-destructive; uv/pytest operate within sandbox and avoid network and metadata changes."
+          ]
+        },
+        "status": "ok",
+        "message": "Capsule-scoped replay plan prepared for isolated sandbox validation.",
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "failures": [],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        },
+        "adapter_receipts": [
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay-input.json",
+            "hash": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+            "media_type": "application/json",
+            "size": 10527
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+            "hash": "sha256:15ca155c82db9c38f67cc999d3b66d95da774efdcc191e821198c03e78106f91",
+            "media_type": "application/json",
+            "size": 10527
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay.json",
+            "hash": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+            "media_type": "application/x-ndjson",
+            "size": 6125
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+            "hash": "sha256:80a62dae00a90a6e420e258537c82e373ea6722c87a290bf4932d7519c3333cb",
+            "media_type": "application/x-ndjson",
+            "size": 6125
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay-result.json",
+            "hash": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+            "media_type": "application/json",
+            "size": 3171
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+            "hash": "sha256:49be81bd180bcf634afa7b876d2fa7baa326bbf259f8d684054bc8b33e063ae7",
+            "media_type": "application/json",
+            "size": 3171
+          }
+        ]
+      },
+      {
+        "schema_version": 2,
+        "interface_version": 1,
+        "run_id": "replay-20260308T120733Z-bed78dc4",
+        "capsule_id": "skill-og-dogfood",
+        "capsule_scope": [
+          "skills/og-dogfood/SKILL.md",
+          "skills/og-dogfood/agents/openai.yaml",
+          "skills/og-dogfood/scripts/run_dogfood.sh"
+        ],
+        "material_inputs": [
+          {
+            "path": "skills/og-dogfood/SKILL.md",
+            "digest": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+            "kind": "file",
+            "size": 3629
+          },
+          {
+            "path": "skills/og-dogfood/agents/openai.yaml",
+            "digest": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+            "kind": "file",
+            "size": 224
+          },
+          {
+            "path": "skills/og-dogfood/scripts/run_dogfood.sh",
+            "digest": "sha256:e31cef8c7afa18dbd35ae3aaa0efee0c8ca6ba826c89e1be472d2c6c67626279",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "steps": [],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "og-cli-regression",
+            "dogfood-run (advisory only in observe mode)"
+          ],
+          "material_paths": [
+            "skills/og-dogfood/SKILL.md",
+            "skills/og-dogfood/agents/openai.yaml",
+            "skills/og-dogfood/scripts/run_dogfood.sh"
+          ],
+          "notes": [
+            "Primary oracle 'dogfood-run' is advisory and disallowed in observe mode; no executable command is available for it within policy.",
+            "Runnable oracle 'og-cli-regression' depends on files outside capsule scope (tests/test_og_sync_verify_replay_hooks.py, og.py) and thus cannot execute with scoped materials only.",
+            "Capsule constraints require repo root with pyproject.toml and og present; these are not in capsule.scope or scope_materials, so regeneration cannot satisfy constraints inside a sandbox limited to scope.",
+            "Networkless sandbox and unknown 'uv' environment prevent resolving dependencies via 'uv run' without additional materials/locks.",
+            "Materials lock (.outcomegraph/materials.lock) not in scope; dependency drift cannot be bounded for a proof."
+          ]
+        },
+        "status": "pending",
+        "message": "Pending: capsule scope lacks executable acceptance and required repo materials; provide repo root materials or permit the dogfood oracle to enable a provable replay.",
+        "parity_results": null,
+        "failures": [
+          "No executable acceptance oracle is available inside capsule scope under observe-mode policy.",
+          "Required repo-level materials (pyproject.toml, og/og.py, tests/*) are outside capsule.scope and cannot be included as inputs.",
+          "Cannot guarantee 'uv' environment or dependency resolution without network or locks; constraints mandate 'uv run'.",
+          "Deterministic evidence under .outcomegraph/events cannot be generated or verified without running the disallowed dogfood script."
+        ],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        },
+        "adapter_receipts": [
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay-input.json",
+            "hash": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+            "media_type": "application/json",
+            "size": 12832
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+            "hash": "sha256:1fafbbac9eed741e8128fee2f75795d914c1c2d3e7acaab59d3d093d755a2b94",
+            "media_type": "application/json",
+            "size": 12832
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay.json",
+            "hash": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+            "media_type": "application/x-ndjson",
+            "size": 7952
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+            "hash": "sha256:2a2c2fdba5988568e7b8425a612e80e27fc53281abaddf7b10bd85fbf2226eb9",
+            "media_type": "application/x-ndjson",
+            "size": 7952
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay-result.json",
+            "hash": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+            "media_type": "application/json",
+            "size": 3550
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+            "hash": "sha256:c41eaf30eefef7420e12c81c38321e821ebedf28d9e8b4cb04dac08d549ffb4b",
+            "media_type": "application/json",
+            "size": 3550
+          }
+        ]
+      },
+      {
+        "schema_version": 2,
+        "interface_version": 1,
+        "run_id": "replay-20260308T120733Z-bed78dc4",
+        "capsule_id": "tests",
+        "capsule_scope": [
+          "tests/conftest.py",
+          "tests/test_capsule_quality_eval.py",
+          "tests/test_cli_mcp_contracts.py",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "tests/conftest.py",
+            "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+            "kind": "file",
+            "size": 240
+          },
+          {
+            "path": "tests/test_capsule_quality_eval.py",
+            "digest": "sha256:91b69d54576f54d939b4d3a3f074e0041abb0fdb5508c32503888d3adb853e61",
+            "kind": "file",
+            "size": 13809
+          },
+          {
+            "path": "tests/test_cli_mcp_contracts.py",
+            "digest": "sha256:02dfa740f223cdeede56cb8ad137cd6cf8f419b70ca98aa588e3355ef8c26c3a",
+            "kind": "file",
+            "size": 4442
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "steps": [
+          {
+            "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1200,
+            "cwd": "."
+          },
+          {
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1200,
+            "cwd": "."
+          },
+          {
+            "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1200,
+            "cwd": "."
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "cli-mcp-contracts-pass",
+            "oracle_name": "pytest-cli-mcp-contracts",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          },
+          {
+            "name": "sync-verify-replay-hooks-pass",
+            "oracle_name": "pytest-sync-verify-replay-hooks",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          },
+          {
+            "name": "capsule-quality-eval-pass",
+            "oracle_name": "pytest-capsule-quality-eval",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "pytest-cli-mcp-contracts",
+            "pytest-sync-verify-replay-hooks",
+            "pytest-capsule-quality-eval"
+          ],
+          "material_paths": [
+            "tests/conftest.py",
+            "tests/test_capsule_quality_eval.py",
+            "tests/test_cli_mcp_contracts.py",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Passing all oracle pytest commands constitutes capsule equivalence for CLI/MCP, distill/replay, and quality evaluation behaviors.",
+            "Scope includes tests/conftest.py to enable repo-root import for local og module during replay.",
+            "Replay sandbox constraints (bash -lc, no network, cwd confinement) are validated by the sync/replay hooks oracle.",
+            "uv run with --no-project avoids project metadata mutation; tests may require git in PATH but no network access."
+          ]
+        },
+        "status": "ok",
+        "message": "Replay plan uses uv+pytest oracles to validate CLI/MCP contracts, distill/replay hooks, and quality evaluation within a networkless sandbox using only scoped test materials.",
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "failures": [],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        },
+        "adapter_receipts": [
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay-input.json",
+            "hash": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+            "media_type": "application/json",
+            "size": 13800
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+            "hash": "sha256:1195e31a07ada0ef28a197ad46757b669b5f782f81c787cb3703c1ec2599e499",
+            "media_type": "application/json",
+            "size": 13800
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay.json",
+            "hash": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+            "media_type": "application/x-ndjson",
+            "size": 8908
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+            "hash": "sha256:6b07553a8cfe9931058031f242f6389c031b8e03dfb7b3b480c2805f8b98aaed",
+            "media_type": "application/x-ndjson",
+            "size": 8908
+          },
+          {
+            "schema_version": 2,
+            "type": "file",
+            "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay-result.json",
+            "hash": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+            "media_type": "application/json",
+            "size": 4641
+          },
+          {
+            "schema_version": 2,
+            "type": "cas",
+            "target": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+            "hash": "sha256:1c5acb6bc1f4e499d716b06555bd153fa533f242876b5c7fb867b6176bb7ab81",
+            "media_type": "application/json",
+            "size": 4641
+          }
+        ]
+      }
+    ],
+    "replay_results": [
+      {
+        "capsule_id": "config",
+        "status": "skipped",
+        "plan_status": "skipped",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles."
+        ],
+        "capsule_scope": [
+          "Default run profile/output/mode for OG sessions.",
+          "Worker path resolution (codex_home hint).",
+          "Safety policy linkage and write ceiling."
+        ],
+        "material_inputs": [],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [],
+          "notes": [
+            "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for config because the capsule is advisory-only without executable acceptance oracles.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [],
+        "oracle_results": []
+      },
+      {
+        "capsule_id": "constitution",
+        "status": "skipped",
+        "plan_status": "skipped",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles."
+        ],
+        "capsule_scope": [
+          "Default OG automation boundary (observe).",
+          "Read allowlist and denylist for side-effecting actions."
+        ],
+        "material_inputs": [],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [],
+          "notes": [
+            "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for constitution because the capsule is advisory-only without executable acceptance oracles.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [],
+        "oracle_results": []
+      },
+      {
+        "capsule_id": "dogfood-replay-json-tmp",
+        "status": "skipped",
+        "plan_status": "pending",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+          "Run `og sync --json` to materialize capsule metadata before replay."
+        ],
+        "capsule_scope": [
+          "dogfood-replay.json.tmp.sqFMiP"
+        ],
+        "material_inputs": [
+          {
+            "path": "dogfood-replay.json.tmp.sqFMiP",
+            "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [
+            "dogfood-replay.json.tmp.sqFMiP"
+          ],
+          "notes": [
+            "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+            "Run `og sync --json` to materialize capsule metadata before replay."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay deferred for dogfood-replay-json-tmp because capsule metadata is missing and no executable acceptance oracles are available.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [
+          "dogfood-replay.json.tmp.sqFMiP"
+        ],
+        "oracle_results": [],
+        "remediation": [
+          "Run `og sync --json` to materialize capsule metadata before replay."
+        ],
+        "bootstrap_missing_capsule": true
+      },
+      {
+        "capsule_id": "dogfood-status-pre-sync-json-tmp",
+        "status": "success",
+        "plan_status": "ok",
+        "certificate_id": "cert-dogfood-status-pre-sync-json-tmp-77a48c15d6",
+        "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-replay.json",
+        "failures": [],
+        "capsule_scope": [
+          "dogfood-status-pre-sync.json.tmp.tvwgLV",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "digest": "sha256:f32a1ca5871a070de1d7c6f659e9d0ee8bd2bae750bfc1709d74a10c4c0e9068",
+            "kind": null,
+            "size": null
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+            "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_signal": "exit_code:0",
+            "reason": "Validate snapshot invariants and drift status via repository-native oracle."
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "dogfood-status-pre-sync-json-tmp-verify"
+          ],
+          "material_paths": [
+            "dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Proof basis: pytest oracle asserts snapshot invariants: schema_version=1, command='status', and data.status=='warn' with issues unknown_verification, unknown_certificates, drift_error.",
+            "Freshness sync state remains 'unknown' with message 'no sync summary available' and certificates.count=0.",
+            "Drift policy present=true with status='ok'; export_control_surface warns about missing export artifacts listed in invariants.",
+            "Verification uses only scoped materials and avoids network/destructive actions."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "replay_steps": [
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "dogfood-status-pre-sync-json-tmp",
+            "step": 0,
+            "command": "test -f dogfood-status-pre-sync.json.tmp.tvwgLV",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:dogfood-status-pre-sync-json-tmp:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 2,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-0.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-0.json",
+                "hash": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                "media_type": "application/json",
+                "size": 618
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                "hash": "sha256:6481ead6db8d58ce4d4bb91987df7a0ea60bd70ed30ba5d2f4794446cbc108ff",
+                "media_type": "application/json",
+                "size": 618
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "dogfood-status-pre-sync-json-tmp",
+            "step": 1,
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [
+              "................................................................. [ 36%]",
+              "................................................................ [ 72%]",
+              "..................................................                       [100%]"
+            ],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:dogfood-status-pre-sync-json-tmp:1",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 15477,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-1.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-replay-step-1.json",
+                "hash": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                "media_type": "application/json",
+                "size": 890
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                "hash": "sha256:4f7b9d1e281e2ecbecfcb4e84ff5120674e739ba5798c3f23e1de9d2b9ec8acd",
+                "media_type": "application/json",
+                "size": 890
+              }
+            ]
+          }
+        ],
+        "equivalence": {
+          "baseline_hash": null,
+          "observed_hash": "sha256:d5b523506b0a2a93c41d61aa49dec5c3a466e651ef4c1c164eaa359c75993edf",
+          "oracle_digest": "sha256:d5b523506b0a2a93c41d61aa49dec5c3a466e651ef4c1c164eaa359c75993edf",
+          "plan_digest": "sha256:01ee66046445c7e98263f69f3a96f2e0bc783b743534946ad6df91cbcb4465a1",
+          "match": true,
+          "materialized_path_count": 11,
+          "trace_count": 2,
+          "oracle_count": 1
+        },
+        "materialized_paths": [
+          ".outcomegraph/constitution/default.yaml",
+          ".outcomegraph/materials.lock",
+          ".outcomegraph/policy.yaml",
+          "CONTEXT.md",
+          "README.md",
+          "RUNBOOKS.md",
+          "SPEC-v2.md",
+          "dogfood-status-pre-sync.json.tmp.tvwgLV",
+          "pyproject.toml",
+          "tests/test_og_sync_verify_replay_hooks.py",
+          "to-do.json"
+        ],
+        "oracle_results": [
+          {
+            "schema_version": 2,
+            "oracle_name": "dogfood-status-pre-sync-json-tmp-verify",
+            "capsule_id": "dogfood-status-pre-sync-json-tmp",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "mode": "observe",
+            "status": "pass",
+            "checked_at": "2026-03-08T12:08:42Z",
+            "changed_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "dogfood-status-pre-sync.json.tmp.tvwgLV",
+              "pyproject.toml",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "observed_code": 0,
+            "stdout": [
+              "................................................................. [ 36%]",
+              "................................................................ [ 72%]",
+              "..................................................                       [100%]"
+            ],
+            "stderr": [],
+            "message": "oracle command executed.",
+            "recovery": {
+              "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 15361,
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-verify-replay.json",
+                "hash": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                "media_type": "application/json",
+                "size": 1147
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                "hash": "sha256:d84206f7d2a3bb1be08eb7a78e64dd1ae4d8ebbf55b8d42d89d95200195bd857",
+                "media_type": "application/json",
+                "size": 1147
+              }
+            ],
+            "trace": ".outcomegraph/traces/dogfood-status-pre-sync-json-tmp-replay-20260308t120733z-bed78dc4-dogfood-status-pre-sync-json-tmp-verify-replay.json"
+          }
+        ],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        }
+      },
+      {
+        "capsule_id": "og",
+        "status": "success",
+        "plan_status": "ok",
+        "certificate_id": "cert-og-fc1ae4d915",
+        "trace": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-replay.json",
+        "failures": [],
+        "capsule_scope": [
+          "og",
+          "og.py",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "og",
+            "digest": "sha256:e394578e138639e2dc65818d3da188b9584dce4247cc3ed1b32fb6a8afe3fccf",
+            "kind": "file",
+            "size": 225
+          },
+          {
+            "path": "og.py",
+            "digest": "sha256:ea31a1226f6ae1c5dea027ffb6c56dcdf014e67f32b81583bc5613946c2376f6",
+            "kind": null,
+            "size": null
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "distill-tests-pass",
+            "oracle_name": "og-distill-tests",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+            "expected_signal": "exit_code:0",
+            "reason": "Repository-native distill snapshot tests validate distill snapshot selection without mutating project metadata."
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "og-distill-tests"
+          ],
+          "material_paths": [
+            "og",
+            "og.py",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Equivalence is proven by oracle tests passing against the scoped materials only.",
+            "Invariants: WORKER_INTERFACE_VERSION=1 and WORKER_SCHEMA_VERSION=2 remain stable; CLI help semantics unchanged.",
+            "Oracle execution uses shlex.split; empty command semantics preserved (status=pass, observed_code=0).",
+            "Replay runs offline/non-destructive; uv/pytest operate within sandbox and avoid network and metadata changes."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "replay_steps": [
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "og",
+            "step": 0,
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [
+              ".......                                                                  [100%]"
+            ],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:og:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 346,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-og-replay-step-0.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-og-replay-step-0.json",
+                "hash": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                "media_type": "application/json",
+                "size": 711
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                "hash": "sha256:1aa0b4dd81c2656690b9f64bd9b0fe85f81465fbdbedb6fdd5fb2e31e8fd1a23",
+                "media_type": "application/json",
+                "size": 711
+              }
+            ]
+          }
+        ],
+        "equivalence": {
+          "baseline_hash": null,
+          "observed_hash": "sha256:1c6c7f65af995cc959396ffc5e75d4d5bf00cc73aa7f60b5ebad14a39536e711",
+          "oracle_digest": "sha256:1c6c7f65af995cc959396ffc5e75d4d5bf00cc73aa7f60b5ebad14a39536e711",
+          "plan_digest": "sha256:48f190bd7126c6bb52e37af49d9d1866b142cd878600e1ae3fda936d788a2c78",
+          "match": true,
+          "materialized_path_count": 14,
+          "trace_count": 1,
+          "oracle_count": 1
+        },
+        "materialized_paths": [
+          ".outcomegraph/constitution/default.yaml",
+          ".outcomegraph/materials.lock",
+          ".outcomegraph/policy.yaml",
+          "CONTEXT.md",
+          "README.md",
+          "RUNBOOKS.md",
+          "SECURITY_POLICY.md",
+          "SPEC-v2.md",
+          "og",
+          "og.py",
+          "pyproject.toml",
+          "tests/test_og_sync_verify_replay_hooks.py",
+          "to-do.json",
+          "to-do.schema.json"
+        ],
+        "oracle_results": [
+          {
+            "schema_version": 2,
+            "oracle_name": "og-distill-tests",
+            "capsule_id": "og",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "mode": "observe",
+            "status": "pass",
+            "checked_at": "2026-03-08T12:09:36Z",
+            "changed_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SECURITY_POLICY.md",
+              "SPEC-v2.md",
+              "og",
+              "og.py",
+              "pyproject.toml",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json",
+              "to-do.schema.json"
+            ],
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py -k TestDistillSnapshotSelection",
+            "observed_code": 0,
+            "stdout": [
+              ".......                                                                  [100%]"
+            ],
+            "stderr": [],
+            "message": "oracle command executed.",
+            "recovery": {
+              "operation": "oracle:og-distill-tests",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 307,
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-og-distill-tests-replay.json",
+                "hash": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                "media_type": "application/json",
+                "size": 966
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                "hash": "sha256:a926cf4068a0d360b5ee5ea9bac8ea16f8a92fe973f68fe003e0d99fff6eb633",
+                "media_type": "application/json",
+                "size": 966
+              }
+            ],
+            "trace": ".outcomegraph/traces/og-replay-20260308t120733z-bed78dc4-og-distill-tests-replay.json"
+          }
+        ],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        }
+      },
+      {
+        "capsule_id": "outcomegraph-egg-info",
+        "status": "skipped",
+        "plan_status": "skipped",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles."
+        ],
+        "capsule_scope": [
+          "outcomegraph.egg-info/PKG-INFO",
+          "outcomegraph.egg-info/SOURCES.txt",
+          "outcomegraph.egg-info/dependency_links.txt",
+          "outcomegraph.egg-info/entry_points.txt",
+          "outcomegraph.egg-info/requires.txt",
+          "outcomegraph.egg-info/top_level.txt"
+        ],
+        "material_inputs": [
+          {
+            "path": "outcomegraph.egg-info/PKG-INFO",
+            "digest": "sha256:45a74e269f2265882d7338832d225941d0f5d16aa396f6af97ccc28e30ca937c"
+          },
+          {
+            "path": "outcomegraph.egg-info/SOURCES.txt",
+            "digest": "sha256:44e1721c4543e86651d89c0fff131c1039fe94c0721356062c7eca2552a02212",
+            "kind": "file",
+            "size": 357
+          },
+          {
+            "path": "outcomegraph.egg-info/dependency_links.txt",
+            "digest": "sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+            "kind": "file",
+            "size": 1
+          },
+          {
+            "path": "outcomegraph.egg-info/entry_points.txt",
+            "digest": "sha256:163be6ea35724e504389876490338e064620fe67d384d679df4d2431cacdf7e1",
+            "kind": "file",
+            "size": 50
+          },
+          {
+            "path": "outcomegraph.egg-info/requires.txt",
+            "digest": "sha256:806706bc16da804481f5daf0177349dfca395db663ce15d223d141370d4b361c",
+            "kind": "file",
+            "size": 30
+          },
+          {
+            "path": "outcomegraph.egg-info/top_level.txt",
+            "digest": "sha256:f4e7e93c5250ba951138f232fc40cf5b90a4fac589bf1634be9fd6f3c280dc00",
+            "kind": "file",
+            "size": 3
+          }
+        ],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [
+            "outcomegraph.egg-info/PKG-INFO",
+            "outcomegraph.egg-info/SOURCES.txt",
+            "outcomegraph.egg-info/dependency_links.txt",
+            "outcomegraph.egg-info/entry_points.txt",
+            "outcomegraph.egg-info/requires.txt",
+            "outcomegraph.egg-info/top_level.txt"
+          ],
+          "notes": [
+            "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for outcomegraph-egg-info because the capsule is advisory-only without executable acceptance oracles.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [
+          "outcomegraph.egg-info/PKG-INFO",
+          "outcomegraph.egg-info/SOURCES.txt",
+          "outcomegraph.egg-info/dependency_links.txt",
+          "outcomegraph.egg-info/entry_points.txt",
+          "outcomegraph.egg-info/requires.txt",
+          "outcomegraph.egg-info/top_level.txt"
+        ],
+        "oracle_results": []
+      },
+      {
+        "capsule_id": "policy",
+        "status": "skipped",
+        "plan_status": "skipped",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles."
+        ],
+        "capsule_scope": [
+          ".outcomegraph/policy.yaml",
+          "SECURITY_POLICY.md"
+        ],
+        "material_inputs": [
+          {
+            "path": ".outcomegraph/policy.yaml",
+            "digest": "sha256:60fd52f19d088cf44da9ad8df5d88dce822929cc4b2ca938a075b85aae1ba1d0"
+          },
+          {
+            "path": "SECURITY_POLICY.md",
+            "digest": "sha256:9399b998aaa6efebb34650ac6158ff3c1117ff104b0da35d058ed3a34e1ab9ed",
+            "kind": "file",
+            "size": 3292
+          }
+        ],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [
+            ".outcomegraph/policy.yaml",
+            "SECURITY_POLICY.md"
+          ],
+          "notes": [
+            "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for policy because the capsule is advisory-only without executable acceptance oracles.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [
+          ".outcomegraph/policy.yaml",
+          "SECURITY_POLICY.md"
+        ],
+        "oracle_results": []
+      },
+      {
+        "capsule_id": "readme",
+        "status": "skipped",
+        "plan_status": "skipped",
+        "certificate_id": null,
+        "trace": null,
+        "failures": [
+          "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles."
+        ],
+        "capsule_scope": [
+          "CLI commands/help surface",
+          "Common flags and env defaults",
+          "Exit semantics and source-run guidance"
+        ],
+        "material_inputs": [],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [],
+          "material_paths": [],
+          "notes": [
+            "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for readme because the capsule is advisory-only without executable acceptance oracles.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [],
+        "oracle_results": []
+      },
+      {
+        "capsule_id": "skill-og-dogfood",
+        "status": "skipped",
+        "plan_status": "pending",
+        "certificate_id": null,
+        "trace": ".outcomegraph/traces/skill-og-dogfood-replay-20260308t120733z-bed78dc4-replay.json",
+        "failures": [
+          "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+          "No executable acceptance oracle is available inside capsule scope under observe-mode policy.",
+          "Required repo-level materials (pyproject.toml, og/og.py, tests/*) are outside capsule.scope and cannot be included as inputs.",
+          "Cannot guarantee 'uv' environment or dependency resolution without network or locks; constraints mandate 'uv run'.",
+          "Deterministic evidence under .outcomegraph/events cannot be generated or verified without running the disallowed dogfood script.",
+          "Replay plan for skill-og-dogfood must declare acceptance_checks.",
+          "Replay plan for skill-og-dogfood equivalence_inputs.oracle_names must match declared acceptance checks."
+        ],
+        "capsule_scope": [
+          "skills/og-dogfood/SKILL.md",
+          "skills/og-dogfood/agents/openai.yaml",
+          "skills/og-dogfood/scripts/run_dogfood.sh"
+        ],
+        "material_inputs": [
+          {
+            "path": "skills/og-dogfood/SKILL.md",
+            "digest": "sha256:ebad24b6848e49c51588e2e0cb0782cb5e3ee3e2666cefe4096694ca55d9c81d",
+            "kind": "file",
+            "size": 3629
+          },
+          {
+            "path": "skills/og-dogfood/agents/openai.yaml",
+            "digest": "sha256:0d31ce4b693fcc042c01c00c6d4276bc737043ba6fa07ed3673e4f910712e1a7",
+            "kind": "file",
+            "size": 224
+          },
+          {
+            "path": "skills/og-dogfood/scripts/run_dogfood.sh",
+            "digest": "sha256:e31cef8c7afa18dbd35ae3aaa0efee0c8ca6ba826c89e1be472d2c6c67626279",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "acceptance_checks": [],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "og-cli-regression",
+            "dogfood-run (advisory only in observe mode)"
+          ],
+          "material_paths": [
+            "skills/og-dogfood/SKILL.md",
+            "skills/og-dogfood/agents/openai.yaml",
+            "skills/og-dogfood/scripts/run_dogfood.sh"
+          ],
+          "notes": [
+            "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+            "Primary oracle 'dogfood-run' is advisory and disallowed in observe mode; no executable command is available for it within policy.",
+            "Runnable oracle 'og-cli-regression' depends on files outside capsule scope (tests/test_og_sync_verify_replay_hooks.py, og.py) and thus cannot execute with scoped materials only.",
+            "Capsule constraints require repo root with pyproject.toml and og present; these are not in capsule.scope or scope_materials, so regeneration cannot satisfy constraints inside a sandbox limited to scope.",
+            "Networkless sandbox and unknown 'uv' environment prevent resolving dependencies via 'uv run' without additional materials/locks.",
+            "Materials lock (.outcomegraph/materials.lock) not in scope; dependency drift cannot be bounded for a proof."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": "Replay skipped for skill-og-dogfood because the capsule is advisory-only and replay inputs are not replay-complete.",
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": 0
+        },
+        "replay_steps": [],
+        "equivalence": null,
+        "materialized_paths": [
+          ".outcomegraph/constitution/default.yaml",
+          ".outcomegraph/materials.lock",
+          ".outcomegraph/policy.yaml",
+          "README.md",
+          "RUNBOOKS.md",
+          "pyproject.toml",
+          "skills/og-dogfood/SKILL.md",
+          "skills/og-dogfood/agents/openai.yaml",
+          "skills/og-dogfood/scripts/run_dogfood.sh"
+        ],
+        "oracle_results": [],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        }
+      },
+      {
+        "capsule_id": "tests",
+        "status": "success",
+        "plan_status": "ok",
+        "certificate_id": "cert-tests-f87f2d9b78",
+        "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-replay.json",
+        "failures": [],
+        "capsule_scope": [
+          "tests/conftest.py",
+          "tests/test_capsule_quality_eval.py",
+          "tests/test_cli_mcp_contracts.py",
+          "tests/test_og_sync_verify_replay_hooks.py"
+        ],
+        "material_inputs": [
+          {
+            "path": "tests/conftest.py",
+            "digest": "sha256:7932f0d297a40ea6c290c875501713901e258879f830ccf1afaa6499d84958ba",
+            "kind": "file",
+            "size": 240
+          },
+          {
+            "path": "tests/test_capsule_quality_eval.py",
+            "digest": "sha256:91b69d54576f54d939b4d3a3f074e0041abb0fdb5508c32503888d3adb853e61",
+            "kind": "file",
+            "size": 13809
+          },
+          {
+            "path": "tests/test_cli_mcp_contracts.py",
+            "digest": "sha256:02dfa740f223cdeede56cb8ad137cd6cf8f419b70ca98aa588e3355ef8c26c3a",
+            "kind": "file",
+            "size": 4442
+          },
+          {
+            "path": "tests/test_og_sync_verify_replay_hooks.py",
+            "digest": "sha256:f19f1a8f604421a2349f53ce908ca5ddd29aaa05d50f4ec6a9000a5e83f19658",
+            "kind": null,
+            "size": null
+          }
+        ],
+        "acceptance_checks": [
+          {
+            "name": "cli-mcp-contracts-pass",
+            "oracle_name": "pytest-cli-mcp-contracts",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          },
+          {
+            "name": "sync-verify-replay-hooks-pass",
+            "oracle_name": "pytest-sync-verify-replay-hooks",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          },
+          {
+            "name": "capsule-quality-eval-pass",
+            "oracle_name": "pytest-capsule-quality-eval",
+            "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+            "expected_signal": "exit_code:0",
+            "reason": null
+          }
+        ],
+        "equivalence_inputs": {
+          "baseline_hash": null,
+          "oracle_names": [
+            "pytest-cli-mcp-contracts",
+            "pytest-sync-verify-replay-hooks",
+            "pytest-capsule-quality-eval"
+          ],
+          "material_paths": [
+            "tests/conftest.py",
+            "tests/test_capsule_quality_eval.py",
+            "tests/test_cli_mcp_contracts.py",
+            "tests/test_og_sync_verify_replay_hooks.py"
+          ],
+          "notes": [
+            "Passing all oracle pytest commands constitutes capsule equivalence for CLI/MCP, distill/replay, and quality evaluation behaviors.",
+            "Scope includes tests/conftest.py to enable repo-root import for local og module during replay.",
+            "Replay sandbox constraints (bash -lc, no network, cwd confinement) are validated by the sync/replay hooks oracle.",
+            "uv run with --no-project avoids project metadata mutation; tests may require git in PATH but no network access."
+          ]
+        },
+        "parity_results": {
+          "match": null,
+          "details": null,
+          "baseline_hash": null,
+          "observed_hash": null,
+          "oracle_digest": null,
+          "trace_count": null
+        },
+        "replay_steps": [
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "tests",
+            "step": 0,
+            "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [
+              "....                                                                     [100%]"
+            ],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:tests:0",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 288,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-0.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-0.json",
+                "hash": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                "media_type": "application/json",
+                "size": 675
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                "hash": "sha256:374f7bb177b52c3fbc73a6d71a2e61da594b8ee773b4c42a7403b4e46af431fc",
+                "media_type": "application/json",
+                "size": 675
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "tests",
+            "step": 1,
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [
+              "................................................................. [ 36%]",
+              "................................................................ [ 72%]",
+              "..................................................                       [100%]"
+            ],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:tests:1",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 15379,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-1.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-1.json",
+                "hash": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                "media_type": "application/json",
+                "size": 836
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                "hash": "sha256:4629b8f4ad6302086e9cdce0b4b44e51b8e35b63751b69d52c67dde874103b57",
+                "media_type": "application/json",
+                "size": 836
+              }
+            ]
+          },
+          {
+            "schema_version": 2,
+            "role": "replay",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "capsule_id": "tests",
+            "step": 2,
+            "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+            "expected_exit_code": 0,
+            "timeout_s": 1800,
+            "requested_cwd": ".",
+            "resolved_cwd": ".",
+            "observed_exit_code": 0,
+            "status": "pass",
+            "stdout": [
+              ".....                                                                    [100%]"
+            ],
+            "stderr": [],
+            "message": "replay step executed.",
+            "failures": [],
+            "recovery": {
+              "operation": "replay-step:tests:2",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 265,
+            "trace": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-2.json",
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/replay-20260308t120733z-bed78dc4-tests-replay-step-2.json",
+                "hash": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                "media_type": "application/json",
+                "size": 678
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                "hash": "sha256:b3e373ddcd6a4d21b4a6b33dcfe49f1f66f0a14d8cd29656946ad1a398492a2a",
+                "media_type": "application/json",
+                "size": 678
+              }
+            ]
+          }
+        ],
+        "equivalence": {
+          "baseline_hash": null,
+          "observed_hash": "sha256:c3bdfbc48cef294487f4269ae2c284d2c5ed871fd0e2f9ba61c9e9624729b0a5",
+          "oracle_digest": "sha256:c3bdfbc48cef294487f4269ae2c284d2c5ed871fd0e2f9ba61c9e9624729b0a5",
+          "plan_digest": "sha256:cb66fa0e5f8de87043655dc88e8d6aa12d7fb98d2d4f84d386910908f920972a",
+          "match": true,
+          "materialized_path_count": 13,
+          "trace_count": 3,
+          "oracle_count": 3
+        },
+        "materialized_paths": [
+          ".outcomegraph/constitution/default.yaml",
+          ".outcomegraph/materials.lock",
+          ".outcomegraph/policy.yaml",
+          "CONTEXT.md",
+          "README.md",
+          "RUNBOOKS.md",
+          "SPEC-v2.md",
+          "pyproject.toml",
+          "tests/conftest.py",
+          "tests/test_capsule_quality_eval.py",
+          "tests/test_cli_mcp_contracts.py",
+          "tests/test_og_sync_verify_replay_hooks.py",
+          "to-do.json"
+        ],
+        "oracle_results": [
+          {
+            "schema_version": 2,
+            "oracle_name": "pytest-cli-mcp-contracts",
+            "capsule_id": "tests",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "mode": "observe",
+            "status": "pass",
+            "checked_at": "2026-03-08T12:11:30Z",
+            "changed_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "pyproject.toml",
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "command": "uv run --with pytest --no-project pytest -q tests/test_cli_mcp_contracts.py",
+            "observed_code": 0,
+            "stdout": [
+              "....                                                                     [100%]"
+            ],
+            "stderr": [],
+            "message": "oracle command executed.",
+            "recovery": {
+              "operation": "oracle:pytest-cli-mcp-contracts",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 251,
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-cli-mcp-contracts-replay.json",
+                "hash": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                "media_type": "application/json",
+                "size": 980
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                "hash": "sha256:5b38ac19bd83f1f203eab2caeffe56a9017f693ec0a80902b972454bc738b98e",
+                "media_type": "application/json",
+                "size": 980
+              }
+            ],
+            "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-cli-mcp-contracts-replay.json"
+          },
+          {
+            "schema_version": 2,
+            "oracle_name": "pytest-sync-verify-replay-hooks",
+            "capsule_id": "tests",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "mode": "observe",
+            "status": "pass",
+            "checked_at": "2026-03-08T12:11:30Z",
+            "changed_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "pyproject.toml",
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "command": "uv run --with pytest --no-project pytest -q tests/test_og_sync_verify_replay_hooks.py",
+            "observed_code": 0,
+            "stdout": [
+              "................................................................. [ 36%]",
+              "................................................................ [ 72%]",
+              "..................................................                       [100%]"
+            ],
+            "stderr": [],
+            "message": "oracle command executed.",
+            "recovery": {
+              "operation": "oracle:pytest-sync-verify-replay-hooks",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 15330,
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-sync-verify-replay-hooks-replay.json",
+                "hash": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                "media_type": "application/json",
+                "size": 1153
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                "hash": "sha256:7961bd6bc7b59341e0ed991adf757124cc6c5f8aab01dab7f0f0da0edcc3ccfc",
+                "media_type": "application/json",
+                "size": 1153
+              }
+            ],
+            "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-sync-verify-replay-hooks-replay.json"
+          },
+          {
+            "schema_version": 2,
+            "oracle_name": "pytest-capsule-quality-eval",
+            "capsule_id": "tests",
+            "run_id": "replay-20260308T120733Z-bed78dc4",
+            "mode": "observe",
+            "status": "pass",
+            "checked_at": "2026-03-08T12:11:45Z",
+            "changed_paths": [
+              ".outcomegraph/constitution/default.yaml",
+              ".outcomegraph/materials.lock",
+              ".outcomegraph/policy.yaml",
+              "CONTEXT.md",
+              "README.md",
+              "RUNBOOKS.md",
+              "SPEC-v2.md",
+              "pyproject.toml",
+              "tests/conftest.py",
+              "tests/test_capsule_quality_eval.py",
+              "tests/test_cli_mcp_contracts.py",
+              "tests/test_og_sync_verify_replay_hooks.py",
+              "to-do.json"
+            ],
+            "command": "uv run --with pytest --no-project pytest -q tests/test_capsule_quality_eval.py",
+            "observed_code": 0,
+            "stdout": [
+              ".....                                                                    [100%]"
+            ],
+            "stderr": [],
+            "message": "oracle command executed.",
+            "recovery": {
+              "operation": "oracle:pytest-capsule-quality-eval",
+              "attempts": 1,
+              "max_retries": 0,
+              "retries_used": 0,
+              "recovered": false,
+              "exhausted": false,
+              "retryable": false,
+              "timed_out": false,
+              "timeout_seconds": 1800
+            },
+            "duration_ms": 266,
+            "receipt_pointers": [
+              {
+                "schema_version": 2,
+                "type": "file",
+                "target": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-capsule-quality-eval-replay.json",
+                "hash": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                "media_type": "application/json",
+                "size": 989
+              },
+              {
+                "schema_version": 2,
+                "type": "cas",
+                "target": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                "hash": "sha256:50a6bafb3d0d701aba347019709bef3acb7355cd0c6d8f12adff8d0c6ea3465e",
+                "media_type": "application/json",
+                "size": 989
+              }
+            ],
+            "trace": ".outcomegraph/traces/tests-replay-20260308t120733z-bed78dc4-pytest-capsule-quality-eval-replay.json"
+          }
+        ],
+        "prompt_provenance": {
+          "id": "worker-replay",
+          "version": "1.0.1",
+          "source_path": "prompts/workers/replay-v1.txt"
+        }
+      }
+    ],
+    "certificate_ids": [
+      "cert-dogfood-status-pre-sync-json-tmp-77a48c15d6",
+      "cert-og-fc1ae4d915",
+      "cert-tests-f87f2d9b78"
+    ],
+    "certificate_refs": [
+      ".outcomegraph/certificates/cert-dogfood-status-pre-sync-json-tmp-77a48c15d6.json",
+      ".outcomegraph/certificates/cert-og-fc1ae4d915.json",
+      ".outcomegraph/certificates/cert-tests-f87f2d9b78.json"
+    ],
+    "errors": [],
+    "recovery": {
+      "operations": 15,
+      "retried_operations": 0,
+      "recovered_operations": 0,
+      "exhausted_operations": 0,
+      "timeout_operations": 0,
+      "total_retries_used": 0,
+      "details": [
+        {
+          "operation": "worker:replay",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:dogfood-status-pre-sync-json-tmp:0",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:dogfood-status-pre-sync-json-tmp:1",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:dogfood-status-pre-sync-json-tmp-verify",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "worker:replay",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:og:0",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:og-distill-tests",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "worker:replay",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "worker:replay",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:tests:0",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:tests:1",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "replay-step:tests:2",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:pytest-cli-mcp-contracts",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:pytest-sync-verify-replay-hooks",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        },
+        {
+          "operation": "oracle:pytest-capsule-quality-eval",
+          "attempts": 1,
+          "max_retries": 0,
+          "retries_used": 0,
+          "recovered": false,
+          "exhausted": false,
+          "retryable": false,
+          "timed_out": false,
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    "duration_ms": 252332,
+    "summary_event": "/tmp/outcomegraph-dogfood-20260308-nY1wfy/.outcomegraph/events/replay-20260308T120733Z-bed78dc4.json"
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics": {
+    "agent_reliability": {
+      "observation": {
+        "observed_at": "2026-03-08T12:11:46Z",
+        "command": "replay",
+        "subcommand": null,
+        "status": "ok",
+        "successful_task": true,
+        "schema_valid_output": true,
+        "retryable_operations": 0,
+        "retry_auto_recoveries": 0,
+        "session_kind": null,
+        "session_id": null,
+        "session_tracked": false,
+        "session_transition": "none",
+        "commands_since_successful_task": 0
+      },
+      "snapshot": {
+        "schema_version": 1,
+        "tracked_at": "2026-03-08T12:11:46Z",
+        "status": "warn",
+        "message": "agent reliability metrics need attention: commands_per_successful_task",
+        "warn_metrics": [
+          "commands_per_successful_task"
+        ],
+        "unknown_metrics": [
+          "retry_auto_recovery_rate",
+          "session_churn"
+        ],
+        "totals": {
+          "commands": 573,
+          "successful_tasks": 137,
+          "schema_valid_outputs": 573,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "resumable_session_starts": 0,
+          "resumable_session_reuses": 0,
+          "resumable_session_rotations": 0
+        },
+        "current": {
+          "commands_since_successful_task": 0
+        },
+        "latest_command": {
+          "command": "replay",
+          "subcommand": null,
+          "status": "ok",
+          "observed_at": "2026-03-08T12:11:46Z",
+          "successful_task": true,
+          "schema_valid_output": true,
+          "retryable_operations": 0,
+          "retry_auto_recoveries": 0,
+          "session_kind": null,
+          "session_id": null,
+          "session_transition": "none",
+          "commands_since_successful_task": 0
+        },
+        "commands_per_successful_task": {
+          "value": 4.182,
+          "units": "commands/task",
+          "direction": "lower_is_better",
+          "status": "warn",
+          "total_commands": 573,
+          "successful_tasks": 137
+        },
+        "schema_valid_output_rate": {
+          "value": 1.0,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "ok",
+          "valid_outputs": 573,
+          "total_outputs": 573
+        },
+        "retry_auto_recovery_rate": {
+          "value": null,
+          "units": "ratio",
+          "direction": "higher_is_better",
+          "status": "unknown",
+          "retryable_operations": 0,
+          "recovered_operations": 0
+        },
+        "session_churn": {
+          "value": null,
+          "units": "ratio",
+          "direction": "lower_is_better",
+          "status": "unknown",
+          "tracked_session_kinds": [
+            "autopilot",
+            "daemon"
+          ],
+          "session_starts": 0,
+          "reused_sessions": 0,
+          "rotated_sessions": 0,
+          "repeat_observations": 0
+        }
+      }
+    }
+  }
+}
