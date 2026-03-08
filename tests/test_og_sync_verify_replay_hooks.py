@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import sys
+import time
 import tomllib
 from contextlib import contextmanager, redirect_stdout
 import subprocess
@@ -1418,6 +1419,72 @@ class TestDaemonLifecycle(_RepoTestCase):
         self.assertFalse(refreshed)
         self.assertEqual(updated_payload["updated_at"], original_payload["updated_at"])
         self.assertEqual(updated_payload["holder"]["pid"], holder["pid"])
+
+    def test_recover_sync_lock_does_not_remove_new_active_lock(self) -> None:
+        with self.git_root_patch():
+            og._init_outcomegraph()
+            lock_path = self.repo / ".outcomegraph" / "work" / "lock"
+            active_timestamp = og._utc_timestamp()
+            active_payload = og._build_lock_record(
+                active_timestamp,
+                og.LOCK_STATUS_LOCKED,
+                {"pid": 45678, "host": "remote-sync-host", "command": "og sync"},
+                og._build_session_record(
+                    og.SESSION_KIND_SYNC,
+                    og.SESSION_LIFECYCLE_EPHEMERAL,
+                    og.SESSION_STATE_ACTIVE,
+                    created_at=active_timestamp,
+                    updated_at=active_timestamp,
+                    ttl_seconds=og.WORK_LOCK_STALE_SECONDS,
+                ),
+            )
+            lock_path.write_text(json.dumps(active_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            stale_payload = og._build_lock_record(
+                "2026-01-01T00:00:00Z",
+                og.LOCK_STATUS_LOCKED,
+                {"pid": 11111, "host": "test-host", "command": "og sync"},
+                og._build_session_record(
+                    og.SESSION_KIND_SYNC,
+                    og.SESSION_LIFECYCLE_EPHEMERAL,
+                    og.SESSION_STATE_ACTIVE,
+                    created_at="2026-01-01T00:00:00Z",
+                    updated_at="2026-01-01T00:00:00Z",
+                    ttl_seconds=og.WORK_LOCK_STALE_SECONDS,
+                ),
+            )
+
+            reason = og._recover_sync_lock(str(self.repo), stale_payload)
+            observed_payload = json.loads(lock_path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(reason)
+        self.assertEqual(observed_payload["holder"]["pid"], 45678)
+
+    def test_recover_sync_lock_with_retries_attempts_multiple_recoveries(self) -> None:
+        holder = {"pid": 22222, "host": "test-host", "command": "og sync"}
+        first_payload = {"status": og.LOCK_STATUS_LOCKED, "holder": {"pid": 1}}
+        second_payload = {"status": og.LOCK_STATUS_LOCKED, "holder": {"pid": 2}}
+        acquired_payload = {
+            "status": og.LOCK_STATUS_LOCKED,
+            "holder": holder,
+            "session": {"session_id": "sync-20260308t000000z-abcdef1234"},
+        }
+        with patch.object(og, "_recover_sync_lock", side_effect=["stale", "orphaned_pid"]) as recover_lock, patch.object(
+            og,
+            "_acquire_work_lock",
+            side_effect=[(False, second_payload), (True, acquired_payload)],
+        ) as acquire_lock:
+            acquired, lock_payload, reasons = og._recover_sync_lock_with_retries(
+                str(self.repo),
+                holder,
+                first_payload,
+                max_attempts=3,
+            )
+
+        self.assertTrue(acquired)
+        self.assertEqual(lock_payload, acquired_payload)
+        self.assertEqual(reasons, ["stale", "orphaned_pid"])
+        self.assertEqual(recover_lock.call_count, 2)
+        self.assertEqual(acquire_lock.call_count, 2)
 
 
 class TestSyncWorkflows(_RepoTestCase):
@@ -2849,6 +2916,75 @@ safety:
             "generated_at",
             (self.repo / ".outcomegraph" / "export" / "mcp-resources.json").read_text(encoding="utf-8"),
         )
+
+    def test_run_distill_stage_fails_fast_when_batch_progress_stalls(self) -> None:
+        snapshot = {"changed_files": ["capsules/default.yaml"]}
+
+        def slow_run_worker_with_retries(
+            role: str,
+            input_payload: dict[str, object],
+            repo_root: str,
+            trace_path: str,
+            worker_adapter: dict[str, object],
+            *,
+            timeout_seconds: int,
+            max_retries: int,
+        ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+            time.sleep(0.1)
+            output_payload = {
+                "schema_version": og.WORKER_SCHEMA_VERSION,
+                "interface_version": og.WORKER_INTERFACE_VERSION,
+                "run_id": str(input_payload["run_id"]),
+                "capsule_updates": [_distill_update("default", ["capsules/default.yaml"])],
+            }
+            recovery = og._build_recovery_record(
+                "worker:distill",
+                attempts=1,
+                max_retries=max_retries,
+                timeout_seconds=timeout_seconds,
+                retryable=False,
+            )
+            return output_payload, [], recovery
+
+        with self.git_root_patch(), patch.object(
+            og,
+            "_initialize_adapter_runtime",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_collect_affected_capsules",
+            return_value=["default"],
+        ), patch.object(
+            og,
+            "_collect_changed_materials",
+            return_value=[],
+        ), patch.object(
+            og,
+            "_group_changed_files_by_capsule",
+            return_value={"default": ["capsules/default.yaml"]},
+        ), patch.object(
+            og,
+            "adapter_get",
+            return_value={"type": "worker", "name": "codex", "manifest": {"name": "codex"}},
+        ), patch.object(
+            og,
+            "_build_distill_target_capsules",
+            return_value=[{"id": "default", "changed_files": ["capsules/default.yaml"]}],
+        ), patch.object(
+            og,
+            "_select_distill_stall_timeout",
+            return_value=0,
+        ), patch.object(
+            og,
+            "_run_worker_with_retries",
+            side_effect=slow_run_worker_with_retries,
+        ), patch.object(og, "_set_pending_state", return_value={"status": "ok"}) as set_pending:
+            payload = og._run_distill_stage(str(self.repo), snapshot, "run-1", "analyze", "observe")
+
+        self.assertEqual(payload["status"], "pending")
+        self.assertEqual(payload["code"], og.WORKER_RUNTIME_UNAVAILABLE_CODE)
+        self.assertIn("distill stage timed out", payload["message"])
+        set_pending.assert_called_once()
 
     def test_run_distill_stage_marks_pending_when_worker_is_unavailable(self) -> None:
         snapshot = {"changed_files": ["capsules/default.yaml"]}

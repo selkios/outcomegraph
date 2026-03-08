@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextvars import ContextVar
 import importlib.metadata
 import json
@@ -409,6 +409,7 @@ CANONICAL_EXPORT_SCOPES = ("capsules", "refs", "decisions", "claims", "certifica
 WORK_LOCK_STALE_SECONDS = 300
 WORK_LOCK_HEARTBEAT_SECONDS = 60
 WORK_PROGRESS_HEARTBEAT_SECONDS = 20
+WORK_LOCK_RECOVERY_MAX_ATTEMPTS = 3
 OPTIMIZATION_DEFAULT_MIN_IMPROVEMENT = 0.02
 OPTIMIZATION_SUPPORTED_METRICS = ("contains", "exact")
 LOCK_STATUS_LOCKED = "locked"
@@ -452,6 +453,8 @@ WORKER_ADAPTER_BOOTSTRAP_PROMPT_CHAR_BUDGET = 130_000
 WORKER_ADAPTER_DISTILL_MAX_WORKERS = 4
 WORKER_ADAPTER_BOOTSTRAP_MAX_WORKERS = 2
 WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS = 300
+DISTILL_STAGE_PROGRESS_POLL_SECONDS = 1.0
+DISTILL_STAGE_TIMEOUT_GRACE_SECONDS = 30
 WORKER_PROMPT_ASSET_DIR = os.path.join(os.path.dirname(__file__), "prompts", "workers")
 WORKER_PROMPT_MANIFEST_PATH = os.path.join(WORKER_PROMPT_ASSET_DIR, "manifest.json")
 WORKER_PROMPT_BINDINGS: dict[str, dict[str, str]] = {
@@ -8517,8 +8520,6 @@ def _canonical_export_snapshot(repo_root: str) -> dict[str, object]:
 
 
 def _render_agents_export(snapshot: dict[str, object]) -> str:
-    counts = snapshot["counts"]
-    by_scope = counts["by_scope"]
     lines = [
         _render_context_contract().rstrip(),
         "",
@@ -8541,21 +8542,14 @@ def _render_agents_export(snapshot: dict[str, object]) -> str:
         "- og autopilot init|disable",
         "- og daemon install|start|stop|status",
         "",
-        f"- Canonical artifact directories tracked: {sorted(list(by_scope.keys()))}",
-        f"- Total canonical artifacts: {counts['total']}",
+        "- Canonical artifact directories tracked: `.outcomegraph/capsules`, `.outcomegraph/refs`, `.outcomegraph/decisions`, `.outcomegraph/claims`, `.outcomegraph/certificates`, `.outcomegraph/datasets`, and `.outcomegraph/constitution`.",
+        "- Artifact-level inventory lives in `.outcomegraph/export/README_OUTCOMES.md`.",
         "",
+        "## Export semantics",
+        "- Exports are generated deterministically from canonical artifacts.",
+        "- Writes are idempotent: unchanged content is not rewritten.",
+        "- Control-surface files are projections only; canonical truth remains in `.outcomegraph` artifacts.",
     ]
-    for scope in sorted(by_scope):
-        lines.extend([f"- `{scope}`: {by_scope[scope]} item(s)"])
-    lines.extend(
-        [
-            "",
-            "## Export semantics",
-            "- Exports are generated deterministically from canonical artifacts.",
-            "- Writes are idempotent: unchanged content is not rewritten.",
-            "- Control-surface files are projections only; canonical truth remains in `.outcomegraph` artifacts.",
-        ]
-    )
     return "\n".join(lines) + "\n"
 
 
@@ -8598,7 +8592,6 @@ def _render_readme_outcomes(snapshot: dict[str, object]) -> str:
 
 
 def _render_skill_export(snapshot: dict[str, object]) -> str:
-    counts = snapshot["counts"]
     lines = [
         "# OutcomeGraph Steward Skill",
         "",
@@ -8625,7 +8618,7 @@ def _render_skill_export(snapshot: dict[str, object]) -> str:
         "- Keep exporting control surfaces from available truth where possible.",
         "",
         "## 5) Artifact health",
-        f"- Tracked canonical paths currently include {counts['total']} known artifact files.",
+        "- Track canonical artifacts under `.outcomegraph/` and treat export files as projections.",
         "- Export refresh includes `export/AGENTS.md`, `export/README_OUTCOMES.md`, and `export/mcp-resources.json`.",
     ]
     return "\n".join(lines) + "\n"
@@ -9094,6 +9087,12 @@ def _recover_sync_lock(repo_root: str, lock_payload: dict | None) -> str | None:
     if reason is None:
         return None
     lock_path = os.path.join(repo_root, WORK_LOCK_FILE)
+    current_payload = _read_json_file(lock_path)
+    if isinstance(current_payload, dict):
+        current_reason = _lock_recovery_reason(current_payload)
+        if current_reason is None:
+            return None
+        reason = current_reason
     try:
         os.remove(lock_path)
     except FileNotFoundError:
@@ -9101,6 +9100,29 @@ def _recover_sync_lock(repo_root: str, lock_payload: dict | None) -> str | None:
     except OSError as exc:
         raise RuntimeError(f"failed to recover sync lock: {exc}") from exc
     return reason
+
+
+def _recover_sync_lock_with_retries(
+    repo_root: str,
+    holder: dict[str, object],
+    lock_payload: dict | None,
+    *,
+    max_attempts: int = WORK_LOCK_RECOVERY_MAX_ATTEMPTS,
+) -> tuple[bool, dict | None, list[str]]:
+    attempts_remaining = max(int(max_attempts), 0)
+    acquired = False
+    current_payload = lock_payload
+    recovered_reasons: list[str] = []
+
+    while attempts_remaining > 0 and not acquired:
+        attempts_remaining -= 1
+        reason = _recover_sync_lock(repo_root, current_payload)
+        if reason is None:
+            break
+        recovered_reasons.append(reason)
+        acquired, current_payload = _acquire_work_lock(repo_root, holder)
+
+    return acquired, current_payload, recovered_reasons
 
 
 def _release_work_lock(repo_root: str, holder: dict) -> None:
@@ -14937,7 +14959,13 @@ def _run_distill_stage(
 
         completed_batches: dict[int, tuple[dict[str, object], list[dict[str, object]], dict[str, object]]] = {}
         max_workers = _select_distill_max_workers(repo_root, snapshot, len(batch_specs))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        distill_stall_timeout_seconds = _select_distill_stall_timeout(
+            worker_timeout_seconds=distill_timeout_seconds,
+            max_retries=max_retries,
+        )
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        timed_out = False
+        try:
             future_map = {}
             for batch_index, batch_capsules, batch_changed_files, trace_path in batch_specs:
                 distill_input = _build_distill_input(
@@ -14960,9 +14988,35 @@ def _run_distill_stage(
                     max_retries=max_retries,
                 )
                 future_map[future] = batch_index
-            for future in as_completed(future_map):
-                batch_index = future_map[future]
-                completed_batches[batch_index] = future.result()
+
+            pending_futures = set(future_map)
+            last_progress = time.monotonic()
+            while pending_futures:
+                elapsed_since_progress = time.monotonic() - last_progress
+                remaining = distill_stall_timeout_seconds - elapsed_since_progress
+                if remaining <= 0:
+                    timed_out = True
+                    pending_indices = sorted(future_map[future] for future in pending_futures)
+                    pending_capsules = [
+                        [str(capsule.get("id") or "") for capsule in batch_specs[index][1] if isinstance(capsule, dict)]
+                        for index in pending_indices
+                    ]
+                    raise WorkerAdapterError(
+                        f"distill stage timed out after {distill_stall_timeout_seconds}s waiting for {len(pending_futures)} batch(es): {pending_capsules}"
+                    )
+                done_futures, pending_futures = wait(
+                    pending_futures,
+                    timeout=min(DISTILL_STAGE_PROGRESS_POLL_SECONDS, remaining),
+                    return_when=FIRST_COMPLETED,
+                )
+                if not done_futures:
+                    continue
+                last_progress = time.monotonic()
+                for future in done_futures:
+                    batch_index = future_map[future]
+                    completed_batches[batch_index] = future.result()
+        finally:
+            executor.shutdown(wait=not timed_out, cancel_futures=timed_out)
 
         recovery_records: list[dict[str, object]] = []
         for batch_index, batch_capsules, _, _ in batch_specs:
@@ -15079,6 +15133,12 @@ def _select_distill_worker_timeout(repo_root: str, snapshot: dict[str, object]) 
         return WORKER_ADAPTER_BOOTSTRAP_TIMEOUT_SECONDS
 
     return WORKER_ADAPTER_DEFAULT_TIMEOUT_SECONDS
+
+
+def _select_distill_stall_timeout(*, worker_timeout_seconds: int, max_retries: int) -> int:
+    timeout_value = max(int(worker_timeout_seconds), 1)
+    retry_attempts = max(int(max_retries), 0) + 1
+    return (timeout_value * retry_attempts) + DISTILL_STAGE_TIMEOUT_GRACE_SECONDS
 
 
 def _select_distill_batch_size(
@@ -18310,10 +18370,14 @@ def run_command(
                 return _command_exit_code(payload)
         holder = {"pid": os.getpid(), "host": socket.gethostname(), "command": "og sync"}
         lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
-        recovered_lock_reason: str | None = None
+        recovered_lock_reasons: list[str] = []
         if not lock_acquired and bool(options.get("recover_stale_lock", False)):
             try:
-                recovered_lock_reason = _recover_sync_lock(repo_root, lock_payload)
+                lock_acquired, lock_payload, recovered_lock_reasons = _recover_sync_lock_with_retries(
+                    repo_root,
+                    holder,
+                    lock_payload,
+                )
             except RuntimeError as exc:
                 payload = {
                     "status": "error",
@@ -18324,8 +18388,6 @@ def run_command(
                 }
                 emit_command_result(payload, output_json)
                 return _command_exit_code(payload)
-            if recovered_lock_reason is not None:
-                lock_acquired, lock_payload = _acquire_work_lock(repo_root, holder)
         if not lock_acquired:
             active_session = _session_from_payload(lock_payload.get("session")) if isinstance(lock_payload, dict) else None
             active_session_id = active_session.get("session_id") if isinstance(active_session, dict) else None
@@ -18353,8 +18415,10 @@ def run_command(
             }
             if bool(options.get("recover_stale_lock", False)):
                 contended_payload["recovery_attempted"] = True
-                if recovered_lock_reason is not None:
-                    contended_payload["recovery_reason"] = recovered_lock_reason
+                contended_payload["recovery_attempts"] = len(recovered_lock_reasons)
+                if recovered_lock_reasons:
+                    contended_payload["recovery_reason"] = recovered_lock_reasons[-1]
+                    contended_payload["recovery_reasons"] = recovered_lock_reasons
             _set_pending_state(
                 repo_root,
                 f"lock contended by {active_session_id or lock_payload.get('holder', {}).get('pid') if lock_payload else 'unknown'}",
@@ -18399,8 +18463,9 @@ def run_command(
             heartbeat_thread.start()
             progress_thread.start()
             try:
-                if recovered_lock_reason is not None:
-                    options["recovered_lock_reason"] = recovered_lock_reason
+                if recovered_lock_reasons:
+                    options["recovered_lock_reason"] = recovered_lock_reasons[-1]
+                    options["recovered_lock_reasons"] = list(recovered_lock_reasons)
                 payload = _run_sync_job(repo_root, options, active_session)
                 payload["lock"] = {"status": LOCK_STATUS_LOCKED, "payload": lock_payload, "session": active_session}
                 emit_command_result(payload, output_json)

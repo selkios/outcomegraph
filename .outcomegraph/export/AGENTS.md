@@ -53,13 +53,8 @@ OutcomeGraph canonical agent guidance contract.
 - og autopilot init|disable
 - og daemon install|start|stop|status
 
-- Canonical artifact directories tracked: ['certificates', 'claims', 'constitution', 'materials.lock']
-- Total canonical artifacts: 242
-
-- `certificates`: 120 item(s)
-- `claims`: 120 item(s)
-- `constitution`: 1 item(s)
-- `materials.lock`: 1 item(s)
+- Canonical artifact directories tracked: `.outcomegraph/capsules`, `.outcomegraph/refs`, `.outcomegraph/decisions`, `.outcomegraph/claims`, `.outcomegraph/certificates`, `.outcomegraph/datasets`, and `.outcomegraph/constitution`.
+- Artifact-level inventory lives in `.outcomegraph/export/README_OUTCOMES.md`.
 
 ## Export semantics
 - Exports are generated deterministically from canonical artifacts.
