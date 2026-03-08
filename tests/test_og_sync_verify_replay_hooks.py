@@ -5876,3 +5876,213 @@ class TestRepositoryGuidanceContract(TestCase):
             f"JSON envelope schema_version: {og.COMMAND_RESULT_SCHEMA_VERSION}",
         ):
             self.assertIn(snippet, text)
+
+
+class TestLiveCliFlows(_RepoTestCase):
+    def _run_json_command(self, args: list[str]) -> tuple[int, dict[str, object]]:
+        with self.git_root_patch():
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = og.main(["--json", *args])
+        return code, json.loads(buffer.getvalue())
+
+    def test_live_cli_happy_path_sync_then_verify_then_replay(self) -> None:
+        app_file = self.repo / "app.py"
+        test_file = self.repo / "test_smoke.py"
+        app_file.write_text("VALUE = 1\n", encoding="utf-8")
+        test_file.write_text(
+            (
+                "import pathlib\n"
+                "import unittest\n\n"
+                "class SmokeTest(unittest.TestCase):\n"
+                "    def test_app_file_exists(self) -> None:\n"
+                "        self.assertTrue(pathlib.Path('app.py').exists())\n"
+            ),
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(self.repo), "add", "app.py", "test_smoke.py"], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "baseline"], check=True)
+        app_file.write_text("VALUE = 2\n", encoding="utf-8")
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+
+        snapshot = {
+            "repository_head": "HEAD",
+            "branch": "main",
+            "changed_files": ["app.py"],
+            "changed_count": 1,
+            "has_changes": True,
+            "force_full_sync": False,
+            "diff_baseline": {
+                "strategy": "manual",
+                "reference": "HEAD",
+                "resolved": "HEAD",
+                "details": "test fixture baseline",
+            },
+            "profile": "analyze",
+            "mode": "observe",
+            "captured_at": "2026-03-08T00:00:00Z",
+        }
+
+        def worker_side_effect(
+            role: str,
+            payload: dict[str, object],
+            repo_root: str,
+            trace_path: str,
+            adapter: dict[str, object] | None,
+            *,
+            timeout_seconds: int,
+            max_retries: int,
+        ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+            if role == "distill":
+                update = _distill_update("app", ["app.py"])
+                update["scope"] = ["app.py", "test_smoke.py"]
+                update["dependencies"] = ["app.py", "test_smoke.py"]
+                update["oracles"] = [
+                    {
+                        "name": "app-verify",
+                        "command": "python3 -m unittest -q test_smoke",
+                        "scope": ["app.py", "test_smoke.py"],
+                    }
+                ]
+                output = {
+                    "schema_version": og.WORKER_SCHEMA_VERSION,
+                    "interface_version": og.WORKER_INTERFACE_VERSION,
+                    "run_id": str(payload.get("run_id") or "sync-live"),
+                    "capsule_updates": [update],
+                }
+                recovery = og._build_recovery_record(
+                    "worker:distill",
+                    attempts=1,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_seconds,
+                )
+                return output, [], recovery
+
+            if role == "replay":
+                scope_materials = [dict(item) for item in payload.get("scope_materials", []) if isinstance(item, dict)]
+                material_paths = [str(item.get("path") or "") for item in scope_materials if str(item.get("path") or "")]
+                capsule_payload = payload.get("capsule") if isinstance(payload.get("capsule"), dict) else {}
+                plan = {
+                    "schema_version": og.WORKER_SCHEMA_VERSION,
+                    "interface_version": og.WORKER_INTERFACE_VERSION,
+                    "run_id": str(payload.get("run_id") or "replay-live"),
+                    "capsule_id": str(payload.get("capsule_id") or "app"),
+                    "capsule_scope": [str(item) for item in capsule_payload.get("scope", []) if str(item)],
+                    "material_inputs": scope_materials,
+                    "steps": [
+                        {
+                            "command": "python3 -m unittest -q test_smoke",
+                            "cwd": ".",
+                            "expected_exit_code": 0,
+                        }
+                    ],
+                    "acceptance_checks": [
+                        {
+                            "name": "app-verify",
+                            "oracle_name": "app-verify",
+                            "command": "python3 -m unittest -q test_smoke",
+                            "expected_signal": "exit_code=0",
+                            "reason": None,
+                        }
+                    ],
+                    "equivalence_inputs": {
+                        "baseline_hash": None,
+                        "oracle_names": ["app-verify"],
+                        "material_paths": material_paths,
+                        "notes": ["replay proof plan generated by test fixture"],
+                    },
+                    "status": "ok",
+                    "message": "replay plan generated",
+                    "failures": [],
+                    "parity_results": {
+                        "match": None,
+                        "details": None,
+                        "baseline_hash": None,
+                        "observed_hash": None,
+                        "oracle_digest": None,
+                        "trace_count": 0,
+                    },
+                }
+                recovery = og._build_recovery_record(
+                    "worker:replay",
+                    attempts=1,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_seconds,
+                )
+                return plan, [], recovery
+
+            raise AssertionError(f"unexpected worker role: {role}")
+
+        with patch.object(og, "_initialize_adapter_runtime", return_value=[]), patch.object(
+            og, "adapter_get", return_value={"name": "test-worker", "capabilities": ["distill", "replay"]}
+        ), patch.object(og, "_run_worker_with_retries", side_effect=worker_side_effect), patch.object(
+            og, "_collect_sync_snapshot", return_value=snapshot
+        ):
+            sync_code, sync_payload = self._run_json_command(["sync"])
+            verify_code, verify_payload = self._run_json_command(["verify", "--changed"])
+            replay_code, replay_payload = self._run_json_command(["replay", "--changed"])
+
+        self.assertEqual(sync_code, 0)
+        self.assertEqual(sync_payload["status"], "ok")
+        self.assertEqual(sync_payload["command"], "sync")
+        self.assertEqual(sync_payload["data"]["status"], "ok")
+
+        self.assertEqual(verify_code, 0)
+        self.assertEqual(verify_payload["status"], "ok")
+        self.assertEqual(verify_payload["command"], "verify")
+        self.assertEqual(verify_payload["data"]["status"], "ok")
+        self.assertIn("app", verify_payload["data"]["verified_capsules"])
+
+        self.assertEqual(replay_code, 0)
+        self.assertEqual(replay_payload["status"], "ok")
+        self.assertEqual(replay_payload["command"], "replay")
+        self.assertEqual(replay_payload["data"]["status"], "ok")
+        replay_results = replay_payload["data"]["replay_results"]
+        self.assertTrue(replay_results)
+        self.assertEqual(replay_results[0]["status"], "success")
+
+    def test_live_cli_failure_path_replay_before_sync_metadata(self) -> None:
+        source_file = self.repo / "src" / "feature.py"
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+        source_file.write_text("FLAG = True\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "src/feature.py"], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "baseline"], check=True)
+        source_file.write_text("FLAG = False\n", encoding="utf-8")
+
+        with self.git_root_patch():
+            og._init_outcomegraph()
+
+        snapshot = {
+            "repository_head": "HEAD",
+            "branch": "main",
+            "changed_files": ["src/feature.py"],
+            "changed_count": 1,
+            "has_changes": True,
+            "force_full_sync": False,
+            "diff_baseline": {
+                "strategy": "manual",
+                "reference": "HEAD",
+                "resolved": "HEAD",
+                "details": "test fixture baseline",
+            },
+            "profile": "analyze",
+            "mode": "observe",
+            "captured_at": "2026-03-08T00:00:00Z",
+        }
+
+        with patch.object(og, "_initialize_adapter_runtime", return_value=[]), patch.object(
+            og, "adapter_get", return_value={"name": "test-worker", "capabilities": ["replay"]}
+        ), patch.object(og, "_collect_sync_snapshot", return_value=snapshot):
+            replay_code, replay_payload = self._run_json_command(["replay", "--changed"])
+
+        self.assertEqual(replay_code, 0)
+        self.assertEqual(replay_payload["command"], "replay")
+        self.assertEqual(replay_payload["status"], "warn")
+        self.assertEqual(replay_payload["data"]["status"], "warn")
+        replay_results = replay_payload["data"]["replay_results"]
+        self.assertTrue(replay_results)
+        self.assertEqual(replay_results[0]["status"], "skipped")
+        failures = " ".join(replay_results[0].get("failures", []))
+        self.assertIn("Run `og sync --json` to materialize capsule metadata before replay.", failures)

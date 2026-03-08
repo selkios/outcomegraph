@@ -19,12 +19,13 @@ Source: [SPEC-v2.md](./SPEC-v2.md)
 ### 1.2 Day-to-day human flow
 
 1. Make code edits.
-2. Run `og sync`.
-3. Inspect summary output.
+2. Run `og sync --recover-stale-lock` when a stale lock is plausible; otherwise run `og sync`.
+3. Inspect summary output (`short_circuit_bypass` means idempotent sync was correctly forced to re-materialize missing cert/export surfaces).
 4. Run `og verify --changed` for uncertain surfaces; it now refreshes exports before writing the verify summary.
 5. Run `og explain` when traceability is needed.
 6. If needed, run `og replay --changed` for stronger behavioral confirmation; it also refreshes exports before the replay summary is recorded.
-7. If the runtime looks degraded or stale, run `og doctor --json` before retrying mutating commands.
+7. Use `og status --verbose` when you need full verification/drift internals; default status output is compact.
+8. If the runtime looks degraded or stale, run `og doctor --json` before retrying mutating commands.
 
 ### 1.3 Autonomous flow
 
@@ -56,6 +57,7 @@ Symptom: `og sync` exits without running job, reports pending state, and emits `
 Recovery:
 
 - Inspect the top-level `errors[0]` record for the typed `SESSION_CONTENDED` payload and copy the emitted `session_id` if needed for later correlation.
+- If the holder is likely stale/orphaned, retry with `og sync --recover-stale-lock --json` (single recovery attempt).
 - Retry after active run finishes.
 - Confirm `og status` no longer shows active sync.
 - Pending work will be picked up on next run.
@@ -125,6 +127,26 @@ Recovery:
 - Ensure `.outcomegraph/materials.lock` or the current repo tree covers the files inside that capsule scope.
 - Record at least one executable capsule oracle; advisory-only oracles are not enough for replay certification.
 - Re-run `og replay --changed --dry-run` first, then `og replay --changed` once the regeneration inputs are complete.
+
+### 2.6c Verify completed with warnings
+
+Symptom: `og verify --changed` returns `status: warn` with warning text about non-executable or advisory-only oracles.
+
+Recovery:
+
+- Treat this as an evidence-gap signal, not a transport/runtime failure.
+- Add executable capsule oracles where required, or document an explicit oracle-gap reason if advisory behavior is intentional.
+- Re-run `og verify --changed --json`; expected state returns to `ok` once executable oracle coverage is present.
+
+### 2.6d Replay completed with warnings
+
+Symptom: `og replay --changed` returns `status: warn` with warnings that all replay targets were skipped due missing prerequisites.
+
+Recovery:
+
+- Materialize capsule metadata first (`og sync --json`) so replay has bounded scope/material references.
+- Add executable acceptance oracles for target capsules.
+- Re-run `og replay --changed --dry-run` to inspect planned work, then run mutating replay again.
 
 ### 2.7 Adapter/interface mismatch
 

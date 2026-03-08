@@ -12,6 +12,21 @@ boundary for humans, agents, CI, and MCP clients.
 - `work`, `events`, and `objects` are written as immutable evidence for replay and audit.
 - Runtime errors are surfaced with structured status payloads so callers can branch safely.
 
+## Git tracking policy for `.outcomegraph`
+
+Track curated control-plane files:
+
+- `.outcomegraph/constitution/**`
+- `.outcomegraph/config.yaml`
+- `.outcomegraph/policy.yaml`
+- `.outcomegraph/export/AGENTS.md`
+- `.outcomegraph/.gitignore`
+
+Ignore regenerated run outputs by default:
+
+- runtime churn: `work/`, `cache/`, `events/`, `objects/`, `traces/`
+- regenerated canon: `capsules/`, `refs/`, `decisions/`, `claims/`, `certificates/`, `materials.lock`, `export/*` (except `export/AGENTS.md`)
+
 ## Worker prompt assets and capsule quality
 
 - Worker prompt bodies live under `prompts/workers/`, and `prompts/workers/manifest.json`
@@ -200,6 +215,8 @@ Common flags:
 - `--dry-run` / `--dry-run=true|false` (render no-write plans for `sync`, `verify`, `replay`, and `export`)
 - `--max-retries <n>` (bounded retry budget for transient worker/oracle/replay-step failures)
 - `--timeout <seconds>` (override subprocess timeouts for `sync`, `verify`, and `replay`)
+- `--recover-stale-lock` / `--recover-stale-lock=true|false` (on `sync`, recover orphaned/expired lock state once and retry lock acquisition)
+- `--verbose` (on `status`, include full verification/drift payloads instead of compact summaries)
 - `--session-id <id>` (resume or assert a known `daemon` or `autopilot disable` session using the emitted lowercase `<kind>-<timestamp>-<hash>` id)
 
 Environment defaults:
@@ -297,7 +314,9 @@ Runs the production reconciliation pipeline:
 Sync uses a work lock and idempotency key:
 
 - if no material changes are detected, sync may short-circuit to `ok`.
+- when short-circuit preconditions are met but certificates/exports are missing, sync records `short_circuit_bypass` and runs full stages.
 - duplicate runs are prevented by lock/pending state.
+- `--recover-stale-lock` attempts one stale-lock recovery + reacquire cycle when contention is detected.
 - failed stages are captured as `status: error` with explicit `message` and `errors`.
 
 ### `og verify`
@@ -308,6 +327,7 @@ Validates impacted capsules and writes structured verify artifacts for drift and
 - Without `--changed`: verify known capsules (falls back to safe defaults).
 - `--validate` / `--dry-run`: inspect affected capsules, oracle selection, and write targets without mutating artifacts.
 - `--max-retries` / `--timeout`: bound retry and timeout behavior for oracle subprocesses.
+- if checks pass but one or more capsule oracles are advisory-only (`command: null`), verify returns `status: warn`.
 
 ### `og replay`
 
@@ -317,6 +337,7 @@ execution parity records where applicable.
 - `--changed`: replay only impacted capsules based on working-tree deltas.
 - `--validate` / `--dry-run`: inspect replay targets and write intent without mutating artifacts.
 - `--max-retries` / `--timeout`: bound retry and timeout behavior for worker, replay-step, and replay-oracle subprocesses.
+- replay returns `status: warn` when all targets are skipped because replay prerequisites (capsule metadata/executable acceptance oracles) are missing.
 
 ### `og doctor`
 
@@ -348,6 +369,7 @@ Builds a runtime/freshness dashboard used by operators and daemons:
 - rolling `agent_reliability` metrics for commands-per-successful-task, schema-valid output rate, retry auto-recovery rate, and resumable session churn
 
 `status --json` publishes the same rolling snapshot under `data.agent_reliability`.
+`status --verbose` includes full verification/drift internals; default output keeps compact summaries.
 
 ### `og mcp-server`
 
@@ -450,8 +472,10 @@ If you see unexpected status or stale diagnostics:
   - stage-level `steps` for `sync`
   - daemon `last_sync_status`
 - check lock state with `og status --json`.
+- use `og sync --recover-stale-lock --json` when lock contention is likely stale/orphaned.
 - run `og doctor --json` to collect consolidated diagnostics and remediation hints.
 - use `og sync --validate --json`, `og verify --validate --json`, or `og replay --dry-run --json` before re-running mutating commands after a failure.
+- treat `verify` warnings as evidence gaps (usually advisory/non-executable oracle coverage), and `replay` warnings as replay-prerequisite gaps.
 - repair ledger state intentionally via sync repair flow if integrity is degraded (the CLI emits repair artifacts when possible).
 - If you receive `SESSION_CONTENDED`, wait for the active session or reuse the emitted `session_id` on resumable `daemon` / `autopilot disable` commands.
 

@@ -24,8 +24,8 @@ og autopilot init
 After meaningful code changes:
 
 ```bash
-og sync
-og status
+og sync --recover-stale-lock
+og status --verbose
 og verify --changed
 og replay --changed
 ```
@@ -120,20 +120,16 @@ Default mode is safe-by-default (`observe`):
 
 ## 5) What is canonical
 
-Tracked in Git (compact truth):
+Tracked in Git by default (curated control plane):
 
 - constitutions
-- capsules
-- refs
-- decisions
-- certificates
-- generated guidance exports
+- config/policy defaults
+- generated operator guidance contract (`.outcomegraph/export/AGENTS.md`)
 
-Not tracked by default:
+Generated locally and ignored by default:
 
-- raw traces
-- bulky logs
-- local caches
+- runtime churn: `work`, `cache`, `events`, `objects`, `traces`
+- regenerated canon: `capsules`, `refs`, `decisions`, `claims`, `certificates`, `materials.lock`, non-guidance exports
 
 For details, contracts, schemas, and architecture, use [SPEC-v2.md](./SPEC-v2.md).
 
@@ -157,7 +153,7 @@ verify: status: ok with steps [verify, export] and verified_capsules present
 drift:  no blocking policy or certificate regressions
 ```
 
-Observed rollout evidence in this repository:
+Observed rollout evidence (local examples):
 
 - `.outcomegraph/events/sync-20260305T082953Z-8485041f63.json`
 - `.outcomegraph/events/sync-20260305T092058Z-9008c47e88.json`

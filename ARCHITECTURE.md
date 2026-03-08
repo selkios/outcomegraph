@@ -276,25 +276,22 @@ Runtime events that block or degrade autonomy map to runbook actions in [RUNBOOK
 
 ## 7) Data boundaries (tracked vs not tracked)
 
-The repo tracks compact replayable truth. Bulky runtime exhaust is kept out of Git by default.
+The repo tracks curated control-plane truth. Runtime and regenerated churn are kept out of Git by default.
 
 ```mermaid
 flowchart LR
   subgraph GT[Git tracked]
     T1[constitution]
-    T2[capsules]
-    T3[refs]
-    T4[decisions]
-    T5[claims]
-    T6[certificate manifests]
-    T7[generated guidance exports]
+    T2[config and policy defaults]
+    T3[curated AGENTS export]
+    T4[artifact ignore policy]
   end
 
   subgraph NG[Not tracked by default]
-    N1[raw JSONL traces]
-    N2[full stdout or stderr blobs]
-    N3[screenshots and temp reports]
-    N4[local cache blobs]
+    N1[runtime churn: work, cache, events, objects, traces]
+    N2[regenerated canon: capsules, refs, decisions, claims, certificates]
+    N3[materials lock and non-guidance exports]
+    N4[temp reports and local cache blobs]
   end
 
   GT --> O[Canonical replayable truth]
